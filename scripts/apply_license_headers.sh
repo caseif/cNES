@@ -25,8 +25,6 @@ find "./include" "./src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | w
     if grep -Pzoq "(?s)\/\*.*Copyright \(c\).*?\*\/" "$file"; then
         echo "Updating header for file $file"
 
-        tmp="$file.tmp"
-
         # adapted from https://stackoverflow.com/a/21702566
         # this basically replaces the license pattern with our current formatted license,
         # with a neat trick to deal with a multi-line context
