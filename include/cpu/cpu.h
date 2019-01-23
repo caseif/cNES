@@ -48,7 +48,9 @@ typedef struct {
     uint8_t y;
 } CpuRegisters;
 
-void load_program(char *program);
+void initialize_cpu(void);
+
+void load_cartridge(Cartridge *cartridge);
 
 uint8_t memory_read(uint16_t addr);
 

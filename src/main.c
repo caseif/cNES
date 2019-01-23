@@ -25,6 +25,7 @@
 
 #include "cartridge.h"
 #include "loader.h"
+#include "system.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,6 +59,10 @@ int main(int argc, char **argv) {
     }
 
     printf("Successfully loaded ROM file %s.\n", rom_file_name);
+
+    printf("Starting execution...\n");
+
+    start_main_loop(cart);
 
     return 0;
 }

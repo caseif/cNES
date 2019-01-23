@@ -25,4 +25,6 @@
 
 #pragma once
 
-void start_main_loop(void);
+#include "cartridge.h"
+
+void start_main_loop(Cartridge *cart);

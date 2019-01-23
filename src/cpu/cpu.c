@@ -25,14 +25,22 @@
 
 #include "cartridge.h"
 #include "cpu/cpu.h"
+#include "cpu/instrs.h"
+
+#include <stdio.h>
 
 #define SYSTEM_MEMORY 2048
 #define STACK_BOTTOM_ADDR 0x100
+#define BASE_PC 0x8000
 
 static Cartridge *g_cartridge;
 
 static CpuRegisters g_regs;
-static char g_sys_memory[SYSTEM_MEMORY];
+static unsigned char g_sys_memory[SYSTEM_MEMORY];
+
+void initialize_cpu(void) {
+    g_regs.pc = BASE_PC;
+}
 
 void load_cartridge(Cartridge *cartridge) {
     g_cartridge = cartridge;
@@ -79,17 +87,15 @@ void memory_write(uint16_t addr, uint8_t val) {
 }
 
 void stack_push(char val) {
-    g_sys_memory[STACK_BOTTOM_ADDR + g_regs.sp] = val;
-    g_regs.sp -= 1;
+    g_sys_memory[STACK_BOTTOM_ADDR + g_regs.sp--] = val;
 }
 
-char stack_pop() {
-    g_regs.sp += 1;
-    return g_sys_memory[STACK_BOTTOM_ADDR + g_regs.sp];
+char stack_pop(void) {
+    return g_sys_memory[STACK_BOTTOM_ADDR + g_regs.sp++];
 }
 
 static char _next_prg_byte(void) {
-    return g_cartridge->prg_rom[g_regs.pc++];
+    return memory_read(g_regs.pc++);
 }
 
 static uint16_t _next_prg_short(void) {
@@ -99,5 +105,8 @@ static uint16_t _next_prg_short(void) {
 }
 
 void exec_next_instr(void) {
-    //TODO
+    Instruction *instr = decode_instr(_next_prg_byte());
+    printf("decoded instr %s:%s @ $%x\n", mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), g_regs.pc - 1);
+
+    g_regs.pc += (get_instr_len(instr->addr_mode) - 1);
 }

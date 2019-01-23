@@ -23,11 +23,15 @@
  * THE SOFTWARE.
  */
 
+#include "cartridge.h"
 #include "cpu/cpu.h"
 
 #include <stdbool.h>
 
-void start_main_loop(void) {
+void start_main_loop(Cartridge *cart) {
+    initialize_cpu();
+    load_cartridge(cart);
+
     while (true) {
         exec_next_instr();
     }
