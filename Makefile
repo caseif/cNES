@@ -14,10 +14,10 @@ OBJEXT = o
 INCLUDES = ./include
 LIBS = c
 
-INCFLAGS = $(foreach d, $(INCLUDES), -I$d)
-LIBFLAGS = $(foreach d, $(LIBS), -l$d)
-CFLAGS = $(INCFLAGS) -Wall -pedantic-errors -std=c11
-LDFLAGS = $(LIBFLAGS)
+INCFLAGS := $(foreach d, $(INCLUDES), -I$d)
+LIBFLAGS := $(foreach d, $(LIBS), -l$d)
+CFLAGS   := $(INCFLAGS) -Wall -pedantic-errors -std=c11
+LDFLAGS  := $(LIBFLAGS)
 
 SRCFILES = $(call rwildcard, $(SRCDIR), *.$(SRCEXT))
 HFILES = $(call rwildcard, $(INCDIR), *.$(HEXT))
@@ -26,12 +26,12 @@ OBJFILES = $(patsubst %, $(OUTDIR)/%, $(patsubst $(SRCDIR)/%.$(SRCEXT), %.$(OBJE
 
 MKDIR_P = @mkdir -p
 
-all: apply_license_headers $(OUTDIR)/$(BINNAME)
+all: $(OUTDIR)/$(BINNAME)
 
 .PHONY: apply_license_headers
 
 apply_license_headers:
-	./scripts/apply_license_headers.sh $@
+	./scripts/apply_license_headers.sh
 
 $(OUTDIR)/$(BINNAME): $(OBJFILES)
 	$(LD) $(LDFLAGS) -o $(OUTDIR)/$(BINNAME) $(OBJFILES)
@@ -49,10 +49,6 @@ $(OUTDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
 
 clean:
 	rm -rf $(OUTDIR)
-
-.PHONY: gendirs
-
-gendirs: ${OUTDIR}
 
 ${OUTDIR}:
 	${MKDIR_P} ${OUTDIR}
