@@ -30,13 +30,13 @@
 #include <stdint.h>
 
 typedef struct {
-    char carry:1 PACKED;
-    char zero:1 PACKED;
-    char interrupt_disable:1 PACKED;
-    char decimal:1 PACKED;
-    char break_command:2 PACKED;
-    char overflow:1 PACKED;
-    char negative:1 PACKED;
+    unsigned char carry:1 PACKED;
+    unsigned char zero:1 PACKED;
+    unsigned char interrupt_disable:1 PACKED;
+    unsigned char decimal:1 PACKED;
+    unsigned char break_command:2 PACKED;
+    unsigned char overflow:1 PACKED;
+    unsigned char negative:1 PACKED;
 } StatusRegister;
 
 typedef struct {
@@ -48,6 +48,19 @@ typedef struct {
     uint8_t y;
 } CpuRegisters;
 
+typedef struct {
+    uint16_t vector_loc;
+    bool maskable;
+    bool push_pc;
+    bool set_b;
+    bool set_i;
+} InterruptType;
+
+InterruptType *INT_RESET = &(InterruptType) {0xFFFA, false, true,  false, false};
+InterruptType *INT_NMI =   &(InterruptType) {0xFFFC, false, false, false, false};
+InterruptType *INT_IRQ =   &(InterruptType) {0xFFFE, true,  true,  false, true};
+InterruptType *INT_BRK =   &(InterruptType) {0xFFFE, false, true,  true,  true};
+
 void initialize_cpu(void);
 
 void load_cartridge(Cartridge *cartridge);
@@ -55,5 +68,7 @@ void load_cartridge(Cartridge *cartridge);
 uint8_t memory_read(uint16_t addr);
 
 void memory_write(uint16_t addr, uint8_t val);
+
+void issue_interrupt(InterruptType *type);
 
 void exec_next_instr(void);
