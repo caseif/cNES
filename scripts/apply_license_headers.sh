@@ -18,8 +18,8 @@ header=$(sed -r "s/^/ * /" <<< "$header")
 # add /* */ to the start and end
 header="/*\n$header\n */"\
 
-# discover all source files
-find "./src" -type f -iname "*.c" -print0 | while IFS= read -r -d $'\0' file; do
+# discover all source/header files
+find "./include" "./src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | while IFS= read -r -d $'\0' file; do
     #TODO: figure out how to detect if files are up-to-date
 
     if grep -Pzoq "(?s)\/\*.*Copyright \(c\).*?\*\/" "$file"; then
@@ -30,7 +30,17 @@ find "./src" -type f -iname "*.c" -print0 | while IFS= read -r -d $'\0' file; do
         # adapted from https://stackoverflow.com/a/21702566
         # this basically replaces the license pattern with our current formatted license,
         # with a neat trick to deal with a multi-line context
-        gawk -v RS='^$' -v hdr="$header\n\n" '{sub(/\/\*.*?Copyright \(c\).*?\*\/\n*/,hdr)}1 {printf $0}' $file > "$tmp" && mv $tmp $file
+        # we also append a dot to preserve trailing whitespace during substitution
+        output=$(gawk -v RS='^$' -v hdr="$header\n\n" '{sub(/\/\*.*?Copyright \(c\).*?\*\/\n*/,hdr)}1 {print $0}' $file && echo .)
+
+        # escape any formatting sequences present in the code since printf likes to convert them
+        output="${output//%/%%}"
+        # escape previously-escaped newlines since printf likes to convert them too
+        output="${output//\\n/\\\\n}"
+        # print appends a newline, so we need to remove it and the trailing dot we added
+        output="${output:0:-2}"
+        # finally, write it to disk!
+        printf "$output" > $file
     else
         echo "Generating new header for file $file"
         

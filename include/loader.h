@@ -23,41 +23,10 @@
  * THE SOFTWARE.
  */
 
+#pragma once
+
 #include "cartridge.h"
-#include "loader.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 
-int main(int argc, char **argv) {
-    if (argc < 2) {
-        printf("Too few args!\n");
-        printf("Usage: %s <ROM>\n", argv[0]);
-        exit(1);
-    }
-
-    if (argc > 2) {
-        printf("Too many args!\n");
-        printf("Usage: %s <ROM>\n", argv[0]);
-        exit(1);
-    }
-
-    char *rom_file_name = argv[1];
-
-    FILE *rom_file = fopen(rom_file_name, "rb");
-
-    if (!rom_file) {
-        printf("Could not open ROM file %s.\n", rom_file_name);
-    }
-
-    Cartridge *cart = load_rom(rom_file);
-
-    if (!cart) {
-        printf("Failed to load ROM.\n");
-        return -1;
-    }
-
-    printf("Successfully loaded ROM file %s.\n", rom_file_name);
-
-    return 0;
-}
+Cartridge *load_rom(FILE *file);
