@@ -1,5 +1,4 @@
-CC = gcc
-LD = gcc
+LD = $(CC)
 
 SRCDIR = src
 OUTDIR = build
@@ -22,7 +21,10 @@ OBJFILES = $(patsubst %, $(OUTDIR)/%, $(patsubst $(SRCDIR)/%.$(SRCEXT),   %.$(OB
 
 MKDIR_P = @mkdir -p
 
-all: gendirs compile
+all: gendirs apply_license_header compile
+
+apply_license_header:
+	./scripts/apply_license_headers.sh
 
 compile: $(OBJFILES)
 	$(LD) $(LDFLAGS) -o $(OUTDIR)/$(BINNAME) $(OBJFILES)
