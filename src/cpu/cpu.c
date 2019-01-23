@@ -115,63 +115,63 @@ static uint16_t _next_prg_short(void) {
 /**
  * Returns value M along with the address it was read from, if applicable.
  */
-static InstructionParameter *_get_next_m(AddressingMode mode) {
+static InstructionParameter _get_next_m(AddressingMode mode) {
     switch (mode) {
         case IMM: {
-            return &(InstructionParameter) {_next_prg_byte(), 0};
+            return (InstructionParameter) {_next_prg_byte(), 0};
         }
         case REL: {
-            return &(InstructionParameter) {_next_prg_byte(), 0};
+            return (InstructionParameter) {_next_prg_byte(), 0};
         }
         case ZRP: {
             uint16_t addr = _next_prg_byte();
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case ZPX: {
             uint16_t addr = _next_prg_byte();
             addr += g_regs.x;
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case ZPY: {
             uint16_t addr = _next_prg_byte();
             addr += g_regs.y;
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case ABS: {
             uint16_t addr = _next_prg_short();
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case ABX: {
             uint16_t addr = (g_regs.x + _next_prg_short());
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case ABY: {
             uint16_t addr = (g_regs.y + _next_prg_short());
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case IND: {
             uint16_t orig_addr = _next_prg_short();
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
             uint16_t addr = (addr_low | (addr_high << 8));
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case IZX: {
             uint16_t orig_addr = (g_regs.x + _next_prg_byte());
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
             uint16_t addr = (addr_low | (addr_high << 8));
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case IZY: {
             uint16_t orig_addr = _next_prg_byte();
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
             uint16_t addr = (g_regs.y + (addr_low | (addr_high << 8)));
-            return &(InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr};
         }
         case IMP: {
-            return &(InstructionParameter) {0, 0};
+            return (InstructionParameter) {0, 0};
         }
         default: {
             printf("Unhandled addressing mode %s", addr_mode_to_str(mode));
@@ -181,7 +181,6 @@ static InstructionParameter *_get_next_m(AddressingMode mode) {
 }
 
 static void _do_branch(int8_t offset) {
-    printf("orig: %x | offset: %d | post: %x\n", g_regs.pc, offset, g_regs.pc + offset);
     g_regs.pc += offset;
 }
 
@@ -270,9 +269,9 @@ void issue_interrupt(InterruptType *type) {
         g_regs.pc = vector;
     }
 
-void _exec_instr(Instruction *instr, InstructionParameter *param) {
-    uint16_t m = param->value;
-    uint16_t addr = param->src_addr;
+void _exec_instr(Instruction *instr, InstructionParameter param) {
+    uint16_t m = param.value;
+    uint16_t addr = param.src_addr;
 
     switch (instr->mnemonic) {
         // storage
@@ -498,7 +497,6 @@ void _exec_instr(Instruction *instr, InstructionParameter *param) {
             stack_push(g_regs.pc & 0xFF);        // push LSB of PC
 
             g_regs.pc = addr;
-            printf("JSR to $%x\n", addr);
 
             break;
         case RTS: {
@@ -599,10 +597,10 @@ void _exec_instr(Instruction *instr, InstructionParameter *param) {
 void exec_next_instr(void) {
     Instruction *instr = decode_instr(_next_prg_byte());
 
-    InstructionParameter *param = _get_next_m(instr->addr_mode);
+    InstructionParameter param = _get_next_m(instr->addr_mode);
 
     printf("decoded instr %s:%s with param $%x (addr $%x) @ $%x\n",
-            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param->value, param->src_addr, g_regs.pc - get_instr_len(instr));
+            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr, g_regs.pc - get_instr_len(instr));
 
     _exec_instr(instr, param);
 }
