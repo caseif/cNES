@@ -27,19 +27,31 @@
 
 #include "util.h"
 
-#include <stdbool.h>
-#include <stddef.h>
-
-typedef enum {HORIZONTAL, VERTICAL} MirroringMode;
+#include <stdint.h>
 
 typedef struct {
-    char *prg_rom;
-    char *chr_rom;
-    size_t prg_size;
-    size_t chr_size;
-    MirroringMode mirror_mode;
-    bool has_prg_ram;
-    bool ignore_mirror_ctrl;
-    char mapper;
+    char carry:1 PACKED;
+    char zero:1 PACKED;
+    char interrupt_disable:1 PACKED;
+    char decimal:1 PACKED;
+    char break_command:2 PACKED;
+    char overflow:1 PACKED;
+    char negative:1 PACKED;
+} StatusRegister;
 
-} Cartridge;
+typedef struct {
+    StatusRegister status;
+    uint16_t pc;
+    uint8_t sp;
+    uint8_t acc;
+    uint8_t x;
+    uint8_t y;
+} CpuRegisters;
+
+void load_program(char *program);
+
+uint8_t memory_read(uint16_t addr);
+
+void memory_write(uint16_t addr, uint8_t val);
+
+void exec_next_instr(void);

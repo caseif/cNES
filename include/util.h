@@ -25,6 +25,8 @@
 
 #pragma once
 
+#define PACKED __attribute__((packed))
+
 static inline unsigned int endian_swap(unsigned int x) {
     return (x >> 24)               | 
           ((x << 8 ) & 0x00FF0000) |

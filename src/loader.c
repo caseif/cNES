@@ -32,9 +32,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-const uint32_t NES_MAGIC = 0x4E45531A;
-const size_t PRG_CHUNK_SIZE = 0x4000;
-const size_t CHR_CHUNK_SIZE = 0x2000;
+#define NES_MAGIC 0x4E45531A
+#define PRG_CHUNK_SIZE ((size_t) 0x4000)
+#define CHR_CHUNK_SIZE ((size_t) 0x2000)
 
 typedef struct {
     MirroringMode mirror_mode:1 PACKED;
@@ -126,6 +126,8 @@ Cartridge *load_rom(FILE *file) {
 
     cart->prg_rom = prg_data;
     cart->chr_rom = chr_data;
+    cart->prg_size = prg_size * PRG_CHUNK_SIZE;
+    cart->chr_size = chr_size * CHR_CHUNK_SIZE;
     cart->mirror_mode = flag6.mirror_mode;
     cart->has_prg_ram = flag6.has_prg_ram;
     cart->ignore_mirror_ctrl = flag6.ignore_mirror_ctrl;

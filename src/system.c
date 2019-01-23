@@ -23,23 +23,12 @@
  * THE SOFTWARE.
  */
 
-#pragma once
-
-#include "util.h"
+#include "cpu/cpu.h"
 
 #include <stdbool.h>
-#include <stddef.h>
 
-typedef enum {HORIZONTAL, VERTICAL} MirroringMode;
-
-typedef struct {
-    char *prg_rom;
-    char *chr_rom;
-    size_t prg_size;
-    size_t chr_size;
-    MirroringMode mirror_mode;
-    bool has_prg_ram;
-    bool ignore_mirror_ctrl;
-    char mapper;
-
-} Cartridge;
+void start_main_loop(void) {
+    while (true) {
+        exec_next_instr();
+    }
+}
