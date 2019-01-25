@@ -13,7 +13,9 @@ header=$(sed -r "s/\\$\{author\}/$AUTHOR/" <<< "$header")
 header=$(sed -r "s/\\$\{email\}/$EMAIL/" <<< "$header")
 
 # add an asterisk to the start of each line
-header=$(sed -r "s/^/ * /" <<< "$header")
+header=$(sed -r "s/^(.)/ * \1/" <<< "$header")
+# separate command for empty lines to avoid trailing spaces
+header=$(sed -r "s/^$/ */" <<< "$header")
 
 # add /* */ to the start and end
 header="/*\n$header\n */"\
@@ -49,4 +51,5 @@ find "./include" "./src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | w
         # remove the last character and write the output back to the file
         printf "${output:0:-1}" > $file
     fi
+    break
 done
