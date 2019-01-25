@@ -50,6 +50,12 @@ typedef struct {
     AddressingMode addr_mode;
 } Instruction;
 
+typedef struct {
+    uint16_t value;
+    uint16_t base_value;
+    uint16_t src_addr;
+} InstructionParameter;
+
 typedef enum { NONE, BRANCH, JUMP, R, W, RW } InstructionType;
 
 const char *mnemonic_to_str(const Mnemonic mnemonic);
@@ -61,3 +67,5 @@ const InstructionType get_instr_type(const Mnemonic mnemonic);
 uint8_t get_instr_len(const Instruction *instr);
 
 const Instruction *decode_instr(unsigned char opcode);
+
+uint8_t get_instr_cycles(const Instruction *instr, InstructionParameter *param, CpuRegisters *regs);

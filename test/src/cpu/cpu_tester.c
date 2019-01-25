@@ -34,6 +34,7 @@
 #include <string.h>
 
 extern CpuRegisters g_cpu_regs;
+extern uint8_t g_burn_cycles;
 
 extern bool test_addition(void);
 extern bool test_arithmetic(void);
@@ -87,7 +88,7 @@ void load_cpu_test(char *file_name) {
 void pump_cpu(void) {
     do {
         cycle_cpu();
-    } while (decode_instr(memory_read(g_cpu_regs.pc))->mnemonic != NOP);
+    } while (!(g_burn_cycles == 0 && decode_instr(memory_read(g_cpu_regs.pc))->mnemonic == NOP));
 }
 
 bool do_cpu_tests(void) {

@@ -23,9 +23,11 @@
  * THE SOFTWARE.
  */
 
+#include "cpu/cpu.h"
 #include "cpu/instrs.h"
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -62,6 +64,25 @@ static const Instruction g_instr_list[] = {
     {INX, IMP}, {SBC, IMM}, {NOP, IMP}, {SBC, IMM}, {CPX, ABS}, {SBC, ABS}, {INC, ABS}, {ISC, ABS},
     {BEQ, REL}, {SBC, IZY}, {KIL, IMP}, {ISC, IZY}, {NOP, ZPX}, {SBC, ZPX}, {INC, ZPX}, {ISC, ZPX},
     {SED, IMP}, {SBC, ABY}, {NOP, IMP}, {ISC, ABY}, {NOP, ABX} ,{SBC, ABX}, {INC, ABX}, {ISC, ABX} 
+};
+
+static const uint8_t g_instr_cycles[] = {
+    7, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    6, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6,
+    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,
+    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
+    2, 6, 0, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
+    2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
+    2, 5, 0, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
+    2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+    2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
+    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7
 };
 
 const char *g_mnemonic_strs[] = {
@@ -163,4 +184,71 @@ uint8_t get_instr_len(const Instruction *instr) {
 
 const Instruction *decode_instr(unsigned char opcode) {
     return &g_instr_list[opcode];
+}
+
+static bool _does_cross_page_boundary(uint8_t a, int8_t offset) {
+    return offset > 0 && (a > 0xFF - offset || a <= 0xFF - offset);
+}
+
+static bool _can_incur_page_boundary_penalty(const Instruction *instr) {
+    uint8_t opcode = instr->mnemonic;
+
+    // all opcodes with an even high nybble don't incur penalties
+    if (!(opcode & 1)) {
+        return false;
+    }
+
+    uint8_t low_nybble = opcode & 0xF;
+
+    if ((opcode >> 4) == 0x9) {
+        // for all opcodes 0x9X, only 0x90 incurs a penalty
+        return low_nybble == 0;
+    } else if ((opcode >> 4) == 0xA) {
+        // row 0xAX is unusual - I can't find a pattern in it
+        if (low_nybble == 0x3 || low_nybble == 0xB || low_nybble == 0xE || low_nybble == 0xF) {
+            return true;
+        }
+    }
+
+    return low_nybble == 0x0 || low_nybble == 0x1 || low_nybble == 0x9 || low_nybble == 0xC || low_nybble == 0xD;
+}
+
+uint8_t get_instr_cycles(const Instruction *instr, InstructionParameter *param, CpuRegisters *regs) {
+    uint8_t cycles = g_instr_cycles[instr->mnemonic];
+
+    if (_can_incur_page_boundary_penalty(instr)) {
+        uint16_t base_addr;
+        int8_t offset;
+
+        switch (instr->addr_mode) {
+            case ABX:
+                base_addr = param->base_value;
+                offset = regs->x;
+                break;
+            case ABY:
+                base_addr = param->base_value;
+                offset = regs->y;
+                break;
+            case IZY:
+                base_addr = param->base_value;
+                offset = regs->y;
+                break;
+            case REL:
+                base_addr = regs->pc;
+                offset = param->base_value;
+                break;
+            default:
+                base_addr = 0;
+                offset = 0;
+                break;
+        }
+
+        if (_does_cross_page_boundary(base_addr, offset)) {
+            cycles++;
+        }
+    }
+
+    //TODO: determine if branch is taken
+
+    return cycles;
 }

@@ -38,11 +38,6 @@
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x20 // unused flag is set by default
 
-typedef struct {
-    uint16_t value;
-    uint16_t src_addr;
-} InstructionParameter;
-
 const InterruptType *INT_RESET = &(InterruptType) {0xFFFA, false, true,  false, false};
 const InterruptType *INT_NMI   = &(InterruptType) {0xFFFC, false, false, false, false};
 const InterruptType *INT_IRQ   = &(InterruptType) {0xFFFE, true,  true,  false, true};
@@ -54,6 +49,8 @@ static DataBlob g_prg_rom;
 
 unsigned char g_sys_memory[SYSTEM_MEMORY];
 CpuRegisters g_cpu_regs;
+
+uint8_t g_burn_cycles = 0;
 
 void initialize_cpu(void) {
     g_cpu_regs.pc = BASE_PC;
@@ -133,60 +130,65 @@ static uint16_t _next_prg_short(void) {
 static InstructionParameter _get_next_m(AddressingMode mode) {
     switch (mode) {
         case IMM: {
-            return (InstructionParameter) {_next_prg_byte(), 0};
+            uint8_t val = _next_prg_byte();
+            return (InstructionParameter) {val, val, 0};
         }
         case REL: {
-            return (InstructionParameter) {_next_prg_byte(), 0};
+            uint8_t val = _next_prg_byte();
+            return (InstructionParameter) {val, val, 0};
         }
         case ZRP: {
             uint8_t addr = _next_prg_byte();
-            return (InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr, addr};
         }
         case ZPX: {
-            uint8_t addr = _next_prg_byte();
-            addr += g_cpu_regs.x;
-            return (InstructionParameter) {memory_read(addr), addr};
+            uint8_t base_addr = _next_prg_byte();
+            uint8_t addr = base_addr + g_cpu_regs.x;
+            return (InstructionParameter) {memory_read(addr), base_addr, addr};
         }
         case ZPY: {
-            uint8_t addr = _next_prg_byte();
-            addr += g_cpu_regs.y;
-            return (InstructionParameter) {memory_read(addr), addr};
+            uint8_t base_addr = _next_prg_byte();
+            uint8_t addr = base_addr + g_cpu_regs.y;
+            return (InstructionParameter) {memory_read(addr), base_addr, addr};
         }
         case ABS: {
             uint16_t addr = _next_prg_short();
-            return (InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), addr, addr};
         }
         case ABX: {
-            uint16_t addr = (g_cpu_regs.x + _next_prg_short());
-            return (InstructionParameter) {memory_read(addr), addr};
+            uint16_t base_addr = _next_prg_short();
+            uint16_t addr = g_cpu_regs.x + base_addr;
+            return (InstructionParameter) {memory_read(addr), base_addr, addr};
         }
         case ABY: {
-            uint16_t addr = (g_cpu_regs.y + _next_prg_short());
-            return (InstructionParameter) {memory_read(addr), addr};
+            uint16_t base_addr = _next_prg_short();
+            uint16_t addr = g_cpu_regs.y + base_addr;
+            return (InstructionParameter) {memory_read(addr), base_addr, addr};
         }
         case IND: {
             uint16_t orig_addr = _next_prg_short();
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
             uint16_t addr = (addr_low | (addr_high << 8));
-            return (InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), orig_addr, addr};
         }
         case IZX: {
-            uint16_t orig_addr = (g_cpu_regs.x + _next_prg_byte());
+            uint16_t base_addr = _next_prg_byte();
+            uint16_t orig_addr = (g_cpu_regs.x + base_addr);
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
             uint16_t addr = (addr_low | (addr_high << 8));
-            return (InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), base_addr, addr};
         }
         case IZY: {
             uint16_t orig_addr = _next_prg_byte();
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
             uint16_t addr = (g_cpu_regs.y + (addr_low | (addr_high << 8)));
-            return (InstructionParameter) {memory_read(addr), addr};
+            return (InstructionParameter) {memory_read(addr), orig_addr, addr};
         }
         case IMP: {
-            return (InstructionParameter) {0, 0};
+            return (InstructionParameter) {0, 0, 0};
         }
         default: {
             printf("Unhandled addressing mode %s", addr_mode_to_str(mode));
@@ -197,6 +199,7 @@ static InstructionParameter _get_next_m(AddressingMode mode) {
 
 static void _do_branch(int8_t offset) {
     g_cpu_regs.pc += offset;
+    g_burn_cycles += 1; // taking a branch incurs a 1-cycle penalty
 }
 
 static void _set_alu_flags(uint16_t val) {
@@ -209,22 +212,22 @@ static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, b
     uint8_t val = implicit ? g_cpu_regs.acc : m;
 
     // rotation mask - contains information about the carry bit
-    uint8_t rMask = 0;
+    uint8_t r_mask = 0;
     if (rotate) {
         // set if only if we're rotating
-        rMask = g_cpu_regs.status.carry;
+        r_mask = g_cpu_regs.status.carry;
         if (right) {
             // if we're rotating to the right, the carry bit gets copied to bit 7
-            rMask <<= 7;
+            r_mask <<= 7;
         }
     }
 
     // carry mask - set to the bit which will be copied to the carry flag
-    uint8_t cMask = right ? 0x01 : 0x80;
-    g_cpu_regs.status.carry = (val & cMask) ? 1 : 0;
+    uint8_t c_mask = right ? 0x01 : 0x80;
+    g_cpu_regs.status.carry = (val & c_mask) ? 1 : 0;
 
     // compute the result by shifting and applying the rotation mask
-    uint8_t res = (right ? (g_cpu_regs.acc >> 1) : (g_cpu_regs.acc << 1)) | rMask;
+    uint8_t res = (right ? (g_cpu_regs.acc >> 1) : (g_cpu_regs.acc << 1)) | r_mask;
 
     // set the zero and negative flags based on the result
     _set_alu_flags(res);
@@ -615,9 +618,15 @@ void _exec_next_instr(void) {
     printf("Decoded instruction %s:%s with computed param $%02x (src addr $%02x) @ $%04x\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr, g_cpu_regs.pc - get_instr_len(instr));
 
+    g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
+
     _exec_instr(instr, param);
 }
 
 void cycle_cpu(void) {
+    if (g_burn_cycles > 0) {
+        g_burn_cycles--;
+        return;
+    }
     _exec_next_instr();
 }
