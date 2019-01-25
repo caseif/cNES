@@ -26,7 +26,7 @@ OBJFILES = $(patsubst %, $(OUTDIR)/%, $(patsubst $(SRCDIR)/%.$(SRCEXT), %.$(OBJE
 
 MKDIR_P = @mkdir -p
 
-all: $(OUTDIR)/$(BINNAME)
+all: apply_license_headers $(OUTDIR)/$(BINNAME)
 
 .PHONY: apply_license_headers
 

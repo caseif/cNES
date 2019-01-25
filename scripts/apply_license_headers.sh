@@ -18,11 +18,22 @@ header=$(sed -r "s/^(.)/ * \1/" <<< "$header")
 header=$(sed -r "s/^$/ */" <<< "$header")
 
 # add /* */ to the start and end
-header="/*\n$header\n */"\
+header=$(printf "/*"'\n'"$header"'\n'" */")
+
+# variable to track how many files are updated
+count=0
 
 # discover all source/header files
 find "./include" "./src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | while IFS= read -r -d $'\0' file; do
-    #TODO: figure out how to detect if files are up-to-date
+    #escape asterisks in the header
+    header_esc=$(sed 's/[\*]/\\&/g' <<< "$header")
+
+    # read in the file and check if it starts with the header
+    if [[ $(cat "$file") == $header_esc* ]]; then
+        continue
+    fi
+
+    count=$((count+1))
 
     if grep -Pzoq "(?s)\/\*.*Copyright \(c\).*?\*\/" "$file"; then
         echo "Updating header for file $file"
@@ -51,5 +62,9 @@ find "./include" "./src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | w
         # remove the last character and write the output back to the file
         printf "${output:0:-1}" > $file
     fi
-    break
 done
+
+# if we didn't update anything, say so (to avoid zero-output)
+if [ $count -eq 0 ]; then
+    echo "All file headers up-to-date"
+fi
