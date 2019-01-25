@@ -168,7 +168,11 @@ static InstructionParameter _get_next_m(AddressingMode mode) {
         case IND: {
             uint16_t orig_addr = _next_prg_short();
             uint8_t addr_low = memory_read(orig_addr);
-            uint8_t addr_high = memory_read(orig_addr + 1);
+            // if the indirect target is the last byte of a page, the target
+            // high byte will incorrectly be read from the first byte of the
+            // same page
+            uint16_t high_target = ((orig_addr & 0xFF) == 0xFF) ? (orig_addr - 0xFF) : (orig_addr + 1);
+            uint8_t addr_high = memory_read(high_target);
             uint16_t addr = (addr_low | (addr_high << 8));
             return (InstructionParameter) {memory_read(addr), orig_addr, addr};
         }

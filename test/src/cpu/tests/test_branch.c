@@ -37,6 +37,10 @@ bool test_branch(void) {
     pump_cpu();
     ASSERT_EQ(0, g_cpu_regs.x);
 
+    // test JMP (indirect)
+    pump_cpu();
+    ASSERT_EQ(2, g_cpu_regs.x);
+
     // test JMP
     pump_cpu();
     ASSERT_EQ(1, g_cpu_regs.acc);

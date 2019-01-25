@@ -9,10 +9,10 @@
 ; test JMP (indirect)
 ;;;;;;;;;;;;;;;;
 
-LDX #$00            ; reset registers
-LDA #$11            ; low byte of target address
+LDX #$00            ; reset X register
+LDA #<ind_skip_1    ; low byte of target address
 STA $0050
-LDA #$80            ; high byte of target address
+LDA #>ind_skip_1    ; high byte of target address
 STA $0051
 
 JMP ($0050)         ; jump to address specified at $0050 ($8012)
@@ -20,6 +20,33 @@ JMP ($0050)         ; jump to address specified at $0050 ($8012)
 LDX #$01            ; set X=1 (this shouldn't execute)
 
 ;;; this is offset $0011 in PRG ;;;
+ind_skip_1:
+NOP                 ; perform assertions:
+                    ; x = 0x0
+
+; test page boundary bug
+; we stick a label at the bottom offset from the correct label by $1000 bytes
+; so that the low byte is the same but the high byte is different
+
+LDX #$00            ; reset X register
+
+LDA #$EE            ; load bogus byte as MSB
+STA $0300           ; store after page boundary
+LDA #<ind_skip_3    ; fetch lower byte of incorrect label
+STA $02FF           ; store before page boundary
+
+LDA #>ind_skip_3    ; fetch upper byte of correct label
+STA $0200           ; store after wrong page boundary
+
+JMP ($02FF)
+
+ind_skip_2:
+LDX #$01            ; this shouldn't execute
+
+ind_skip_3:
+LDX #$02            ; this should execute
+
+ind_end:
 NOP                 ; perform assertions:
                     ; x = 0x0
 
