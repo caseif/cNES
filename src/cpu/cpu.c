@@ -512,18 +512,24 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case JMP:
             g_cpu_regs.pc = addr;
             break;
-        case JSR:
-            stack_push((g_cpu_regs.pc >> 8) & 0xFF); // push MSB of PC
-            stack_push(g_cpu_regs.pc & 0xFF);        // push LSB of PC
+        case JSR: {
+            // on a real 6502, the PC gets pushed before it is moved past the
+            // last byte of the JSR instruction
+            uint16_t pc = g_cpu_regs.pc - 1;
+            stack_push((pc >> 8) & 0xFF); // push MSB of PC
+            stack_push(pc & 0xFF);        // push LSB of PC
 
             g_cpu_regs.pc = addr;
 
             break;
+        }
         case RTS: {
             uint8_t pcl = stack_pop(); // pop LSB of PC
             uint8_t pcm = stack_pop(); // pop MSB of PC
 
-            g_cpu_regs.pc = ((pcm << 8) | pcl);
+            // we account for the PC pointing to the last byte of the JSR
+            // instruction
+            g_cpu_regs.pc = ((pcm << 8) | pcl) + 1;
 
             break;
         }
