@@ -40,6 +40,11 @@ typedef struct {
     uint16_t src_addr;
 } InstructionParameter;
 
+const InterruptType *INT_RESET = &(InterruptType) {0xFFFA, false, true,  false, false};
+const InterruptType *INT_NMI   = &(InterruptType) {0xFFFC, false, false, false, false};
+const InterruptType *INT_IRQ   = &(InterruptType) {0xFFFE, true,  true,  false, true};
+const InterruptType *INT_BRK   = &(InterruptType) {0xFFFE, false, true,  true,  true};
+
 static Cartridge *g_cartridge;
 
 static CpuRegisters g_regs;
@@ -235,7 +240,7 @@ static void _do_cmp(uint8_t reg, uint16_t m) {
     }
 }
 
-void issue_interrupt(InterruptType *type) {
+void issue_interrupt(const InterruptType *type) {
         // check if the interrupt should be masked
         if (type->maskable && g_regs.status.interrupt_disable) {
             return;
@@ -269,7 +274,7 @@ void issue_interrupt(InterruptType *type) {
         g_regs.pc = vector;
     }
 
-void _exec_instr(Instruction *instr, InstructionParameter param) {
+void _exec_instr(const Instruction *instr, InstructionParameter param) {
     uint16_t m = param.value;
     uint16_t addr = param.src_addr;
 
@@ -595,7 +600,7 @@ void _exec_instr(Instruction *instr, InstructionParameter param) {
 }
 
 void exec_next_instr(void) {
-    Instruction *instr = decode_instr(_next_prg_byte());
+    const Instruction *instr = decode_instr(_next_prg_byte());
 
     InstructionParameter param = _get_next_m(instr->addr_mode);
 

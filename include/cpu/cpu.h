@@ -56,10 +56,10 @@ typedef struct {
     bool set_i;
 } InterruptType;
 
-InterruptType *INT_RESET = &(InterruptType) {0xFFFA, false, true,  false, false};
-InterruptType *INT_NMI =   &(InterruptType) {0xFFFC, false, false, false, false};
-InterruptType *INT_IRQ =   &(InterruptType) {0xFFFE, true,  true,  false, true};
-InterruptType *INT_BRK =   &(InterruptType) {0xFFFE, false, true,  true,  true};
+extern const InterruptType *INT_RESET;
+extern const InterruptType *INT_NMI;
+extern const InterruptType *INT_IRQ;
+extern const InterruptType *INT_BRK;
 
 void initialize_cpu(void);
 
@@ -69,6 +69,6 @@ uint8_t memory_read(uint16_t addr);
 
 void memory_write(uint16_t addr, uint8_t val);
 
-void issue_interrupt(InterruptType *type);
+void issue_interrupt(const InterruptType *type);
 
 void exec_next_instr(void);

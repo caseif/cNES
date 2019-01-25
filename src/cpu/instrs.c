@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static Instruction g_instr_list[] = {
+static const Instruction g_instr_list[] = {
     {BRK, IMP}, {ORA, IZX}, {KIL, IMP}, {SLO, IZX}, {NOP, ZRP}, {ORA, ZRP}, {ASL, ZRP}, {SLO, ZRP},
     {PHP, IMP}, {ORA, IMM}, {ASL, IMP}, {ANC, IMM}, {NOP, ABS}, {ORA, ABS}, {ASL, ABS}, {SLO, ABS},
     {BPL, REL}, {ORA, IZY}, {KIL, IMP}, {SLO, IZY}, {NOP, ZPX}, {ORA, ZPX}, {ASL, ZPX}, {SLO, ZPX},
@@ -64,7 +64,33 @@ static Instruction g_instr_list[] = {
     {SED, IMP}, {SBC, ABY}, {NOP, IMP}, {ISC, ABY}, {NOP, ABX} ,{SBC, ABX}, {INC, ABX}, {ISC, ABX} 
 };
 
-InstructionType get_instr_type(Mnemonic mnemonic) {
+const char *g_mnemonic_strs[] = {
+    "LDA", "LDX", "LDY", "STA", "STX", "STY", "TAX", "TAY",
+    "TSX", "TXA", "TYA", "TXS", "ADC", "SBC", "DEC", "DEX",
+    "DEY", "INC", "INX", "INY", "AND", "ASL", "LSR", "BIT",
+    "EOR", "ORA", "ROL", "ROR", "BCC", "BCS", "BNE", "BEQ",
+    "BPL", "BMI", "BVC", "BVS", "JMP", "JSR", "RTI", "RTS",
+    "CLC", "CLD", "CLI", "CLV", "CMP", "CPX", "CPY", "SEC",
+    "SED", "SEI", "PHA", "PHP", "PLA", "PLP", "BRK", "NOP",
+    "KIL", "ANC", "SLO", "RLA", "SRE", "RRA", "SAX", "LAX",
+    "DCP", "ALR", "XAA", "TAS", "SHY", "SHX", "AHX", "ARR",
+    "LAS", "ISC", "AXS"
+};
+
+const char *g_addr_mode_strs[] = {
+    "IMM", "ZRP", "ZPX", "ZPY", "ABS", "ABX",
+    "ABY", "IND", "IZX", "IZY", "REL", "IMP"
+};
+
+const char *mnemonic_to_str(const Mnemonic mnemonic) {
+    return g_mnemonic_strs[(unsigned int) mnemonic];
+}
+
+const char *addr_mode_to_str(const AddressingMode addr_mode) {
+    return g_addr_mode_strs[(unsigned int) addr_mode];
+}
+
+const InstructionType get_instr_type(const Mnemonic mnemonic) {
     switch (mnemonic) {
         case LDA:
         case LDX:
@@ -107,7 +133,7 @@ InstructionType get_instr_type(Mnemonic mnemonic) {
     }
 }
 
-uint8_t get_instr_len(Instruction *instr) {
+uint8_t get_instr_len(const Instruction *instr) {
     // BRK has a padding byte
     if (instr->mnemonic == BRK) {
         return 2;
@@ -130,11 +156,11 @@ uint8_t get_instr_len(Instruction *instr) {
         case IND:
             return 3;
         default:
-            printf("get_instr_len: Unhandled case %s", instr->addr_mode);
+            printf("get_instr_len: Unhandled case %d", instr->addr_mode);
             assert(0);
     }
 }
 
-Instruction *decode_instr(unsigned char opcode) {
+const Instruction *decode_instr(unsigned char opcode) {
     return &g_instr_list[opcode];
 }
