@@ -2,39 +2,60 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst 
 
 LD = $(CC)
 
+TESTDIR = test
+
 SRCDIR = src
 INCDIR = include
+TEST_SRCDIR = $(TESTDIR)/src
+TEST_INCDIR = $(TESTDIR)/include
+
 OUTDIR = build
 BINNAME = cnes
+
+TEST_BINNAME = cnes_test
 
 SRCEXT = c
 HEXT   = h
 OBJEXT = o
 
 INCLUDES = ./include
+TEST_INCLUDES = ./test/include
 LIBS = c
 
 INCFLAGS := $(foreach d, $(INCLUDES), -I$d)
+TEST_INCFLAGS := $(foreach d, $(TEST_INCLUDES), -I$d)
 LIBFLAGS := $(foreach d, $(LIBS), -l$d)
 CFLAGS   := $(INCFLAGS) -Wall -pedantic-errors -std=c11
+TEST_CFLAGS := $(TEST_INCFLAGS) $(CFLAGS)
 LDFLAGS  := $(LIBFLAGS)
 
 SRCFILES = $(call rwildcard, $(SRCDIR), *.$(SRCEXT))
 HFILES = $(call rwildcard, $(INCDIR), *.$(HEXT))
+TEST_SRCFILES = $(call rwildcard, $(TEST_SRCDIR), *.$(SRCEXT))
+TEST_HFILES = $(call rwildcard, $(TEST_INCDIR), *.$(HEXT))
 
 OBJFILES = $(patsubst %, $(OUTDIR)/%, $(patsubst $(SRCDIR)/%.$(SRCEXT), %.$(OBJEXT), $(SRCFILES)))
+
+TEST_OBJFILES := $(patsubst %, $(OUTDIR)/$(TESTDIR)/%, $(patsubst $(TEST_SRCDIR)/%.$(SRCEXT), %.$(OBJEXT), $(TEST_SRCFILES)))
+TEST_OBJFILES += $(filter-out build/main.o,$(OBJFILES))
 
 MKDIR_P = @mkdir -p
 
 all: apply_license_headers $(OUTDIR)/$(BINNAME)
 
-.PHONY: apply_license_headers
+test: $(OUTDIR)/$(TEST_BINNAME)
+	./build/cnes_test
+
+.PHONY: apply_license_headers clean all
 
 apply_license_headers:
 	./scripts/apply_license_headers.sh
 
 $(OUTDIR)/$(BINNAME): $(OBJFILES)
 	$(LD) $(LDFLAGS) -o $(OUTDIR)/$(BINNAME) $(OBJFILES)
+
+$(OUTDIR)/$(TEST_BINNAME): $(TEST_OBJFILES)
+	$(LD) $(LDFLAGS) -o $(OUTDIR)/$(TEST_BINNAME) $(TEST_OBJFILES)
 
 .SECONDEXPANSION:
 $(OUTDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
@@ -44,6 +65,17 @@ $(OUTDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
 			sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
 			-e '/^$$/ d' -e 's/$$/ :/' < $(OUTDIR)/$*.d >> $(OUTDIR)/$*.P; \
 			rm -f $(OUTDIR)/$*.d
+
+$(info $(TEST_OBJFILES))
+
+.SECONDEXPANSION:
+$(OUTDIR)/$(TESTDIR)/%.$(OBJEXT): $(TEST_SRCDIR)/%.$(SRCEXT)
+	@mkdir -p $(@D)
+	$(CC) $(TEST_CFLAGS) -MD -c -o $@ $<
+	@cp $(OUTDIR)/$(TESTDIR)/$*.d $(OUTDIR)/$(TESTDIR)/$*.P; \
+			sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+			-e '/^$$/ d' -e 's/$$/ :/' < $(OUTDIR)/$(TESTDIR)/$*.d >> $(OUTDIR)/$(TESTDIR)/$*.P; \
+			rm -f $(OUTDIR)/$(TESTDIR)/$*.d
 
 -include *.P
 

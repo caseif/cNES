@@ -33,6 +33,6 @@ void start_main_loop(Cartridge *cart) {
     load_cartridge(cart);
 
     while (true) {
-        exec_next_instr();
+        cycle_cpu();
     }
 }

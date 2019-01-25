@@ -24,7 +24,7 @@ header=$(printf "/*"'\n'"$header"'\n'" */")
 count=0
 
 # discover all source/header files
-find "./include" "./src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | while IFS= read -r -d $'\0' file; do
+find "./include" "./src" "./test/include" "./test/src" -type f \( -iname "*.c" -or -iname "*.h" \) -print0 | while IFS= read -r -d $'\0' file; do
     #escape asterisks in the header
     header_esc=$(sed 's/[\*]/\\&/g' <<< "$header")
 

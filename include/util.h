@@ -25,9 +25,15 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define PACKED __attribute__((packed))
+
+typedef struct {
+    unsigned char *data;
+    size_t size;
+} DataBlob;
 
 static inline uint32_t endian_swap(uint32_t x) {
     return (x >> 24)               | 

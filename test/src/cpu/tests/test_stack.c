@@ -23,56 +23,33 @@
  * THE SOFTWARE.
  */
 
-#pragma once
+#include "test_assert.h"
+#include "cpu/cpu_tester.h"
 
-#include "cartridge.h"
-#include "util.h"
+#include "cpu/cpu.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+extern CpuRegisters g_cpu_regs;
 
-typedef struct {
-    unsigned char carry:1 PACKED;
-    unsigned char zero:1 PACKED;
-    unsigned char interrupt_disable:1 PACKED;
-    unsigned char decimal:1 PACKED;
-    unsigned char break_command:2 PACKED;
-    unsigned char overflow:1 PACKED;
-    unsigned char negative:1 PACKED;
-} StatusRegister;
+bool test_stack(void) {
+    load_cpu_test("stack.bin");
 
-typedef struct {
-    StatusRegister status;
-    uint16_t pc;
-    uint8_t sp;
-    uint8_t acc;
-    uint8_t x;
-    uint8_t y;
-} CpuRegisters;
+    pump_cpu();
+        ASSERT_EQ(0x01, g_cpu_regs.acc);
+    ASSERT_EQ(0xFD, g_cpu_regs.x);
+    ASSERT_EQ(0x02, g_cpu_regs.y);
+    ASSERT_EQ(0xFF, g_cpu_regs.sp);
 
-typedef struct {
-    uint16_t vector_loc;
-    bool maskable;
-    bool push_pc;
-    bool set_b;
-    bool set_i;
-} InterruptType;
+    pump_cpu();
+    ASSERT_EQ(0x01, g_cpu_regs.acc);
+    ASSERT_EQ(0x00, g_cpu_regs.x);
+    ASSERT_EQ(0x02, g_cpu_regs.y);
+    ASSERT_EQ(0xFF, g_cpu_regs.sp);
 
-extern const InterruptType *INT_RESET;
-extern const InterruptType *INT_NMI;
-extern const InterruptType *INT_IRQ;
-extern const InterruptType *INT_BRK;
+    pump_cpu();
+    ASSERT_EQ(1, g_cpu_regs.status.carry);
+    ASSERT_EQ(0, g_cpu_regs.status.zero);
+    ASSERT_EQ(1, g_cpu_regs.status.interrupt_disable);
+    ASSERT_EQ(0, g_cpu_regs.status.negative);
 
-void initialize_cpu(void);
-
-void load_cartridge(Cartridge *cartridge);
-
-void load_program(DataBlob blob);
-
-uint8_t memory_read(uint16_t addr);
-
-void memory_write(uint16_t addr, uint8_t val);
-
-void issue_interrupt(const InterruptType *type);
-
-void cycle_cpu(void);
+    return true;
+}

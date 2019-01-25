@@ -25,54 +25,39 @@
 
 #pragma once
 
-#include "cartridge.h"
-#include "util.h"
-
-#include <stdbool.h>
 #include <stdint.h>
 
-typedef struct {
-    unsigned char carry:1 PACKED;
-    unsigned char zero:1 PACKED;
-    unsigned char interrupt_disable:1 PACKED;
-    unsigned char decimal:1 PACKED;
-    unsigned char break_command:2 PACKED;
-    unsigned char overflow:1 PACKED;
-    unsigned char negative:1 PACKED;
-} StatusRegister;
+typedef enum {
+    LDA, LDX, LDY, STA, STX, STY, TAX, TAY,
+    TSX, TXA, TYA, TXS, ADC, SBC, DEC, DEX,
+    DEY, INC, INX, INY, AND, ASL, LSR, BIT,
+    EOR, ORA, ROL, ROR, BCC, BCS, BNE, BEQ,
+    BPL, BMI, BVC, BVS, JMP, JSR, RTI, RTS,
+    CLC, CLD, CLI, CLV, CMP, CPX, CPY, SEC,
+    SED, SEI, PHA, PHP, PLA, PLP, BRK, NOP,
+    KIL, ANC, SLO, RLA, SRE, RRA, SAX, LAX,
+    DCP, ALR, XAA, TAS, SHY, SHX, AHX, ARR,
+    LAS, ISC, AXS
+} Mnemonic;
+
+typedef enum {
+    IMM, ZRP, ZPX, ZPY, ABS, ABX,
+    ABY, IND, IZX, IZY, REL, IMP
+} AddressingMode;
 
 typedef struct {
-    StatusRegister status;
-    uint16_t pc;
-    uint8_t sp;
-    uint8_t acc;
-    uint8_t x;
-    uint8_t y;
-} CpuRegisters;
+    Mnemonic mnemonic;
+    AddressingMode addr_mode;
+} Instruction;
 
-typedef struct {
-    uint16_t vector_loc;
-    bool maskable;
-    bool push_pc;
-    bool set_b;
-    bool set_i;
-} InterruptType;
+typedef enum { NONE, BRANCH, JUMP, R, W, RW } InstructionType;
 
-extern const InterruptType *INT_RESET;
-extern const InterruptType *INT_NMI;
-extern const InterruptType *INT_IRQ;
-extern const InterruptType *INT_BRK;
+const char *mnemonic_to_str(const Mnemonic mnemonic);
 
-void initialize_cpu(void);
+const char *addr_mode_to_str(const AddressingMode addr_mode);
 
-void load_cartridge(Cartridge *cartridge);
+const InstructionType get_instr_type(const Mnemonic mnemonic);
 
-void load_program(DataBlob blob);
+uint8_t get_instr_len(const Instruction *instr);
 
-uint8_t memory_read(uint16_t addr);
-
-void memory_write(uint16_t addr, uint8_t val);
-
-void issue_interrupt(const InterruptType *type);
-
-void cycle_cpu(void);
+const Instruction *decode_instr(unsigned char opcode);

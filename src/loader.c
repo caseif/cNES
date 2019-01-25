@@ -97,7 +97,7 @@ Cartridge *load_rom(FILE *file) {
 
     size_t read_items;
 
-    char *prg_data = malloc(prg_size * PRG_CHUNK_SIZE);
+    unsigned char *prg_data = malloc(prg_size * PRG_CHUNK_SIZE);
 
     printf("Attempting to read %ld PRG chunks\n", prg_size);
 
@@ -109,7 +109,7 @@ Cartridge *load_rom(FILE *file) {
         return NULL;
     }
 
-    char *chr_data = malloc(chr_size * CHR_CHUNK_SIZE);
+    unsigned char *chr_data = malloc(chr_size * CHR_CHUNK_SIZE);
 
     printf("Attempting to read %ld CHR chunks\n", chr_size);
 
