@@ -55,10 +55,6 @@ bool test_store_load(void) {
     ASSERT_EQ(1, memory_read(0x02));
     ASSERT_EQ(1, memory_read(0x11));
 
-    // test zero-page (x-indexed) loading
-    pump_cpu();
-    ASSERT_EQ(6, g_cpu_regs.acc);
-
     // test absolute addressing
     pump_cpu();
     ASSERT_EQ(1, memory_read(0x0023));

@@ -43,10 +43,6 @@ NOP                 ; perform assertions:
 ; test zero-page (x-indexed) addressing
 ;;;;;;;;;;;;;;;;
 
-;;;;;;;;;;;;;;;;
-; test storing
-;;;;;;;;;;;;;;;;
-
 LDA #$01            ; a = 0x01
 LDX #$02            ; x = 0x02
 STA $10,X           ; write a=1 to 10+2=$0012
@@ -63,22 +59,6 @@ NOP                 ; perform assertions:
                     ; $00A1 = 0x01
                     ; $0001 = 0x01
                     ; $0011 = 0x01
-
-;;;;;;;;;;;;;;;;
-; test loading
-;;;;;;;;;;;;;;;;
-
-LDA #$00            ; a = 0x00
-LDX #$02            ; x = 0x02
-ADC $10,X           ; add $12 to a
-ADC $90,X           ; add $92 to a
-ADC $FF,X           ; add $01 to a
-LDX #$90            ; x = 0x90
-ADC $11,X           ; add $A1 to a
-ADC $72,X           ; add $02 to a
-ADC $81,X           ; add $11 to a
-NOP                 ; perform assertions:
-                    ; a = 6
 
 ;;;;;;;;;;;;;;;;
 ; test absolute addressing

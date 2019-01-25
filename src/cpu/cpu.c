@@ -35,6 +35,8 @@
 #define SYSTEM_MEMORY 2048
 #define STACK_BOTTOM_ADDR 0x100
 #define BASE_PC 0x8000
+#define BASE_SP 0xFF
+#define DEFAULT_STATUS 0x20 // unused flag is set by default
 
 typedef struct {
     uint16_t value;
@@ -55,6 +57,8 @@ CpuRegisters g_cpu_regs;
 
 void initialize_cpu(void) {
     g_cpu_regs.pc = BASE_PC;
+    g_cpu_regs.sp = BASE_SP;
+    memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
     memset(g_sys_memory, '\0', SYSTEM_MEMORY);
 }
 
@@ -358,7 +362,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             uint8_t m7 = (m >> 7);
 
             // unsigned overflow will occur if at least two among the most significant operand bits and the carry bit are set
-            g_cpu_regs.status.carry = ((a7 & m7) | (a7 & g_cpu_regs.status.carry) | (m7 & g_cpu_regs.status.carry)) ? 1 : 0;
+            g_cpu_regs.status.carry = ((a7 & m7) | (a7 & g_cpu_regs.status.carry) | (m7 & g_cpu_regs.status.carry));
 
             // signed overflow will occur if the sign of both inputs if different from the sign of the result
             g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & (m ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
@@ -368,13 +372,11 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case SBC: {
             uint8_t acc0 = g_cpu_regs.acc;
 
-            uint8_t not_carry = g_cpu_regs.status.carry ? 0 : 1;
-
-            g_cpu_regs.acc = (acc0 - m - not_carry);
+            g_cpu_regs.acc = (acc0 - m - !g_cpu_regs.status.carry);
 
             _set_alu_flags(g_cpu_regs.acc);
 
-            g_cpu_regs.status.carry = ((acc0 >> 7) + ((0xFF - m) >> 7) + (((g_cpu_regs.acc & 0x40) & ((0xFF - m) & 0x40)) >> 6) <= 1) ? 1 : 0;
+            g_cpu_regs.status.carry = g_cpu_regs.acc <= acc0;
 
             g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & ((0xFF - m) ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
 
@@ -610,7 +612,7 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr->addr_mode);
 
-    printf("decoded instr %s:%s with param $%x (addr $%x) @ $%x\n",
+    printf("Decoded instruction %s:%s with computed param $%02x (src addr $%02x) @ $%04x\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr, g_cpu_regs.pc - get_instr_len(instr));
 
     _exec_instr(instr, param);
