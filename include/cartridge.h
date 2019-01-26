@@ -26,11 +26,10 @@
 #pragma once
 
 #include "util.h"
+#include "ppu/ppu.h"
 
 #include <stdbool.h>
 #include <stddef.h>
-
-typedef enum {HORIZONTAL, VERTICAL} MirroringMode;
 
 typedef struct {
     unsigned char *prg_rom;
