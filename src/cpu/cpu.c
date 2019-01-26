@@ -26,6 +26,7 @@
 #include "cartridge.h"
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
+#include "ppu/ppu.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -69,43 +70,69 @@ void load_program(DataBlob program_blob) {
 }
 
 uint8_t memory_read(uint16_t addr) {
-    if (addr < 0x2000) {
-        return g_sys_memory[addr % 0x800];
-    } else if (addr < 0x4000) {
-        return 0; //TODO: read from PPU MMIO
-    } else if (addr < 0x4020) {
-        if (addr == 0x4014) {
-            //TODO: I think this is supposed to return the PPU latch value
+    switch (addr) {
+        case 0 ... 0x1FFF: {
+            return g_sys_memory[addr % 0x800];
+        }
+        case 0x2000 ... 0x2007: {
+            return read_ppu_mmio((uint8_t) (addr - 0x2000));
+        }
+        case 0x4014: {
+            //TODO: DMA register
             return 0;
-        } else {
-            return 0; //TODO
         }
-    } else if (addr < 0x8000) {
-        return 0; //TODO
-    } else {
-        addr -= 0x8000;
-        // ROM is mirrored if cartridge only has 1 bank
-        if (g_prg_rom.size <= 16384) {
-            addr %= 0x4000;
+        case 0x4000 ... 0x4013:
+        case 0x4015: {
+            //TODO: APU MMIO
+            return 0;
         }
-        return g_prg_rom.data[addr];
+        case 0x4016 ... 0x4017: {
+            //TODO: controller input
+            return 0;
+        }
+        case 0x8000 ... 0xFFFF: {
+            addr -= 0x8000;
+            // ROM is mirrored if cartridge only has 1 bank
+            if (g_prg_rom.size <= 16384) {
+                addr %= 0x4000;
+            }
+            return g_prg_rom.data[addr];
+        }
+        default: {
+            // nothing here
+            return 0;
+        }
     }
 }
 
 void memory_write(uint16_t addr, uint8_t val) {
-    if (addr < 0x2000) {
-        g_sys_memory[addr % 0x800] = val;
-    } else if (addr < 0x4000) {
-        //TODO: handle write to PPU MMIO
-    } else if (addr < 0x4020) {
-        if (addr == 0x4014) {
-            //TODO: write to PPU DMA register
-        } else {
-            //TODO
+    switch (addr) {
+        case 0 ... 0x1FFF: {
+            g_sys_memory[addr % 0x800] = val;
+            return;
+        }
+        case 0x2000 ... 0x2007: {
+            write_ppu_mmio((uint8_t) (addr - 0x2000), val);
+            return;
+        }
+        case 0x4014: {
+            //TODO: DMA register
+            return;
+        }
+        case 0x4000 ... 0x4013:
+        case 0x4015: {
+            //TODO: APU MMIO
+            return;
+        }
+        case 0x4016 ... 0x4017: {
+            //TODO: controller input
+            return;
+        }
+        case 0x8000 ... 0xFFFF: {
+            // attempts to write to ROM fail silently
+            return;
         }
     }
-
-    // attempts to write to ROM fail silently
 }
 
 void stack_push(char val) {
@@ -625,8 +652,8 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr->addr_mode);
 
-    printf("Decoded instruction %s:%s with computed param $%02x (src addr $%02x) @ $%04x\n",
-            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr, g_cpu_regs.pc - get_instr_len(instr));
+    //printf("Decoded instruction %s:%s with computed param $%02x (src addr $%02x) @ $%04x\n",
+    //        mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr, g_cpu_regs.pc - get_instr_len(instr));
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 

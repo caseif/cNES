@@ -28,6 +28,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef WINDOWS
+#include <windows.h>
+#else
+#define __USE_POSIX199309
+#include <time.h>
+#endif
+
 #define PACKED __attribute__((packed))
 
 typedef struct {
@@ -40,4 +47,12 @@ static inline uint32_t endian_swap(uint32_t x) {
           ((x << 8 ) & 0x00FF0000) |
           ((x >> 8 ) & 0x0000FF00) |
            (x << 24);
+}
+
+static inline void sleep_cp(int ms) {
+    #ifdef WINDOWS
+    Sleep(ms);
+    #else
+    nanosleep((struct timespec[]) {{0, ms * 1000000L}}, NULL);
+    #endif
 }

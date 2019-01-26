@@ -24,15 +24,39 @@
  */
 
 #include "cartridge.h"
+#include "util.h"
 #include "cpu/cpu.h"
+#include "ppu/ppu.h"
 
 #include <stdbool.h>
+#include <time.h>
+
+#define FRAMES_PER_SECOND 60.0988
+#define CYCLES_PER_FRAME 29780.5
+#define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
+
+#define SLEEP_INTERVAL 10 // milliseconds
 
 void start_main_loop(Cartridge *cart) {
     initialize_cpu();
     load_cartridge(cart);
 
+    unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;
+
+    unsigned int cycles_since_sleep = 0;
+
+    time_t last_sleep = 0;
+
     while (true) {
         cycle_cpu();
+        cycle_ppu();
+        cycle_ppu();
+        cycle_ppu();
+
+        if (++cycles_since_sleep > cycles_per_interval) {
+            sleep_cp(SLEEP_INTERVAL - (clock() - last_sleep) / 1000);
+            cycles_since_sleep = 0;
+            last_sleep = clock();
+        }
     }
 }

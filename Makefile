@@ -25,7 +25,7 @@ LIBS = c
 INCFLAGS := $(foreach d, $(INCLUDES), -I$d)
 TEST_INCFLAGS := $(foreach d, $(TEST_INCLUDES), -I$d)
 LIBFLAGS := $(foreach d, $(LIBS), -l$d)
-CFLAGS   := $(INCFLAGS) -Wall -pedantic-errors -std=c11
+CFLAGS   := $(INCFLAGS) -Wall -std=c11
 TEST_CFLAGS := $(TEST_INCFLAGS) $(CFLAGS)
 LDFLAGS  := $(LIBFLAGS)
 
@@ -41,12 +41,12 @@ TEST_OBJFILES += $(filter-out build/main.o,$(OBJFILES))
 
 MKDIR_P = @mkdir -p
 
+.PHONY: apply_license_headers clean all test
+
 all: apply_license_headers $(OUTDIR)/$(BINNAME)
 
 test: $(OUTDIR)/$(TEST_BINNAME)
 	./build/cnes_test
-
-.PHONY: apply_license_headers clean all
 
 apply_license_headers:
 	./scripts/apply_license_headers.sh
@@ -65,8 +65,6 @@ $(OUTDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
 			sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
 			-e '/^$$/ d' -e 's/$$/ :/' < $(OUTDIR)/$*.d >> $(OUTDIR)/$*.P; \
 			rm -f $(OUTDIR)/$*.d
-
-$(info $(TEST_OBJFILES))
 
 .SECONDEXPANSION:
 $(OUTDIR)/$(TESTDIR)/%.$(OBJEXT): $(TEST_SRCDIR)/%.$(SRCEXT)
