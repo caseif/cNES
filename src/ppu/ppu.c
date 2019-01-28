@@ -289,10 +289,11 @@ void cycle_ppu(void) {
                 
                 switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
-                        // flush the palette select data into the primary latch
-                        g_ppu_internal_regs.palette_select_latch = g_ppu_internal_regs.attr_table_entry_latch;
+                        // flush the palette select data into the primary shift registers
+                        g_ppu_internal_regs.palette_shift_l = g_ppu_internal_regs.attr_table_entry_latch & 1;
+                        g_ppu_internal_regs.palette_shift_h = g_ppu_internal_regs.attr_table_entry_latch >> 1;
 
-                        // flush the pattern bitmap latches into the primary shift registers
+                        // flush the pattern bitmap latches into the upper halves of the primary shift registers
 
                         // clear upper bits
                         g_ppu_internal_regs.pattern_shift_l &= 0xFF;
@@ -367,13 +368,15 @@ void cycle_ppu(void) {
                 }
 
                 unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h << 1) & 1)
-                        + (g_ppu_internal_regs.pattern_shift_l & 1);
+                        | (g_ppu_internal_regs.pattern_shift_l & 1);
                 
                 unsigned int palette_offset;
 
                 if (palette_low) {
                     // if the palette low bits are not zero, we select the color normally
-                    palette_offset = (g_ppu_internal_regs.palette_select_latch << 2) + palette_low;
+                    unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
+                            | (g_ppu_internal_regs.palette_shift_l & 1);
+                    palette_offset = (palette_high << 2) + palette_low;
                 } else {
                     // otherwise, we use the default background color
                     palette_offset = 0;
@@ -381,6 +384,12 @@ void cycle_ppu(void) {
 
                 uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
                 g_pixel_data[fetch_pixel_x][fetch_pixel_y] = ppu_memory_read(palette_entry_addr);
+
+                // shift the internal registers
+                g_ppu_internal_regs.pattern_shift_h >>= 1;
+                g_ppu_internal_regs.pattern_shift_l >>= 1;
+                g_ppu_internal_regs.palette_shift_h >>= 1;
+                g_ppu_internal_regs.palette_shift_l >>= 1;
             }
 
             break;

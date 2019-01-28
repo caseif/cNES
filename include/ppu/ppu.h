@@ -68,12 +68,11 @@ typedef struct {
 
     uint8_t pattern_bitmap_l_latch;
     uint8_t pattern_bitmap_h_latch;
-    unsigned int palette_select_latch:2;
 
     uint16_t pattern_shift_l;
     uint16_t pattern_shift_h;
-    uint16_t palette_shift_a;
-    uint16_t palette_shift_b;
+    uint16_t palette_shift_l;
+    uint16_t palette_shift_h;
 } PpuInternalRegisters;
 
 void initialize_ppu(MirroringMode mirror_mode);
