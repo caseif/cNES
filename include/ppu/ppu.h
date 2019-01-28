@@ -25,9 +25,8 @@
 
 #pragma once
 
+#include "cartridge.h"
 #include "util.h"
-
-typedef enum {MIRROR_HORIZONTAL, MIRROR_VERTICAL} MirroringMode;
 
 typedef struct {
     unsigned char name_table:2 PACKED;
@@ -63,6 +62,9 @@ typedef struct {
     uint8_t x;   // fine x-scroll
     uint8_t w:1; // write flag (for twice-writable registers)
 
+    uint8_t scroll_x;
+    uint8_t scroll_y;
+
     uint8_t name_table_entry_latch;
     unsigned int attr_table_entry_latch:2;
 
@@ -75,7 +77,7 @@ typedef struct {
     uint16_t palette_shift_h;
 } PpuInternalRegisters;
 
-void initialize_ppu(MirroringMode mirror_mode);
+void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode);
 
 uint8_t read_ppu_mmio(uint8_t index);
 

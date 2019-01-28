@@ -39,7 +39,7 @@
 
 void start_main_loop(Cartridge *cart) {
     initialize_cpu();
-    initialize_ppu(cart->mirror_mode);
+    initialize_ppu(cart, cart->mirror_mode);
     load_cartridge(cart);
 
     unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;

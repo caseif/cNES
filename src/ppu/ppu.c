@@ -65,6 +65,8 @@ typedef union {
     uint8_t serial;
 } AttributeTableEntry;
 
+static Cartridge *g_cartridge;
+
 static MirroringMode g_mirror_mode;
 
 PpuControl g_ppu_control;
@@ -75,6 +77,7 @@ PpuInternalRegisters g_ppu_internal_regs;
 unsigned char g_pattern_table_left[0x1000];
 unsigned char g_pattern_table_right[0x1000];
 unsigned char g_name_table_mem[0x800];
+unsigned char g_palette_ram[0x20];
 
 unsigned char g_pixel_data[RESOLUTION_H][RESOLUTION_V];
 
@@ -82,7 +85,9 @@ static uint64_t g_frame;
 static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
-void initialize_ppu(MirroringMode mirror_mode) {
+void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode) {
+    g_cartridge = cartridge;
+
     g_mirror_mode = mirror_mode;
     
     memset(&g_ppu_control, '\0', 1);
@@ -98,13 +103,14 @@ uint8_t read_ppu_mmio(uint8_t index) {
 
     switch (index) {
         case 2: {
+            // return the status
             uint8_t res;
             memcpy(&res, &g_ppu_status, 1);
             return res;
         }
         case 7: {
-            //TODO: VRAM access
-            return 0;
+            // read from stored address
+            return ppu_memory_read(g_ppu_internal_regs.v);
         }
         default: {
             //TODO: I think it returns a latch value here
@@ -119,29 +125,56 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
     switch (index) {
         case 0:
             memcpy(&g_ppu_control, &val, 1);
-            return;
+            break;
         case 1:
             memcpy(&g_ppu_mask, &val, 1);
-            return;
+            break;
         case 2:
             //TODO: not sure what to do here
-            return;
+            break;
         case 3:
             //TODO: sprite RAM address
-            return;
+            break;
         case 4:
             //TODO: sprite RAM data
-            return;
+            break;
         case 5:
-            //TODO: PPUSCROLL
-            return;
+            // set either x- or y-scroll, depending on whether this is the first or second write
+            if (g_ppu_internal_regs.w) {
+                g_ppu_internal_regs.scroll_y = val;
+            } else {
+                g_ppu_internal_regs.scroll_x = val;
+            }
+
+            // flip w flag
+            g_ppu_internal_regs.w = !g_ppu_internal_regs.w;
+            break;
         case 6:
-            //TODO: VRAM address
-            return;
+            // set either the upper or lower address bits, depending on which write this is
+            if (g_ppu_internal_regs.w) {
+                // clear upper bits
+                g_ppu_internal_regs.v &= 0xFF;
+                // set upper bits
+                g_ppu_internal_regs.v |= val << 8;
+            } else {
+                // clear lower bits
+                g_ppu_internal_regs.v &= 0xFF00;
+                // set upper bits
+                g_ppu_internal_regs.v |= val;
+            }
+
+            // flip w flag
+            g_ppu_internal_regs.w = !g_ppu_internal_regs.w;
+
+            break;
         case 7: {
-            //TODO: VRAM access
-            return;
+            // write to the stored address
+            ppu_memory_write(g_ppu_internal_regs.v, val);
+
+            break;
         }
+        default:
+            assert(false);
     }
 }
 
@@ -188,16 +221,27 @@ uint16_t _translate_name_table_address(uint16_t addr) {
 uint8_t ppu_memory_read(uint16_t addr) {
     switch (addr) {
         // pattern table left
-        case 0x0000 ... 0x0FFF: {
-            return g_pattern_table_left[addr];
-        }
-        // pattern table right
-        case 0x1000 ... 0x1FFF: {
-            return g_pattern_table_right[addr - 0x1000];
+        case 0x0000 ... 0x1FFF: {
+            return g_cartridge->chr_rom[addr];
         }
         // name table 0
-        case 0x2000 ... 0x2FFF: {
-            return g_name_table_mem[_translate_name_table_address(addr - 0x2000)];
+        case 0x2000 ... 0x3EFF: {
+            return g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)];
+        }
+        case 0x3F00 ... 0x3FFF: {
+            unsigned int index = (addr - 0x3F00) % 0x20;
+
+            // certain indices are just mirrors
+            switch (index) {
+                case 0x10:
+                case 0x14:
+                case 0x18:
+                case 0x1C:
+                    index -= 0x10;
+                    break;
+            }
+
+            return g_palette_ram[index];
         }
         // unmapped
         default: {
@@ -210,16 +254,30 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
     switch (addr) {
         // pattern table left
         case 0x0000 ... 0x0FFF: {
-            g_pattern_table_left[addr] = val;
-        }
-        // pattern table right
-        case 0x1000 ... 0x1FFF: {
-            g_pattern_table_right[addr - 0x1000] = val;
+            //TODO: unsupported altogether for now
+            break;
         }
         // name table 0
-        case 0x2000 ... 0x2FFF: {
+        case 0x2000 ... 0x3EFF: {
                         //TODO: fetch attribute byte
-            g_name_table_mem[_translate_name_table_address(addr - 0x2000)] = val;
+            g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)] = val;
+            break;
+        }
+        case 0x3F00 ... 0x3FFF: {
+            unsigned int index = (addr - 0x3F00) % 0x20;
+
+            // certain indices are just mirrors
+            switch (index) {
+                case 0x10:
+                case 0x14:
+                case 0x18:
+                case 0x1C:
+                    index -= 0x10;
+                    break;
+            }
+
+            g_palette_ram[index] = val;
+            break;
         }
         // unmapped
         default: {
@@ -298,12 +356,12 @@ void cycle_ppu(void) {
                         // clear upper bits
                         g_ppu_internal_regs.pattern_shift_l &= 0xFF;
                         // set upper bits
-                        g_ppu_internal_regs.pattern_shift_l &= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
+                        g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
                         
                         // clear upper bits
                         g_ppu_internal_regs.pattern_shift_h &= 0xFF;
                         // set upper bits
-                        g_ppu_internal_regs.pattern_shift_h &= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
+                        g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
                     }
                     // fetch name table entry
                     case 1: {
