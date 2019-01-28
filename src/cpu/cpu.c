@@ -39,8 +39,8 @@
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x20 // unused flag is set by default
 
-const InterruptType *INT_RESET = &(InterruptType) {0xFFFA, false, true,  false, false};
-const InterruptType *INT_NMI   = &(InterruptType) {0xFFFC, false, false, false, false};
+const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
+const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};
 const InterruptType *INT_IRQ   = &(InterruptType) {0xFFFE, true,  true,  false, true};
 const InterruptType *INT_BRK   = &(InterruptType) {0xFFFE, false, true,  true,  true};
 
@@ -278,9 +278,10 @@ static void _do_cmp(uint8_t reg, uint16_t m) {
 
     if (reg >= m) {
         g_cpu_regs.status.carry = 1;
-        g_cpu_regs.status.zero = reg == m ? 1 : 0;
+        g_cpu_regs.status.zero = reg == m;
     } else {
         g_cpu_regs.status.carry = 0;
+        g_cpu_regs.status.zero = 0;
     }
 }
 
@@ -652,8 +653,9 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr->addr_mode);
 
-    //printf("Decoded instruction %s:%s with computed param $%02x (src addr $%02x) @ $%04x\n",
-    //        mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr, g_cpu_regs.pc - get_instr_len(instr));
+    /*printf("Decoded instruction %s:%s with computed param $%02x (src addr $%04x) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
+            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr,
+            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 

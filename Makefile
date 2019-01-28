@@ -25,7 +25,7 @@ LIBS = c
 INCFLAGS := $(foreach d, $(INCLUDES), -I$d)
 TEST_INCFLAGS := $(foreach d, $(TEST_INCLUDES), -I$d)
 LIBFLAGS := $(foreach d, $(LIBS), -l$d)
-CFLAGS   := $(INCFLAGS) -Wall -std=c11
+CFLAGS   := -g $(INCFLAGS) -Wall -std=c11
 TEST_CFLAGS := $(TEST_INCFLAGS) $(CFLAGS)
 LDFLAGS  := $(LIBFLAGS)
 

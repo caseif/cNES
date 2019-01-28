@@ -170,6 +170,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
         case 7: {
             // write to the stored address
             ppu_memory_write(g_ppu_internal_regs.v, val);
+            g_ppu_internal_regs.v++;
 
             break;
         }
@@ -251,6 +252,7 @@ uint8_t ppu_memory_read(uint16_t addr) {
 }
 
 void ppu_memory_write(uint16_t addr, uint8_t val) {
+    //printf("writing %02x to addr %04x\n", val, addr);
     switch (addr) {
         // pattern table left
         case 0x0000 ... 0x0FFF: {
@@ -291,9 +293,8 @@ static uint16_t _compute_table_addr(unsigned int pix_x, unsigned int pix_y, unsi
     uint8_t h_off = pix_x / granularity;
     uint8_t v_off = pix_y / granularity;
 
-    //TODO
-    uint8_t scroll_x = 0;
-    uint8_t scroll_y = 0;
+    uint8_t scroll_x = g_ppu_internal_regs.scroll_x;
+    uint8_t scroll_y = g_ppu_internal_regs.scroll_y;
 
     uint8_t table_index = g_ppu_control.name_table;
 
@@ -318,17 +319,32 @@ static uint16_t _compute_table_addr(unsigned int pix_x, unsigned int pix_y, unsi
     return table_addr;
 }
 
+void display_frame(void) {
+    //printf("\e[1;1H\e[2J");
+
+    for (unsigned int x = 0; x < RESOLUTION_H; x++) {
+        for (unsigned int y = 0; y < RESOLUTION_V; y++) {
+            //printf("%02x ", g_pixel_data[x][y]);
+        }
+        //printf("\n");
+    }
+    for (unsigned int i = 0x2000; i < 0x3000; i++) {
+        //printf("%02x ", g_name_table_mem[i - 0x2000]);
+    }
+}
+
 void cycle_ppu(void) {
+    if (g_scanline == 0 && g_scanline_tick == 0 && g_frame % 2 == 1) {
+        g_scanline_tick = 1;
+    }
+
     switch (g_scanline) {
-        // first tick is "skipped" on odd frames
-        case 0:
-            if (g_frame % 2 == 1 && g_scanline_tick == 0) {
-                g_scanline_tick = 1;
-            }
-            // intentional fall-through to visible screen ticking
         // visible screen
-        case 1 ... 239: {
-            if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
+        case 0 ... 239: {
+            if (g_scanline_tick == 0) {
+                // idle tick
+                break;
+            } else if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
                 //TODO: perform sprite tile fetching
             } else {
                 unsigned int fetch_pixel_x;
@@ -344,7 +360,7 @@ void cycle_ppu(void) {
                     // these cycles are for garbage NT fetches
                     break;
                 }
-                
+
                 switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
                         // flush the palette select data into the primary shift registers
@@ -362,6 +378,8 @@ void cycle_ppu(void) {
                         g_ppu_internal_regs.pattern_shift_h &= 0xFF;
                         // set upper bits
                         g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
+
+                        break;
                     }
                     // fetch name table entry
                     case 1: {
@@ -424,30 +442,6 @@ void cycle_ppu(void) {
                         break;
                     }
                 }
-
-                unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h << 1) & 1)
-                        | (g_ppu_internal_regs.pattern_shift_l & 1);
-                
-                unsigned int palette_offset;
-
-                if (palette_low) {
-                    // if the palette low bits are not zero, we select the color normally
-                    unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
-                            | (g_ppu_internal_regs.palette_shift_l & 1);
-                    palette_offset = (palette_high << 2) + palette_low;
-                } else {
-                    // otherwise, we use the default background color
-                    palette_offset = 0;
-                }
-
-                uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
-                g_pixel_data[fetch_pixel_x][fetch_pixel_y] = ppu_memory_read(palette_entry_addr);
-
-                // shift the internal registers
-                g_ppu_internal_regs.pattern_shift_h >>= 1;
-                g_ppu_internal_regs.pattern_shift_l >>= 1;
-                g_ppu_internal_regs.palette_shift_h >>= 1;
-                g_ppu_internal_regs.palette_shift_l >>= 1;
             }
 
             break;
@@ -456,7 +450,9 @@ void cycle_ppu(void) {
         case 241: {
             if (g_scanline_tick == 1) {
                 g_ppu_status.vblank = 1;
-                issue_interrupt(INT_NMI);
+                if (g_ppu_control.gen_nmis) {
+                    issue_interrupt(INT_NMI);
+                }
             }
 
             break;
@@ -472,6 +468,32 @@ void cycle_ppu(void) {
         }
     }
 
+    if (g_scanline < RESOLUTION_V && g_scanline_tick < RESOLUTION_H) {
+            unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h << 1) & 1)
+                    | (g_ppu_internal_regs.pattern_shift_l & 1);
+            
+            unsigned int palette_offset;
+
+            if (palette_low) {
+                // if the palette low bits are not zero, we select the color normally
+                unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
+                        | (g_ppu_internal_regs.palette_shift_l & 1);
+                palette_offset = (palette_high << 2) + palette_low;
+            } else {
+                // otherwise, we use the default background color
+                palette_offset = 0;
+            }
+
+            uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
+            g_pixel_data[g_scanline_tick][g_scanline] = ppu_memory_read(palette_entry_addr);
+
+            // shift the internal registers
+            g_ppu_internal_regs.pattern_shift_h >>= 1;
+            g_ppu_internal_regs.pattern_shift_l >>= 1;
+            g_ppu_internal_regs.palette_shift_h >>= 1;
+            g_ppu_internal_regs.palette_shift_l >>= 1;
+    }
+
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {
         g_scanline_tick = 0;
 
@@ -480,7 +502,8 @@ void cycle_ppu(void) {
 
             g_frame++;
 
-            printf("frame %ld\n", g_frame);
+            //printf("frame %ld\n", g_frame);
+            display_frame();
         }
     }
 }
