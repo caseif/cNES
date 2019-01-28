@@ -152,15 +152,15 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
         case 6:
             // set either the upper or lower address bits, depending on which write this is
             if (g_ppu_internal_regs.w) {
-                // clear upper bits
-                g_ppu_internal_regs.v &= 0xFF;
-                // set upper bits
-                g_ppu_internal_regs.v |= val << 8;
-            } else {
                 // clear lower bits
                 g_ppu_internal_regs.v &= 0xFF00;
                 // set upper bits
                 g_ppu_internal_regs.v |= val;
+            } else {
+                // clear upper bits
+                g_ppu_internal_regs.v &= 0xFF;
+                // set upper bits
+                g_ppu_internal_regs.v |= val << 8;
             }
 
             // flip w flag
@@ -320,16 +320,13 @@ static uint16_t _compute_table_addr(unsigned int pix_x, unsigned int pix_y, unsi
 }
 
 void display_frame(void) {
-    //printf("\e[1;1H\e[2J");
+    printf("\e[1;1H\e[2J");
 
     for (unsigned int x = 0; x < RESOLUTION_H; x++) {
         for (unsigned int y = 0; y < RESOLUTION_V; y++) {
-            //printf("%02x ", g_pixel_data[x][y]);
+            printf("%02x ", g_pixel_data[x][y]);
         }
-        //printf("\n");
-    }
-    for (unsigned int i = 0x2000; i < 0x3000; i++) {
-        //printf("%02x ", g_name_table_mem[i - 0x2000]);
+        printf("\n");
     }
 }
 
@@ -503,7 +500,7 @@ void cycle_ppu(void) {
             g_frame++;
 
             //printf("frame %ld\n", g_frame);
-            display_frame();
+            //display_frame();
         }
     }
 }
