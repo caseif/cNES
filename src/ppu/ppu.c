@@ -218,7 +218,7 @@ uint16_t _translate_name_table_address(uint16_t addr) {
 
 uint8_t ppu_memory_read(uint16_t addr) {
     switch (addr) {
-        // pattern table left
+        // pattern table
         case 0x0000 ... 0x1FFF: {
             return g_cartridge->chr_rom[addr];
         }
@@ -469,6 +469,7 @@ void cycle_ppu(void) {
 
             uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
             set_pixel(g_scanline_tick, g_scanline, ppu_memory_read(palette_entry_addr));
+            //set_pixel(g_scanline_tick, g_scanline, g_ppu_internal_regs.name_table_entry_latch);
 
             // shift the internal registers
             g_ppu_internal_regs.pattern_shift_h >>= 1;

@@ -238,37 +238,34 @@ static void _set_alu_flags(uint16_t val) {
     g_cpu_regs.status.negative = (val & 0x80) ? 1 : 0;
 }
 
-static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, bool rotate) {
-    // fetch the target value either from the accumulator or from memory
-    uint8_t val = implicit ? g_cpu_regs.acc : m;
+static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, bool rot) {
+    if (implicit) {
+        m = g_cpu_regs.acc;
+    }
 
-    // rotation mask - contains information about the carry bit
-    uint8_t r_mask = 0;
-    if (rotate) {
-        // set if only if we're rotating
-        r_mask = g_cpu_regs.status.carry;
+    if (right) {
+        g_cpu_regs.status.carry = m & 1;
+    } else {
+        g_cpu_regs.status.carry = (m & 0x80) >> 7;
+    }
+
+    uint8_t res = right ? m >> 1 : m << 1;
+
+    if (rot) {
         if (right) {
-            // if we're rotating to the right, the carry bit gets copied to bit 7
-            r_mask <<= 7;
+            res |= g_cpu_regs.status.carry << 7;
+        } else {
+            res |= g_cpu_regs.status.carry;
         }
     }
 
-    // carry mask - set to the bit which will be copied to the carry flag
-    uint8_t c_mask = right ? 0x01 : 0x80;
-    g_cpu_regs.status.carry = (val & c_mask) ? 1 : 0;
-
-    // compute the result by shifting and applying the rotation mask
-    uint8_t res = (right ? (g_cpu_regs.acc >> 1) : (g_cpu_regs.acc << 1)) | r_mask;
-
-    // set the zero and negative flags based on the result
-    _set_alu_flags(res);
-
-    // write the result to either the accumulator or to memory, depending on the addressing mode
     if (implicit) {
         g_cpu_regs.acc = res;
     } else {
         memory_write(src_addr, res);
     }
+
+    _set_alu_flags(res);
 }
 
 static void _do_cmp(uint8_t reg, uint16_t m) {
@@ -420,7 +417,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case DEC: {
             uint16_t decRes = m - 1;
 
-            memory_write(addr, m - 1);
+            memory_write(addr, decRes);
 
             _set_alu_flags(decRes);
 
@@ -486,15 +483,9 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
         case ROL:
             _do_shift(m, addr, instr->addr_mode == IMP, false, true);
-
-            _set_alu_flags(g_cpu_regs.acc);
-
             break;
         case ROR:
             _do_shift(m, addr, instr->addr_mode == IMP, true, true);
-
-            _set_alu_flags(g_cpu_regs.acc);
-
             break;
         // branching
         case BCC:
@@ -638,8 +629,6 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             //TODO
             // no-op
             break;
-        //default:
-        //    throw new UnsupportedOperationException("Unsupported instruction " + instr.getOpcode().name());
     }
 
     if (g_cpu_regs.pc - 0x8000 >= g_prg_rom.size) {
@@ -655,7 +644,11 @@ void _exec_next_instr(void) {
 
     /*printf("Decoded instruction %s:%s with computed param $%02x (src addr $%04x) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr,
-            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
+            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
+    extern PpuControl g_ppu_control;
+    if (!g_ppu_control.background_table) {
+        printf("HERE DUMBASS\n");
+    }*/
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 
