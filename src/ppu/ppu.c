@@ -36,17 +36,24 @@
 #define RESOLUTION_H 256
 #define RESOLUTION_V 240
 
-#define NAME_TABLE_TILE_LENGTH 8
-#define NAME_TABLE_WIDTH (RESOLUTION_H / NAME_TABLE_TILE_LENGTH)
-#define NAME_TABLE_HEIGHT (RESOLUTION_V / NAME_TABLE_TILE_LENGTH)
+#define NAME_TABLE_GRANULARITY 8
+#define NAME_TABLE_WIDTH (RESOLUTION_H / NAME_TABLE_GRANULARITY)
+#define NAME_TABLE_HEIGHT (RESOLUTION_V / NAME_TABLE_GRANULARITY)
 
 #define NAME_TABLE_BASE_ADDR 0x2000
 #define NAME_TABLE_INTERVAL 0x400
 #define NAME_TABLE_SIZE 0x3C0
 
-#define ATTR_TABLE_TILE_LENGTH 32
-#define ATTR_TABLE_WIDTH (RESOLUTION_H / ATTR_TABLE_TILE_LENGTH)
-#define ATTR_TABLE_HEIGHT (RESOLUTION_V / ATTR_TABLE_TILE_LENGTH)
+#define ATTR_TABLE_GRANULARITY 32
+#define ATTR_TABLE_WIDTH (RESOLUTION_H / ATTR_TABLE_GRANULARITY)
+#define ATTR_TABLE_HEIGHT (RESOLUTION_V / ATTR_TABLE_GRANULARITY)
+
+#define ATTR_TABLE_BASE_ADDR 0x23C0
+
+#define PT_LEFT_ADDR 0x0000
+#define PT_RIGHT_ADDR 0x1000
+
+#define PALETTE_DATA_BASE_ADDR 0x3F00
 
 typedef union {
     struct sections {
@@ -68,6 +75,8 @@ PpuInternalRegisters g_ppu_internal_regs;
 unsigned char g_pattern_table_left[0x1000];
 unsigned char g_pattern_table_right[0x1000];
 unsigned char g_name_table_mem[0x800];
+
+unsigned char g_pixel_data[RESOLUTION_H][RESOLUTION_V];
 
 static uint64_t g_frame;
 static uint16_t g_scanline;
@@ -124,10 +133,10 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             //TODO: sprite RAM data
             return;
         case 5:
-            //TODO: VRAM address 1
+            //TODO: PPUSCROLL
             return;
         case 6:
-            //TODO: VRAM address 2
+            //TODO: VRAM address
             return;
         case 7: {
             //TODO: VRAM access
@@ -209,6 +218,7 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
         }
         // name table 0
         case 0x2000 ... 0x2FFF: {
+                        //TODO: fetch attribute byte
             g_name_table_mem[_translate_name_table_address(addr - 0x2000)] = val;
         }
         // unmapped
@@ -216,6 +226,38 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
             return;
         }
     }
+}
+
+static uint16_t _compute_table_addr(unsigned int pix_x, unsigned int pix_y, unsigned int width, unsigned int height,
+        unsigned int granularity, uint16_t base_addr) {
+    uint8_t h_off = pix_x / granularity;
+    uint8_t v_off = pix_y / granularity;
+
+    //TODO
+    uint8_t scroll_x = 0;
+    uint8_t scroll_y = 0;
+
+    uint8_t table_index = g_ppu_control.name_table;
+
+    // figure out if we overflowed on the x-axis
+    if (h_off + scroll_x > width) {
+        table_index ^= 0b01; // flip the LSB
+    }
+
+    // figure out if we overflowed on the y-axis
+    if (v_off + scroll_y > height) {
+        table_index ^= 0b10; // flip the MSB
+    }
+
+    uint8_t real_h_off = (h_off + scroll_x) % width;
+    uint8_t real_v_off = (v_off + scroll_y) % height;
+
+    uint16_t table_addr = base_addr + (table_index * NAME_TABLE_INTERVAL)
+            + (real_v_off * width) + real_h_off;
+
+    assert(table_addr < 0x3000);
+
+    return table_addr;
 }
 
 void cycle_ppu(void) {
@@ -246,39 +288,74 @@ void cycle_ppu(void) {
                 }
                 
                 switch ((g_scanline_tick - 1) % 8) {
+                    case 0: {
+                        // flush the palette select data into the primary latch
+                        g_ppu_internal_regs.palette_select_latch = g_ppu_internal_regs.attr_table_entry_latch;
+
+                        // flush the pattern bitmap latches into the primary shift registers
+
+                        // clear upper bits
+                        g_ppu_internal_regs.pattern_shift_l &= 0xFF;
+                        // set upper bits
+                        g_ppu_internal_regs.pattern_shift_l &= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
+                        
+                        // clear upper bits
+                        g_ppu_internal_regs.pattern_shift_h &= 0xFF;
+                        // set upper bits
+                        g_ppu_internal_regs.pattern_shift_h &= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
+                    }
                     // fetch name table entry
                     case 1: {
-                        uint8_t nt_h_off = fetch_pixel_x / 8;
-                        uint8_t nt_v_off = fetch_pixel_y / 8;
-
-                        //TODO
-                        uint8_t scroll_x = 0;
-                        uint8_t scroll_y = 0;
-
-                        uint8_t nt_index = g_ppu_control.name_table;
-
-                        if (nt_h_off + scroll_x > NAME_TABLE_WIDTH) {
-                            nt_index ^= 0b01; // flip the LSB
-                        }
-
-                        if (nt_v_off + scroll_y > NAME_TABLE_HEIGHT) {
-                            nt_index ^= 0b10; // flip the MSB
-                        }
-
-                        uint8_t real_nt_h_off = (nt_h_off + scroll_x) % NAME_TABLE_WIDTH;
-                        uint8_t real_nt_v_off = (nt_v_off + scroll_y) % NAME_TABLE_HEIGHT;
-
-                        uint16_t name_table_addr = NAME_TABLE_BASE_ADDR + (nt_index * NAME_TABLE_INTERVAL)
-                                + (real_nt_v_off * 32) + real_nt_h_off;
-
-                        assert(name_table_addr < 0x3000);
+                        uint16_t name_table_addr = _compute_table_addr(fetch_pixel_x, fetch_pixel_y, NAME_TABLE_WIDTH,
+                                NAME_TABLE_HEIGHT, NAME_TABLE_GRANULARITY, NAME_TABLE_BASE_ADDR);
 
                         g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr);
 
                         break;
                     }
                     case 3: {
-                        //TODO: fetch attribute byte
+                        uint16_t attr_table_addr = _compute_table_addr(fetch_pixel_x, fetch_pixel_y, ATTR_TABLE_WIDTH,
+                                ATTR_TABLE_HEIGHT, ATTR_TABLE_GRANULARITY, ATTR_TABLE_BASE_ADDR);
+
+                        uint8_t attr_table_byte = ppu_memory_read(attr_table_addr);
+
+                        // check if it's in the bottom half of the table cell
+                        if ((fetch_pixel_y % 32) >= 16) {
+                            attr_table_byte >>= 4;
+                        }
+
+                        // check if it's in the right half of the table cell
+                        if ((fetch_pixel_x % 32) >= 16) {
+                            attr_table_byte >>= 2;
+                        }
+
+                        g_ppu_internal_regs.attr_table_entry_latch = attr_table_byte & 0b11;
+
+                        break;
+                    }
+                    case 5: {
+                        // multiply by 8 since each plane is 8 bytes, and 2 since there are two planes per tile
+                        // for a total of 16 consecutive bytes per tile
+                        // then we just add the mod of the current line to get the sub-tile offset
+                        unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
+                                + (fetch_pixel_y % 8);
+
+                        uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                + pattern_offset;
+
+                        g_ppu_internal_regs.pattern_bitmap_l_latch = ppu_memory_read(pattern_addr);
+
+                        break;
+                    }
+                    case 7: {
+                        // basically the same as above, but we add 8 to get the second plane
+                        unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
+                                + (fetch_pixel_y % 8) + 8;
+
+                        uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                + pattern_offset;
+
+                        g_ppu_internal_regs.pattern_bitmap_h_latch = ppu_memory_read(pattern_addr);
 
                         break;
                     }
@@ -288,6 +365,22 @@ void cycle_ppu(void) {
                         break;
                     }
                 }
+
+                unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h << 1) & 1)
+                        + (g_ppu_internal_regs.pattern_shift_l & 1);
+                
+                unsigned int palette_offset;
+
+                if (palette_low) {
+                    // if the palette low bits are not zero, we select the color normally
+                    palette_offset = (g_ppu_internal_regs.palette_select_latch << 2) + palette_low;
+                } else {
+                    // otherwise, we use the default background color
+                    palette_offset = 0;
+                }
+
+                uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
+                g_pixel_data[fetch_pixel_x][fetch_pixel_y] = ppu_memory_read(palette_entry_addr);
             }
 
             break;

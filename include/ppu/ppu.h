@@ -64,7 +64,11 @@ typedef struct {
     uint8_t w:1; // write flag (for twice-writable registers)
 
     uint8_t name_table_entry_latch;
-    uint8_t attr_table_entry_latch;
+    unsigned int attr_table_entry_latch:2;
+
+    uint8_t pattern_bitmap_l_latch;
+    uint8_t pattern_bitmap_h_latch;
+    unsigned int palette_select_latch:2;
 
     uint16_t pattern_shift_l;
     uint16_t pattern_shift_h;
