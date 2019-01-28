@@ -243,12 +243,6 @@ static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, b
         m = g_cpu_regs.acc;
     }
 
-    if (right) {
-        g_cpu_regs.status.carry = m & 1;
-    } else {
-        g_cpu_regs.status.carry = (m & 0x80) >> 7;
-    }
-
     uint8_t res = right ? m >> 1 : m << 1;
 
     if (rot) {
@@ -257,6 +251,12 @@ static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, b
         } else {
             res |= g_cpu_regs.status.carry;
         }
+    }
+
+    if (right) {
+        g_cpu_regs.status.carry = m & 1;
+    } else {
+        g_cpu_regs.status.carry = (m & 0x80) >> 7;
     }
 
     if (implicit) {
