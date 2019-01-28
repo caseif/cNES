@@ -24,6 +24,7 @@
  */
 
 #include "cartridge.h"
+#include "renderer.h"
 #include "util.h"
 #include "cpu/cpu.h"
 #include "ppu/ppu.h"
@@ -41,6 +42,8 @@ void start_main_loop(Cartridge *cart) {
     initialize_cpu();
     initialize_ppu(cart, cart->mirror_mode);
     load_cartridge(cart);
+
+    initialize_renderer();
 
     unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;
 

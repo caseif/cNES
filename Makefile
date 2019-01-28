@@ -20,7 +20,7 @@ OBJEXT = o
 
 INCLUDES = ./include
 TEST_INCLUDES = ./test/include
-LIBS = c
+LIBS = c SDL2main SDL2
 
 INCFLAGS := $(foreach d, $(INCLUDES), -I$d)
 TEST_INCFLAGS := $(foreach d, $(TEST_INCLUDES), -I$d)
@@ -52,10 +52,10 @@ apply_license_headers:
 	./scripts/apply_license_headers.sh
 
 $(OUTDIR)/$(BINNAME): $(OBJFILES)
-	$(LD) $(LDFLAGS) -o $(OUTDIR)/$(BINNAME) $(OBJFILES)
+	$(LD) -o $(OUTDIR)/$(BINNAME) $(OBJFILES) $(LDFLAGS)
 
 $(OUTDIR)/$(TEST_BINNAME): $(TEST_OBJFILES)
-	$(LD) $(LDFLAGS) -o $(OUTDIR)/$(TEST_BINNAME) $(TEST_OBJFILES)
+	$(LD) -o $(OUTDIR)/$(TEST_BINNAME) $(TEST_OBJFILES) $(LDFLAGS)
 
 .SECONDEXPANSION:
 $(OUTDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)

@@ -23,6 +23,7 @@
  * THE SOFTWARE.
  */
 
+#include "renderer.h"
 #include "cpu/cpu.h"
 #include "ppu/ppu.h"
 
@@ -33,8 +34,6 @@
 
 #define SCANLINE_COUNT 262
 #define CYCLES_PER_SCANLINE 341
-#define RESOLUTION_H 256
-#define RESOLUTION_V 240
 
 #define NAME_TABLE_GRANULARITY 8
 #define NAME_TABLE_WIDTH (RESOLUTION_H / NAME_TABLE_GRANULARITY)
@@ -78,8 +77,6 @@ unsigned char g_pattern_table_left[0x1000];
 unsigned char g_pattern_table_right[0x1000];
 unsigned char g_name_table_mem[0x800];
 unsigned char g_palette_ram[0x20];
-
-unsigned char g_pixel_data[RESOLUTION_H][RESOLUTION_V];
 
 static uint64_t g_frame;
 static uint16_t g_scanline;
@@ -319,17 +316,6 @@ static uint16_t _compute_table_addr(unsigned int pix_x, unsigned int pix_y, unsi
     return table_addr;
 }
 
-void display_frame(void) {
-    printf("\e[1;1H\e[2J");
-
-    for (unsigned int x = 0; x < RESOLUTION_H; x++) {
-        for (unsigned int y = 0; y < RESOLUTION_V; y++) {
-            printf("%02x ", g_pixel_data[x][y]);
-        }
-        printf("\n");
-    }
-}
-
 void cycle_ppu(void) {
     if (g_scanline == 0 && g_scanline_tick == 0 && g_frame % 2 == 1) {
         g_scanline_tick = 1;
@@ -482,7 +468,7 @@ void cycle_ppu(void) {
             }
 
             uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
-            g_pixel_data[g_scanline_tick][g_scanline] = ppu_memory_read(palette_entry_addr);
+            set_pixel(g_scanline_tick, g_scanline, ppu_memory_read(palette_entry_addr));
 
             // shift the internal registers
             g_ppu_internal_regs.pattern_shift_h >>= 1;
@@ -499,8 +485,7 @@ void cycle_ppu(void) {
 
             g_frame++;
 
-            //printf("frame %ld\n", g_frame);
-            //display_frame();
+            flush_frame();
         }
     }
 }
