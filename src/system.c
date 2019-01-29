@@ -32,7 +32,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define FRAMES_PER_SECOND 5.0988
+#define FRAMES_PER_SECOND 60.0988
 #define CYCLES_PER_FRAME 29780.5
 #define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
 

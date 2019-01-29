@@ -97,6 +97,7 @@ unsigned char g_pattern_table_left[0x1000];
 unsigned char g_pattern_table_right[0x1000];
 unsigned char g_name_table_mem[0x800];
 unsigned char g_palette_ram[0x20];
+Sprite g_oam_ram[0x40];
 
 static uint64_t g_frame;
 static uint16_t g_scanline;
@@ -150,10 +151,10 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             //TODO: not sure what to do here
             break;
         case 3:
-            //TODO: sprite RAM address
+            g_ppu_internal_regs.s = val;
             break;
         case 4:
-            //TODO: sprite RAM data
+            ((char*) g_oam_ram)[g_ppu_internal_regs.s] = val;
             break;
         case 5:
             // set either x- or y-scroll, depending on whether this is the first or second write
@@ -302,6 +303,13 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
         default: {
             return;
         }
+    }
+}
+
+void initiate_oam_dma(uint8_t page) {
+    for (uint8_t i = 0; i < 0xFF; i++) {
+        uint16_t addr = (page << 8) | i;
+        ((char*) g_oam_ram)[addr] = memory_read(addr);
     }
 }
 
@@ -475,33 +483,35 @@ void cycle_ppu(void) {
     }
 
     if (g_scanline < RESOLUTION_V && g_scanline_tick < RESOLUTION_H) {
-            unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)
-                    | (g_ppu_internal_regs.pattern_shift_l & 1);
-            
-            unsigned int palette_offset;
+        unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)
+                | (g_ppu_internal_regs.pattern_shift_l & 1);
+        
+        unsigned int palette_offset;
 
-            if (palette_low) {
-                // if the palette low bits are not zero, we select the color normally
-                unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
-                        | (g_ppu_internal_regs.palette_shift_l & 1);
-                palette_offset = (palette_high << 2) | palette_low;
-            } else {
-                // otherwise, we use the default background color
-                palette_offset = 0;
+        if (palette_low) {
+            // if the palette low bits are not zero, we select the color normally
+            unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
+                    | (g_ppu_internal_regs.palette_shift_l & 1);
+            palette_offset = (palette_high << 2) | palette_low;
+
+            if (g_oam_ram[0].x == g_scanline - 1 && g_oam_ram[0].y == g_scanline_tick) {
+                g_ppu_status.sprite_0_hit = 1;
             }
+        } else {
+            // otherwise, we use the default background color
+            palette_offset = 0;
+        }
 
-            uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
-            const RGBValue rgb = g_palette[ppu_memory_read(palette_entry_addr)];
+        uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
+        const RGBValue rgb = g_palette[ppu_memory_read(palette_entry_addr)];
 
-            set_pixel(g_scanline_tick, g_scanline, rgb);
-            //set_pixel(g_scanline_tick, g_scanline, g_ppu_internal_regs.name_table_entry_latch);
-            //set_pixel(g_scanline_tick, g_scanline, ppu_memory_read(PALETTE_DATA_BASE_ADDR + ((g_scanline / 7) % 0x20)));
+        set_pixel(g_scanline_tick, g_scanline, rgb);
 
-            // shift the internal registers
-            g_ppu_internal_regs.pattern_shift_h >>= 1;
-            g_ppu_internal_regs.pattern_shift_l >>= 1;
-            g_ppu_internal_regs.palette_shift_h >>= 1;
-            g_ppu_internal_regs.palette_shift_l >>= 1;
+        // shift the internal registers
+        g_ppu_internal_regs.pattern_shift_h >>= 1;
+        g_ppu_internal_regs.pattern_shift_l >>= 1;
+        g_ppu_internal_regs.palette_shift_h >>= 1;
+        g_ppu_internal_regs.palette_shift_l >>= 1;
     }
 
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {

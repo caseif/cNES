@@ -116,7 +116,7 @@ void memory_write(uint16_t addr, uint8_t val) {
             return;
         }
         case 0x4014: {
-            //TODO: DMA register
+            initiate_oam_dma(val);
             return;
         }
         case 0x4000 ... 0x4013:
@@ -642,9 +642,9 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr->addr_mode);
 
-    printf("Decoded instruction %s:%s with computed param $%02x (src addr $%04x) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
+    /*printf("Decoded instruction %s:%s with computed param $%02x (src addr $%04x) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr,
-            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
+            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 

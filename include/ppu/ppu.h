@@ -59,6 +59,7 @@ typedef struct {
 typedef struct {
     uint16_t v;  // current VRAM address
     uint16_t t;  // temporary VRAM address
+    uint16_t s; // sprite address
     uint8_t x;   // fine x-scroll
     uint8_t w:1; // write flag (for twice-writable registers)
 
@@ -77,6 +78,25 @@ typedef struct {
     uint16_t palette_shift_h;
 } PpuInternalRegisters;
 
+typedef struct {
+    uint8_t y;
+    union {
+        struct {
+            unsigned int tile_bank:1 PACKED;
+            unsigned int tile_num:7 PACKED;
+        } tall_tile_info;
+        uint8_t tile_num;
+    };
+    struct {
+        unsigned int palette_index:2 PACKED;
+        unsigned int :3 PACKED; // unused
+        unsigned int priority:1 PACKED;
+        unsigned int flip_hor:1 PACKED;
+        unsigned int flip_ver:1 PACKED;
+    } attrs;
+    uint8_t x;
+} Sprite;
+
 void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode);
 
 uint8_t read_ppu_mmio(uint8_t index);
@@ -86,5 +106,7 @@ void write_ppu_mmio(uint8_t addr, uint8_t val);
 uint8_t ppu_memory_read(uint16_t addr);
 
 void ppu_memory_write(uint16_t addr, uint8_t val);
+
+void initiate_oam_dma(uint8_t page);
 
 void cycle_ppu(void);
