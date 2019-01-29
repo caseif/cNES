@@ -38,6 +38,6 @@ typedef struct {
 
 void initialize_renderer(void);
 
-void set_pixel(unsigned int x, unsigned int y, unsigned char palette_index);
+void set_pixel(unsigned int x, unsigned int y, const RGBValue rgb);
 
 void flush_frame(void);

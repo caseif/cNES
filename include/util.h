@@ -37,6 +37,8 @@
 
 #define PACKED __attribute__((packed))
 
+#define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
+
 typedef struct {
     unsigned char *data;
     size_t size;
@@ -55,4 +57,11 @@ static inline void sleep_cp(int ms) {
     #else
     nanosleep((struct timespec[]) {{0, ms * 1000000L}}, NULL);
     #endif
+}
+
+static inline unsigned char reverse_bits(unsigned char b) {
+   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+   return b;
 }
