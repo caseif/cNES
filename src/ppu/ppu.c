@@ -392,8 +392,7 @@ void cycle_ppu(void) {
                         uint16_t name_table_addr = _compute_table_addr(fetch_pixel_x, fetch_pixel_y, NAME_TABLE_WIDTH,
                                 NAME_TABLE_HEIGHT, NAME_TABLE_GRANULARITY, NAME_TABLE_BASE_ADDR);
 
-                        g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr) % 36;
-                        //g_ppu_internal_regs.name_table_entry_latch = 0x2000 + (fetch_pixel_y / 8 * 16) + ((fetch_pixel_x - 1) / 8);
+                        g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr);
 
                         break;
                     }
@@ -466,10 +465,11 @@ void cycle_ppu(void) {
         // pre-render line
         case 261: {
             // clear status
-            if (g_scanline_tick == 1) {
+            if ((g_ppu_mask.show_background || g_ppu_mask.show_sprites) && g_scanline_tick == 1) {
                 g_ppu_status.vblank = 0;
                 g_ppu_status.sprite_0_hit = 0;
                 g_ppu_status.sprite_overflow = 0;
+                g_ppu_internal_regs.v = 0;
             }
         }
     }

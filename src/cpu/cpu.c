@@ -642,15 +642,9 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr->addr_mode);
 
-    /*printf("len: %d\n", get_instr_len(instr));
-    printf("pc: %04x\n", g_cpu_regs.pc);
     printf("Decoded instruction %s:%s with computed param $%02x (src addr $%04x) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr,
-            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
-    /*extern PpuControl g_ppu_control;
-    if (!g_ppu_control.background_table) {
-        printf("HERE DUMBASS\n");
-    }*/
+            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 
