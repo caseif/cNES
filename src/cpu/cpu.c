@@ -509,6 +509,13 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case ROR:
             _do_shift(m, addr, instr->addr_mode == IMP, true, true);
             break;
+        case BIT:
+            // set negative and overflow flags from memory
+            g_cpu_regs.status.negative = m >> 7;
+            g_cpu_regs.status.overflow = (m >> 6) & 1;
+
+            // mask accumulator with value and set zero flag appropriately
+            g_cpu_regs.status.zero = (g_cpu_regs.acc & m) == 0;
         // branching
         case BCC:
             if (!g_cpu_regs.status.carry) {
@@ -623,6 +630,8 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
         case PLP: {
             uint8_t serial = stack_pop();
+            serial &= ~(1 << 4); // unset bit 4
+            serial |= (1 << 5); // set bit 5
             memcpy(&g_cpu_regs.status, &serial, 1);
             break;
         }
@@ -644,13 +653,18 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case NOP:
             // no-op
             break;
-        case KIL:
-            printf("Encountered KIL instruction @ $%x", g_cpu_regs.pc - 1);
-            exit(-1);
         default:
+        case KIL:
+            printf("Encountered %s instruction @ $%x\n", mnemonic_to_str(instr->mnemonic), g_cpu_regs.pc - 1);
+            printf("Error codes: %02x %02x\n", memory_read(0x02), memory_read(0x03));
+            for (unsigned int i = 0x200; i < 0x400; i++) {
+
+            }
+            exit(-1);
+        //default:
             //TODO
             // no-op
-            break;
+            //break;
     }
 
     if (g_cpu_regs.pc >= g_prg_rom.size + base_pc) {
@@ -664,9 +678,9 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr);
 
-    /*printf("Decoded instruction %s:%s with operand ($%02x/$%02x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
+    printf("Decoded instruction %s:%s with operand ($%04x/$%04x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.raw_operand, param.adj_operand,
-            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
+            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 
