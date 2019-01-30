@@ -63,6 +63,8 @@ typedef struct {
     uint8_t x;   // fine x-scroll
     uint8_t w:1; // write flag (for twice-writable registers)
 
+    uint8_t read_buf;
+
     uint8_t scroll_x;
     uint8_t scroll_y;
 

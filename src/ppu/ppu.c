@@ -134,7 +134,9 @@ uint8_t read_ppu_mmio(uint8_t index) {
         }
         case 7: {
             // read from stored address
-            uint8_t res = ppu_memory_read(g_ppu_internal_regs.v);
+            uint8_t res = g_ppu_internal_regs.read_buf;
+
+            g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v);
 
             g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
 
