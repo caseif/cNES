@@ -134,7 +134,11 @@ uint8_t read_ppu_mmio(uint8_t index) {
         }
         case 7: {
             // read from stored address
-            return ppu_memory_read(g_ppu_internal_regs.v);
+            uint8_t res = ppu_memory_read(g_ppu_internal_regs.v);
+
+            g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
+
+            return res;
         }
         default: {
             //TODO: I think it returns a latch value here
@@ -194,7 +198,8 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
         case 7: {
             // write to the stored address
             ppu_memory_write(g_ppu_internal_regs.v, val);
-            g_ppu_internal_regs.v++;
+
+            g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
 
             break;
         }
