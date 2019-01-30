@@ -57,16 +57,13 @@ typedef struct {
 } PpuStatus;
 
 typedef struct {
-    uint16_t v;  // current VRAM address
-    uint16_t t;  // temporary VRAM address
-    uint16_t s; // sprite address
-    uint8_t x;   // fine x-scroll
-    uint8_t w:1; // write flag (for twice-writable registers)
+    unsigned int v:15;  // current VRAM address
+    unsigned int t:15;  // temporary VRAM address
+    uint16_t s;         // sprite address
+    uint8_t x;          // fine x-scroll
+    uint8_t w:1;        // write flag (for twice-writable registers)
 
     uint8_t read_buf;
-
-    uint8_t scroll_x;
-    uint8_t scroll_y;
 
     uint8_t name_table_entry_latch;
     unsigned int attr_table_entry_latch:2;

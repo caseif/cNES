@@ -103,6 +103,10 @@ static uint64_t g_frame;
 static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
+static inline bool _is_rendering_enabled(void) {
+    return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
+}
+
 void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode) {
     g_cartridge = cartridge;
 
@@ -133,14 +137,20 @@ uint8_t read_ppu_mmio(uint8_t index) {
             return res;
         }
         case 7: {
-            // read from stored address
-            uint8_t res = g_ppu_internal_regs.read_buf;
+            if (g_ppu_internal_regs.v < 0x3F00) {
+                // most VRAM goes through a read buffer
+                uint8_t res = g_ppu_internal_regs.read_buf;
 
-            g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v);
+                g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v);
 
-            g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
+                g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
+                
+                return res;
+            } else {
+                // palette reading bypasses buffer entirely
+                return ppu_memory_read(g_ppu_internal_regs.v);
+            }
 
-            return res;
         }
         default: {
             //TODO: I think it returns a latch value here
@@ -155,6 +165,8 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
     switch (index) {
         case 0:
             memcpy(&g_ppu_control, &val, 1);
+            g_ppu_internal_regs.t &= ~(0b11 << 10); // clear bits 10-11
+            g_ppu_internal_regs.t |= val & 0b11; // set bits 10-11 to current nametable
             break;
         case 1:
             memcpy(&g_ppu_mask, &val, 1);
@@ -171,9 +183,17 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
         case 5:
             // set either x- or y-scroll, depending on whether this is the first or second write
             if (g_ppu_internal_regs.w) {
-                g_ppu_internal_regs.scroll_y = val;
+                g_ppu_internal_regs.t &= ~(0b11111 << 5); // clear bits 5-9
+                g_ppu_internal_regs.t |= (val & 0b11111000) << 2; // set bits 5-9
+
+                g_ppu_internal_regs.t &= ~(0b111 << 12);  // clear bits 12-14
+                g_ppu_internal_regs.t |= (val & 0b111) << 12; // set bits 12-14
             } else {
-                g_ppu_internal_regs.scroll_x = val;
+                // setting x-scroll
+                g_ppu_internal_regs.t &= ~(0b11111); // clear bits 0-4
+                g_ppu_internal_regs.t |= val >> 3; // set bits 0-4
+                
+                g_ppu_internal_regs.x = val & 0x7; // copy fine x to x register
             }
 
             // flip w flag
@@ -183,14 +203,17 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             // set either the upper or lower address bits, depending on which write this is
             if (g_ppu_internal_regs.w) {
                 // clear lower bits
-                g_ppu_internal_regs.v &= 0xFF00;
+                g_ppu_internal_regs.t &= ~0x00FF;
                 // set lower bits
-                g_ppu_internal_regs.v |= val;
+                g_ppu_internal_regs.t |= (val & 0xFF);
+
+                // flush t to v
+                g_ppu_internal_regs.v = g_ppu_internal_regs.t;
             } else {
                 // clear upper bits
-                g_ppu_internal_regs.v &= 0x00FF;
+                g_ppu_internal_regs.t &= ~0x7F00;
                 // set upper bits
-                g_ppu_internal_regs.v |= val << 8;
+                g_ppu_internal_regs.t |= (val & 0b111111) << 8;
             }
 
             // flip w flag
@@ -292,7 +315,6 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
         }
         // name table 0
         case 0x2000 ... 0x3EFF: {
-                        //TODO: fetch attribute byte
             g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)] = val;
             break;
         }
@@ -326,34 +348,52 @@ void initiate_oam_dma(uint8_t page) {
     }
 }
 
-static uint16_t _compute_table_addr(unsigned int pix_x, unsigned int pix_y, unsigned int width, unsigned int height,
-        unsigned int granularity, uint16_t base_addr) {
-    uint8_t scroll_x = g_ppu_internal_regs.scroll_x;
-    uint8_t scroll_y = g_ppu_internal_regs.scroll_y;
+// this code was shamelessly lifted from https://wiki.nesdev.com/w/index.php/PPU_scrolling
+void _update_v_vertical(void) {
+    // update vert(v)
 
-    unsigned int x_index = (pix_x + scroll_x) / granularity;
-    unsigned int y_index = (pix_y + scroll_y) / granularity;
+    unsigned int v = g_ppu_internal_regs.v;
 
-    uint8_t table_index = g_ppu_control.name_table;
+    // if fine y = 7
+    if ((v & 0x7000) == 0x7000) {
+        v &= ~0x7000; // clear fine y
+        unsigned int y = (v & 0x03E0) >> 5; // get coarse y
 
-    // figure out if we overflowed on the x-axis
-    while (x_index >= width) {
-        table_index ^= 0b01; // flip the LSB
-        x_index -= width;
+        // check if we're at the end of the name table
+        if (y == 29) {
+            y = 0; // clear coarse y
+            v ^= 0x8000; // flip vertical name table bit
+        } else if (y == 31) {
+            y = 0; // just clear coarse y
+            //TODO: not sure why we don't switch the name table here
+        } else {
+            y += 1; // just increment coarse y
+        }
+
+        v = (v & ~0x03E0) | (y << 5); // insert coarse y back into v
+    } else {
+        // otherwise, just increment fine y
+        v += 0x1000;
     }
 
-    // figure out if we overflowed on the y-axis
-    while (y_index >= height) {
-        table_index ^= 0b10; // flip the MSB
-        y_index -= height;
+    g_ppu_internal_regs.v = v;
+}
+
+// this code was shamelessly lifted from https://wiki.nesdev.com/w/index.php/PPU_scrolling
+void _update_v_horizontal(void) {
+    unsigned int v = g_ppu_internal_regs.v;
+
+    if ((v & 0x1F) == 0x1F) {
+        // if x = 31 (last tile of nametable), skip to next name table
+        v &= ~0x1F; // clear the LSBs
+        v ^= 0x0400; // flip the horizontal name table bit
+    } else {
+        // otherwise, just increment v
+        v += 1;
     }
 
-    uint16_t table_addr = base_addr + (table_index * NAME_TABLE_INTERVAL)
-            + (y_index * width) + x_index;
-
-    assert(table_addr < 0x3000);
-
-    return table_addr;
+    // write the updated value back to the register
+    g_ppu_internal_regs.v = v;
 }
 
 void cycle_ppu(void) {
@@ -368,6 +408,12 @@ void cycle_ppu(void) {
                 // idle tick
                 break;
             } else if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
+                // hori(v) = hori(t)
+                if (g_scanline_tick == 257 && _is_rendering_enabled()) {
+                    g_ppu_internal_regs.v &= ~0x41F; // clear horizontal bits
+                    g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x41F; // copy horizontal bits to v from t
+                }
+
                 //TODO: perform sprite tile fetching
             } else {
                 unsigned int fetch_pixel_x;
@@ -410,16 +456,17 @@ void cycle_ppu(void) {
                     }
                     // fetch name table entry
                     case 1: {
-                        uint16_t name_table_addr = _compute_table_addr(fetch_pixel_x, fetch_pixel_y, NAME_TABLE_WIDTH,
-                                NAME_TABLE_HEIGHT, NAME_TABLE_GRANULARITY, NAME_TABLE_BASE_ADDR);
+                        // address = name table base + (v except fine y)
+                        uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v & 0x0FFF);
 
                         g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr);
 
                         break;
                     }
                     case 3: {
-                        uint16_t attr_table_addr = _compute_table_addr(fetch_pixel_x, fetch_pixel_y, ATTR_TABLE_WIDTH,
-                                ATTR_TABLE_HEIGHT, ATTR_TABLE_GRANULARITY, ATTR_TABLE_BASE_ADDR);
+                        // address = attr table base + (voodo)
+                        unsigned int v = g_ppu_internal_regs.v;
+                        uint16_t attr_table_addr = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
                         uint8_t attr_table_byte = ppu_memory_read(attr_table_addr);
 
@@ -460,6 +507,18 @@ void cycle_ppu(void) {
 
                         g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(ppu_memory_read(pattern_addr));
 
+
+                        // only update v if rendering is enabled
+                        if (_is_rendering_enabled()) {
+                            // only update vertical v at the end of the visible part of the scanline
+                            if (g_scanline_tick == 256) {
+                                _update_v_vertical();
+                            }
+
+                            // update horizontal v after every tile
+                            _update_v_horizontal();
+                        }
+
                         break;
                     }
                     default: {
@@ -486,11 +545,16 @@ void cycle_ppu(void) {
         // pre-render line
         case 261: {
             // clear status
-            if ((g_ppu_mask.show_background || g_ppu_mask.show_sprites) && g_scanline_tick == 1) {
+            if (g_scanline_tick == 1 && _is_rendering_enabled()) {
                 g_ppu_status.vblank = 0;
                 g_ppu_status.sprite_0_hit = 0;
                 g_ppu_status.sprite_overflow = 0;
-                g_ppu_internal_regs.v = 0;
+            }
+
+            // vert(v) = vert(t)
+            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && _is_rendering_enabled()) {
+                g_ppu_internal_regs.v &= ~0x7BE0; // clear vertical bits
+                g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x7BE0; // copy vertical bits to v from t
             }
         }
     }

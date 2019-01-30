@@ -57,7 +57,7 @@ void initialize_cpu(void) {
     g_cpu_regs.pc = BASE_PC;
     g_cpu_regs.sp = BASE_SP;
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
-    memset(g_sys_memory, '\0', SYSTEM_MEMORY);
+    memset(g_sys_memory, 0xFF, SYSTEM_MEMORY);
 }
 
 void load_cartridge(Cartridge *cartridge) {
