@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
 
     if (!rom_file) {
         printf("Could not open ROM file %s.\n", rom_file_name);
+        return -1;
     }
 
     Cartridge *cart = load_rom(rom_file);

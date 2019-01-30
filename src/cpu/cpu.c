@@ -35,7 +35,6 @@
 
 #define SYSTEM_MEMORY 2048
 #define STACK_BOTTOM_ADDR 0x100
-#define BASE_PC 0x8000
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x20 // unused flag is set by default
 
@@ -51,10 +50,11 @@ static DataBlob g_prg_rom;
 unsigned char g_sys_memory[SYSTEM_MEMORY];
 CpuRegisters g_cpu_regs;
 
+uint16_t base_pc;
+
 uint8_t g_burn_cycles = 0;
 
 void initialize_cpu(void) {
-    g_cpu_regs.pc = BASE_PC;
     g_cpu_regs.sp = BASE_SP;
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
     memset(g_sys_memory, 0xFF, SYSTEM_MEMORY);
@@ -63,6 +63,9 @@ void initialize_cpu(void) {
 void load_cartridge(Cartridge *cartridge) {
     g_cartridge = cartridge;
     load_program((DataBlob) {cartridge->prg_rom, cartridge->prg_size});
+
+    base_pc = memory_read(0xFFFC) | (memory_read(0xFFFD) << 8);
+    g_cpu_regs.pc = base_pc;
 }
 
 void load_program(DataBlob program_blob) {
@@ -650,7 +653,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
     }
 
-    if (g_cpu_regs.pc >= g_prg_rom.size + 0x8000) {
+    if (g_cpu_regs.pc >= g_prg_rom.size + base_pc) {
         printf("Execution address exceeded PRG-ROM bounds (pc=$%x)\n", g_cpu_regs.pc);
         exit(-1);
     }
@@ -661,9 +664,9 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr);
 
-    printf("Decoded instruction %s:%s with operand ($%02x/$%02x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
+    /*printf("Decoded instruction %s:%s with operand ($%02x/$%02x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.raw_operand, param.adj_operand,
-            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
+            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 
