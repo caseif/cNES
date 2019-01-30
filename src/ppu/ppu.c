@@ -151,7 +151,11 @@ uint8_t read_ppu_mmio(uint8_t index) {
                 
                 return res;
             } else {
-                // palette reading bypasses buffer entirely
+                // palette reading bypasses buffer entirely, but still updates it
+
+                // address is offset due to mirroring
+                g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v - 0x1000);
+
                 return ppu_memory_read(g_ppu_internal_regs.v);
             }
 
