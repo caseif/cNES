@@ -516,6 +516,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 
             // mask accumulator with value and set zero flag appropriately
             g_cpu_regs.status.zero = (g_cpu_regs.acc & m) == 0;
+            break;
         // branching
         case BCC:
             if (!g_cpu_regs.status.carry) {
