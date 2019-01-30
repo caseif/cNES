@@ -124,6 +124,12 @@ uint8_t read_ppu_mmio(uint8_t index) {
             // return the status
             uint8_t res;
             memcpy(&res, &g_ppu_status, 1);
+
+            // reading this register resets this latch
+            g_ppu_internal_regs.w = 0;
+            // and the vblank flag
+            g_ppu_status.vblank = 0;
+
             return res;
         }
         case 7: {
