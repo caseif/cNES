@@ -125,18 +125,18 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         case CMP:
         case CPX:
         case CPY:
-            return R;
+            return INS_R;
         case STA:
         case STX:
         case STY:
-            return W;
+            return INS_W;
         case DEC:
         case INC:
         case ASL:
         case LSR:
         case ROL:
         case ROR:
-            return RW;
+            return INS_RW;
         case BCC:
         case BCS:
         case BNE:
@@ -145,12 +145,12 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         case BMI:
         case BVC:
         case BVS:
-            return BRANCH;
+            return INS_BRANCH;
         case JMP:
         case JSR:
-            return JUMP;
+            return INS_JUMP;
         default:
-            return NONE;
+            return INS_NONE;
     }
 }
 
@@ -222,20 +222,20 @@ uint8_t get_instr_cycles(const Instruction *instr, InstructionParameter *param, 
 
         switch (instr->addr_mode) {
             case ABX:
-                base_addr = param->base_value;
+                base_addr = param->raw_operand;
                 offset = regs->x;
                 break;
             case ABY:
-                base_addr = param->base_value;
+                base_addr = param->raw_operand;
                 offset = regs->y;
                 break;
             case IZY:
-                base_addr = param->base_value;
+                base_addr = param->raw_operand;
                 offset = regs->y;
                 break;
             case REL:
                 base_addr = regs->pc;
-                offset = param->base_value;
+                offset = param->raw_operand;
                 break;
             default:
                 base_addr = 0;

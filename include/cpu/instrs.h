@@ -52,11 +52,11 @@ typedef struct {
 
 typedef struct {
     uint16_t value;
-    uint16_t base_value;
-    uint16_t src_addr;
+    uint16_t raw_operand;
+    uint16_t adj_operand;
 } InstructionParameter;
 
-typedef enum { NONE, BRANCH, JUMP, R, W, RW } InstructionType;
+typedef enum { INS_NONE, INS_BRANCH, INS_JUMP, INS_R, INS_W, INS_RW } InstructionType;
 
 const char *mnemonic_to_str(const Mnemonic mnemonic);
 

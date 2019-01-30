@@ -154,8 +154,14 @@ static uint16_t _next_prg_short(void) {
 /**
  * Returns value M along with the address it was read from, if applicable.
  */
-static InstructionParameter _get_next_m(AddressingMode mode) {
-    switch (mode) {
+static InstructionParameter _get_next_m(const Instruction *instr) {
+    uint16_t raw_operand;
+    uint16_t adj_operand;
+
+    switch (instr->addr_mode) {
+        case IMP: {
+            return (InstructionParameter) {0, 0, 0};
+        }
         case IMM: {
             uint8_t val = _next_prg_byte();
             return (InstructionParameter) {val, val, 0};
@@ -165,67 +171,80 @@ static InstructionParameter _get_next_m(AddressingMode mode) {
             return (InstructionParameter) {val, val, 0};
         }
         case ZRP: {
-            uint8_t addr = _next_prg_byte();
-            return (InstructionParameter) {memory_read(addr), addr, addr};
+            raw_operand = _next_prg_byte();
+            adj_operand = raw_operand;
+            break;
         }
         case ZPX: {
-            uint8_t base_addr = _next_prg_byte();
-            uint8_t addr = base_addr + g_cpu_regs.x;
-            return (InstructionParameter) {memory_read(addr), base_addr, addr};
+            raw_operand = _next_prg_byte();
+            // we have to reinterpret the result as a single byte since we're working with the zero-page
+            adj_operand = (uint8_t) (raw_operand + g_cpu_regs.x);
+            break;
         }
         case ZPY: {
-            uint8_t base_addr = _next_prg_byte();
-            uint8_t addr = base_addr + g_cpu_regs.y;
-            return (InstructionParameter) {memory_read(addr), base_addr, addr};
+            raw_operand = _next_prg_byte();
+            // again, we have to reinterpret as a single byte
+            adj_operand = (uint8_t) (raw_operand + g_cpu_regs.y);
+            break;
         }
         case ABS: {
-            uint16_t addr = _next_prg_short();
-            return (InstructionParameter) {memory_read(addr), addr, addr};
+            uint16_t raw_operand = _next_prg_short();
+            adj_operand = raw_operand;
+            break;
         }
         case ABX: {
-            uint16_t base_addr = _next_prg_short();
-            uint16_t addr = g_cpu_regs.x + base_addr;
-            return (InstructionParameter) {memory_read(addr), base_addr, addr};
+            raw_operand = _next_prg_short();
+            adj_operand = g_cpu_regs.x + raw_operand;
+            break;
         }
         case ABY: {
-            uint16_t base_addr = _next_prg_short();
-            uint16_t addr = g_cpu_regs.y + base_addr;
-            return (InstructionParameter) {memory_read(addr), base_addr, addr};
+            raw_operand = _next_prg_short();
+            adj_operand = g_cpu_regs.y + raw_operand;
+            break;
         }
         case IND: {
-            uint16_t orig_addr = _next_prg_short();
-            uint8_t addr_low = memory_read(orig_addr);
+            raw_operand = _next_prg_short();
+
+            uint8_t addr_low = memory_read(raw_operand);
             // if the indirect target is the last byte of a page, the target
             // high byte will incorrectly be read from the first byte of the
             // same page
-            uint16_t high_target = ((orig_addr & 0xFF) == 0xFF) ? (orig_addr - 0xFF) : (orig_addr + 1);
+            uint16_t high_target = ((raw_operand & 0xFF) == 0xFF) ? (raw_operand - 0xFF) : (raw_operand + 1);
             uint8_t addr_high = memory_read(high_target);
-            uint16_t addr = (addr_low | (addr_high << 8));
-            return (InstructionParameter) {memory_read(addr), orig_addr, addr};
+            adj_operand = (addr_low | (addr_high << 8));
+            break;
         }
         case IZX: {
-            uint16_t base_addr = _next_prg_byte();
-            uint16_t orig_addr = (g_cpu_regs.x + base_addr);
+            raw_operand = _next_prg_byte();
+
+            uint16_t orig_addr = (g_cpu_regs.x + raw_operand);
             uint8_t addr_low = memory_read(orig_addr);
             uint8_t addr_high = memory_read(orig_addr + 1);
-            uint16_t addr = (addr_low | (addr_high << 8));
-            return (InstructionParameter) {memory_read(addr), base_addr, addr};
+            adj_operand = (addr_low | (addr_high << 8));
+            break;
         }
         case IZY: {
-            uint16_t orig_addr = _next_prg_byte();
-            uint8_t addr_low = memory_read(orig_addr);
-            uint8_t addr_high = memory_read(orig_addr + 1);
-            uint16_t addr = (g_cpu_regs.y + (addr_low | (addr_high << 8)));
-            return (InstructionParameter) {memory_read(addr), orig_addr, addr};
-        }
-        case IMP: {
-            return (InstructionParameter) {0, 0, 0};
+            raw_operand = _next_prg_byte();
+
+            uint8_t addr_low = memory_read(raw_operand);
+            uint8_t addr_high = memory_read(raw_operand + 1);
+            adj_operand = (g_cpu_regs.y + (addr_low | (addr_high << 8)));
+            break;
         }
         default: {
-            printf("Unhandled addressing mode %s", addr_mode_to_str(mode));
+            printf("Unhandled addressing mode %s", addr_mode_to_str(instr->addr_mode));
             exit(-1);
         }
     }
+
+    uint8_t val = 0;
+    // don't do a read for write-only instructions
+    // this is especially important because erroneous reads can mess with MMIO
+    if (get_instr_type(instr->mnemonic) != INS_W) {
+        val = memory_read(adj_operand);
+    }
+
+    return (InstructionParameter) {val, raw_operand, adj_operand};
 }
 
 static void _do_branch(int8_t offset) {
@@ -318,7 +337,7 @@ void issue_interrupt(const InterruptType *type) {
 
 void _exec_instr(const Instruction *instr, InstructionParameter param) {
     uint16_t m = param.value;
-    uint16_t addr = param.src_addr;
+    uint16_t addr = param.adj_operand;
 
     switch (instr->mnemonic) {
         // storage
@@ -640,10 +659,10 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 void _exec_next_instr(void) {
     const Instruction *instr = decode_instr(_next_prg_byte());
 
-    InstructionParameter param = _get_next_m(instr->addr_mode);
+    InstructionParameter param = _get_next_m(instr);
 
-    /*printf("Decoded instruction %s:%s with computed param $%02x (src addr $%04x) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
-            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.value, param.src_addr,
+    /*printf("Decoded instruction %s:%s with operand ($%02x/$%02x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
+            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.raw_operand, param.adj_operand,
             g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);*/
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
