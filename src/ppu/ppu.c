@@ -112,8 +112,12 @@ void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode) {
 
     g_mirror_mode = mirror_mode;
     
-    memset(&g_ppu_control, '\0', 1);
-    memset(&g_ppu_mask, '\0', 1);
+    g_ppu_control = (PpuControl) {0};
+    g_ppu_mask = (PpuMask) {0};
+
+    memset(g_name_table_mem, 0xFF, 0x1000);
+    memset(g_palette_ram, 0xFF, 0x20);
+    memset(g_oam_ram, 0xFF, 0x40);
     
     g_frame = 0;
     g_scanline = 0;
