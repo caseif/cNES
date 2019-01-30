@@ -682,13 +682,6 @@ void _exec_next_instr(void) {
     printf("Decoded instruction %s:%s with operand ($%04x/$%04x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.raw_operand, param.adj_operand,
             g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
-    if (memory_read(0x6001) == 0xDE && memory_read(0x6002) == 0xB0 && memory_read(0x6003) == 0x61) {
-        printf("res: %02x\n", memory_read(0x6000));
-        printf(memory_read(0x6004));
-        printf("\n");
-    } else {
-        printf("no info\n");
-    }
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 

@@ -171,11 +171,19 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
     assert(index <= 7);
 
     switch (index) {
-        case 0:
+        case 0: {
+            bool old_gen_nmis = g_ppu_control.gen_nmis;
+
             memcpy(&g_ppu_control, &val, 1);
             g_ppu_internal_regs.t &= ~(0b11 << 10); // clear bits 10-11
             g_ppu_internal_regs.t |= val & 0b11; // set bits 10-11 to current nametable
+
+            if (!old_gen_nmis && g_ppu_control.gen_nmis && g_ppu_status.vblank) {
+                issue_interrupt(INT_NMI);
+            }
+
             break;
+        }
         case 1:
             memcpy(&g_ppu_mask, &val, 1);
             break;
