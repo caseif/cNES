@@ -100,8 +100,8 @@ unsigned char g_palette_ram[0x20];
 Sprite g_oam_ram[0x40];
 
 static bool g_odd_frame;
-static uint16_t g_scanline;
-static uint16_t g_scanline_tick;
+uint16_t g_scanline;
+uint16_t g_scanline_tick;
 
 static inline bool _is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;

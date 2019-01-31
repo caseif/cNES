@@ -186,15 +186,9 @@ const Instruction *decode_instr(unsigned char opcode) {
     return &g_instr_list[opcode];
 }
 
-static bool _does_cross_page_boundary(uint8_t a, int8_t offset) {
-    return offset > 0 && (a > 0xFF - offset || a <= 0xFF - offset);
-}
-
-static bool _can_incur_page_boundary_penalty(const Instruction *instr) {
-    uint8_t opcode = instr->mnemonic;
-
+bool can_incur_page_boundary_penalty(const uint8_t opcode) {
     // all opcodes with an even high nybble don't incur penalties
-    if (!(opcode & 1)) {
+    if (!((opcode >> 4) & 1)) {
         return false;
     }
 
@@ -203,8 +197,8 @@ static bool _can_incur_page_boundary_penalty(const Instruction *instr) {
     if ((opcode >> 4) == 0x9) {
         // for all opcodes 0x9X, only 0x90 incurs a penalty
         return low_nybble == 0;
-    } else if ((opcode >> 4) == 0xA) {
-        // row 0xAX is unusual - I can't find a pattern in it
+    } else if ((opcode >> 4) == 0xB) {
+        // row 0xBX is unusual - I can't find a pattern in it
         if (low_nybble == 0x3 || low_nybble == 0xB || low_nybble == 0xE || low_nybble == 0xF) {
             return true;
         }
@@ -213,42 +207,6 @@ static bool _can_incur_page_boundary_penalty(const Instruction *instr) {
     return low_nybble == 0x0 || low_nybble == 0x1 || low_nybble == 0x9 || low_nybble == 0xC || low_nybble == 0xD;
 }
 
-uint8_t get_instr_cycles(const Instruction *instr, InstructionParameter *param, CpuRegisters *regs) {
-    uint8_t cycles = g_instr_cycles[instr->mnemonic];
-
-    if (_can_incur_page_boundary_penalty(instr)) {
-        uint16_t base_addr;
-        int8_t offset;
-
-        switch (instr->addr_mode) {
-            case ABX:
-                base_addr = param->raw_operand;
-                offset = regs->x;
-                break;
-            case ABY:
-                base_addr = param->raw_operand;
-                offset = regs->y;
-                break;
-            case IZY:
-                base_addr = param->raw_operand;
-                offset = regs->y;
-                break;
-            case REL:
-                base_addr = regs->pc;
-                offset = param->raw_operand;
-                break;
-            default:
-                base_addr = 0;
-                offset = 0;
-                break;
-        }
-
-        if (_does_cross_page_boundary(base_addr, offset)) {
-            cycles++;
-        }
-    }
-
-    //TODO: determine if branch is taken
-
-    return cycles;
+uint8_t get_instr_cycles(const uint8_t opcode, InstructionParameter *param, CpuRegisters *regs) {
+    return g_instr_cycles[opcode];
 }

@@ -36,7 +36,7 @@
 #define SYSTEM_MEMORY 2048
 #define STACK_BOTTOM_ADDR 0x100
 #define BASE_SP 0xFF
-#define DEFAULT_STATUS 0x20 // unused flag is set by default
+#define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
 
 #define PRINT_INSTRS 1
 
@@ -56,8 +56,11 @@ uint16_t base_pc;
 
 uint8_t g_burn_cycles = 0;
 
+unsigned int g_total_cycles = 7;
+
 void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
+
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
     memset(g_sys_memory, 0xFF, SYSTEM_MEMORY);
 }
@@ -159,9 +162,11 @@ static uint16_t _next_prg_short(void) {
 /**
  * Returns value M along with the address it was read from, if applicable.
  */
-static InstructionParameter _get_next_m(const Instruction *instr) {
+static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr) {
     uint16_t raw_operand;
     uint16_t adj_operand;
+
+    bool crosses_boundary = false;
 
     switch (instr->addr_mode) {
         case IMP: {
@@ -200,11 +205,17 @@ static InstructionParameter _get_next_m(const Instruction *instr) {
         case ABX: {
             raw_operand = _next_prg_short();
             adj_operand = g_cpu_regs.x + raw_operand;
+
+            crosses_boundary = (adj_operand & 0xFF) < (raw_operand & 0xFF);
+
             break;
         }
         case ABY: {
             raw_operand = _next_prg_short();
             adj_operand = g_cpu_regs.y + raw_operand;
+
+            crosses_boundary = (uint8_t) (adj_operand & 0xFF) < (uint8_t) (raw_operand & 0xFF);
+
             break;
         }
         case IND: {
@@ -216,24 +227,36 @@ static InstructionParameter _get_next_m(const Instruction *instr) {
             // same page
             uint16_t high_target = ((raw_operand & 0xFF) == 0xFF) ? (raw_operand - 0xFF) : (raw_operand + 1);
             uint8_t addr_high = memory_read(high_target);
+
             adj_operand = (addr_low | (addr_high << 8));
+
             break;
         }
         case IZX: {
             raw_operand = _next_prg_byte();
 
-            uint16_t orig_addr = (g_cpu_regs.x + raw_operand);
-            uint8_t addr_low = memory_read(orig_addr);
-            uint8_t addr_high = memory_read(orig_addr + 1);
+            uint16_t orig_addr = g_cpu_regs.x + raw_operand;
+            // this mode wraps around to the same page
+            uint8_t addr_low = memory_read(orig_addr % 0x100);
+            // again, we have to handle wrapping for the second byte
+            uint8_t addr_high = memory_read((orig_addr + 1) % 0x100);
+
             adj_operand = (addr_low | (addr_high << 8));
+
             break;
         }
         case IZY: {
             raw_operand = _next_prg_byte();
 
             uint8_t addr_low = memory_read(raw_operand);
-            uint8_t addr_high = memory_read(raw_operand + 1);
+            // this mode wraps around for the second address
+            uint8_t addr_high = memory_read((raw_operand + 1) % 0x100);
+            uint16_t base_addr = addr_low | (addr_high << 8);
+
             adj_operand = (g_cpu_regs.y + (addr_low | (addr_high << 8)));
+
+            crosses_boundary = (adj_operand & 0xFF) < (base_addr & 0xFF);
+
             break;
         }
         default: {
@@ -249,12 +272,16 @@ static InstructionParameter _get_next_m(const Instruction *instr) {
         val = memory_read(adj_operand);
     }
 
+    if (crosses_boundary && can_incur_page_boundary_penalty(opcode)) {
+        g_burn_cycles++; // crossing a page boundary for certain instructions incurs a 1-cycle penalty
+    }
+
     return (InstructionParameter) {val, raw_operand, adj_operand};
 }
 
 static void _do_branch(int8_t offset) {
     g_cpu_regs.pc += offset;
-    g_burn_cycles += 1; // taking a branch incurs a 1-cycle penalty
+    g_burn_cycles++; // taking a branch incurs a 1-cycle penalty
 }
 
 static void _set_alu_flags(uint16_t val) {
@@ -293,17 +320,9 @@ static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, b
 }
 
 static void _do_cmp(uint8_t reg, uint16_t m) {
-    if (reg >= 0x80) {
-        g_cpu_regs.status.negative = 1;
-    }
-
-    if (reg >= m) {
-        g_cpu_regs.status.carry = 1;
-        g_cpu_regs.status.zero = reg == m;
-    } else {
-        g_cpu_regs.status.carry = 0;
-        g_cpu_regs.status.zero = 0;
-    }
+    g_cpu_regs.status.carry = reg >= m;
+    g_cpu_regs.status.zero = reg == m;
+    g_cpu_regs.status.negative = ((uint8_t) (reg - m)) >> 7;
 }
 
 void issue_interrupt(const InterruptType *type) {
@@ -460,7 +479,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 
             break;
         case INC: {
-            uint16_t incRes = m + 1;
+            uint8_t incRes = m + 1;
 
             memory_write(addr, incRes);
 
@@ -677,17 +696,27 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 }
 
 void _exec_next_instr(void) {
-    const Instruction *instr = decode_instr(_next_prg_byte());
+    // reset burn cycles
+    g_burn_cycles = 0;
 
-    InstructionParameter param = _get_next_m(instr);
+    uint8_t opcode = _next_prg_byte();
+    const Instruction *instr = decode_instr(opcode);
+
+    InstructionParameter param = _get_next_m(opcode, instr);
 
     #if PRINT_INSTRS
-    printf("Decoded instruction %s:%s with operand ($%04x/$%04x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
-            mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.raw_operand, param.adj_operand,
-            g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
+    extern unsigned int g_scanline;
+    extern unsigned int g_scanline_tick;
+    uint8_t status;
+    memcpy(&status, &g_cpu_regs.status, 1);
+    printf("%04x  %s:%s $%04x (a=%02x,x=%02x,y=%02x,sp=%02x,p=%02x,ppu=%d,cyc=%d)\n",
+            g_cpu_regs.pc - get_instr_len(instr), mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode),
+            param.raw_operand, g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp, status,
+            g_scanline_tick, g_total_cycles);
     #endif
 
-    g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
+    // we increment, since decoding the instruction can modify the value
+    g_burn_cycles += get_instr_cycles(opcode, &param, &g_cpu_regs) - 1;
 
     _exec_instr(instr, param);
 }
@@ -695,7 +724,8 @@ void _exec_next_instr(void) {
 void cycle_cpu(void) {
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
-        return;
+    } else {
+        _exec_next_instr();
     }
-    _exec_next_instr();
+    g_total_cycles++;
 }
