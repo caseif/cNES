@@ -38,6 +38,8 @@
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x20 // unused flag is set by default
 
+#define PRINT_INSTRS 1
+
 const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
 const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};
 const InterruptType *INT_IRQ   = &(InterruptType) {0xFFFE, true,  true,  false, true};
@@ -679,9 +681,11 @@ void _exec_next_instr(void) {
 
     InstructionParameter param = _get_next_m(instr);
 
+    #if PRINT_INSTRS
     printf("Decoded instruction %s:%s with operand ($%04x/$%04x) (raw/adj) @ $%04x (a=%02x,x=%02x,y=%02x,sp=%02x)\n",
             mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode), param.raw_operand, param.adj_operand,
             g_cpu_regs.pc - get_instr_len(instr), g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp);
+    #endif
 
     g_burn_cycles = get_instr_cycles(instr, &param, &g_cpu_regs);
 

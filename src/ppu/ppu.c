@@ -99,7 +99,7 @@ unsigned char g_name_table_mem[0x800];
 unsigned char g_palette_ram[0x20];
 Sprite g_oam_ram[0x40];
 
-static uint64_t g_frame;
+static bool g_odd_frame;
 static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
@@ -117,9 +117,9 @@ void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode) {
 
     memset(g_name_table_mem, 0xFF, 0x1000);
     memset(g_palette_ram, 0xFF, 0x20);
-    memset(g_oam_ram, 0xFF, 0x40);
+    memset(g_oam_ram, 0xFF, sizeof(Sprite) * 0x40);
     
-    g_frame = 0;
+    g_odd_frame = false;
     g_scanline = 0;
     g_scanline_tick = 0;
 }
@@ -413,7 +413,8 @@ void _update_v_horizontal(void) {
 }
 
 void cycle_ppu(void) {
-    if (g_scanline == 0 && g_scanline_tick == 0 && g_frame % 2 == 1) {
+    // if the frame is odd and background rendering is enabled, skip the first cycle
+    if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
         g_scanline_tick = 1;
     }
 
@@ -550,6 +551,7 @@ void cycle_ppu(void) {
         // set vblank flag
         case 241: {
             if (g_scanline_tick == 1) {
+                printf("START VBLANK\n");
                 g_ppu_status.vblank = 1;
                 if (g_ppu_control.gen_nmis) {
                     issue_interrupt(INT_NMI);
@@ -561,7 +563,8 @@ void cycle_ppu(void) {
         // pre-render line
         case 261: {
             // clear status
-            if (g_scanline_tick == 1 && _is_rendering_enabled()) {
+            if (g_scanline_tick == 1) {
+                printf("END VBLANK\n");
                 g_ppu_status.vblank = 0;
                 g_ppu_status.sprite_0_hit = 0;
                 g_ppu_status.sprite_overflow = 0;
@@ -613,7 +616,7 @@ void cycle_ppu(void) {
         if (++g_scanline >= SCANLINE_COUNT) {
             g_scanline = 0;
 
-            g_frame++;
+            g_odd_frame = !g_odd_frame;
 
             flush_frame();
 

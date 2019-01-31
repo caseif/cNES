@@ -75,10 +75,10 @@ Cartridge *load_rom(FILE *file) {
     Flag7 flag7 = {0};
     memcpy(&flag7, &(buffer[7]), 1);
 
-    if (flag7.nes2) {
+    /*if (flag7.nes2) {
         printf("NES 2.0 format is unsupported.\n");
         return NULL;
-    }
+    }*/
 
     uint8_t mapper = (flag7.mapper_high << 4) | flag6.mapper_low;
 
