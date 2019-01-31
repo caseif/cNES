@@ -451,6 +451,10 @@ void cycle_ppu(void) {
                     break;
                 }
 
+                if (!_is_rendering_enabled()) {
+                    break;
+                }
+
                 switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
                         // flush the palette select data into the primary shift registers
@@ -551,7 +555,6 @@ void cycle_ppu(void) {
         // set vblank flag
         case 241: {
             if (g_scanline_tick == 1) {
-                printf("START VBLANK\n");
                 g_ppu_status.vblank = 1;
                 if (g_ppu_control.gen_nmis) {
                     issue_interrupt(INT_NMI);
@@ -564,7 +567,6 @@ void cycle_ppu(void) {
         case 261: {
             // clear status
             if (g_scanline_tick == 1) {
-                printf("END VBLANK\n");
                 g_ppu_status.vblank = 0;
                 g_ppu_status.sprite_0_hit = 0;
                 g_ppu_status.sprite_overflow = 0;
