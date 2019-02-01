@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SYSTEM_MEMORY 2048
+#define SYSTEM_MEMORY 0x800
 #define STACK_BOTTOM_ADDR 0x100
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
@@ -52,6 +52,8 @@ static DataBlob g_prg_rom;
 
 unsigned char g_sys_memory[SYSTEM_MEMORY];
 CpuRegisters g_cpu_regs;
+
+unsigned char g_debug_buffer[0x1000];
 
 uint16_t base_pc;
 
@@ -72,6 +74,8 @@ void load_cartridge(Cartridge *cartridge) {
 
     base_pc = memory_read(0xFFFC) | (memory_read(0xFFFD) << 8);
     g_cpu_regs.pc = base_pc;
+
+    printf("Starting execution at $%04x\n", base_pc);
 }
 
 void load_program(DataBlob program_blob) {
@@ -134,6 +138,20 @@ void memory_write(uint16_t addr, uint8_t val) {
         }
         case 0x4016 ... 0x4017: {
             push_controller(addr - 0x4016, val);
+            return;
+        }
+        case 0x6000 ... 0x6FFF: {
+            g_debug_buffer[addr - 0x6000] = val;
+
+            if (g_debug_buffer[1] == 0xDE && g_debug_buffer[2] == 0xB0 && g_debug_buffer[3]) {
+                if (addr == 0x6000 && val != 0x80) {
+                    printf("Error code %02x written\n", val);
+                    if (g_debug_buffer[4]) {
+                        printf("Error message: %s\n", (char*) (g_debug_buffer + 4));
+                    }
+                }
+            }
+
             return;
         }
         case 0x8000 ... 0xFFFF: {
@@ -325,6 +343,23 @@ static void _do_cmp(uint8_t reg, uint16_t m) {
     g_cpu_regs.status.negative = ((uint8_t) (reg - m)) >> 7;
 }
 
+static void _do_adc(uint16_t m) {
+    uint8_t acc0 = g_cpu_regs.acc;
+
+    g_cpu_regs.acc = (acc0 + m + g_cpu_regs.status.carry);
+
+    _set_alu_flags(g_cpu_regs.acc);
+
+    uint8_t a7 = (acc0 >> 7);
+    uint8_t m7 = (m >> 7);
+
+    // unsigned overflow will occur if at least two among the most significant operand bits and the carry bit are set
+    g_cpu_regs.status.carry = ((a7 & m7) | (a7 & g_cpu_regs.status.carry) | (m7 & g_cpu_regs.status.carry));
+
+    // signed overflow will occur if the sign of both inputs if different from the sign of the result
+    g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & (m ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
+}
+
 void issue_interrupt(const InterruptType *type) {
         // check if the interrupt should be masked
         if (type->maskable && g_cpu_regs.status.interrupt_disable) {
@@ -333,11 +368,15 @@ void issue_interrupt(const InterruptType *type) {
 
         // push PC and P
         if (type->push_pc) {
-            stack_push(g_cpu_regs.pc >> 8);      // push MSB
-            stack_push(g_cpu_regs.pc & 0xFF);    // push LSB
+            uint16_t pc_to_push = g_cpu_regs.pc + 2;
+
+            stack_push(pc_to_push >> 8);      // push MSB
+            stack_push(pc_to_push & 0xFF);    // push LSB
 
             uint8_t status_serial;
             memcpy(&status_serial, &g_cpu_regs.status, 1);
+
+            status_serial |= 0x30;
 
             stack_push(status_serial);;
         }
@@ -381,6 +420,13 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             g_cpu_regs.y = m;
 
             _set_alu_flags(g_cpu_regs.y);
+
+            break;
+        case LAX: // unofficial
+            g_cpu_regs.acc = m;
+            g_cpu_regs.x = m;
+
+            _set_alu_flags(m);
 
             break;
         case STA:
@@ -427,20 +473,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
         // math
         case ADC: {
-            uint8_t acc0 = g_cpu_regs.acc;
-
-            g_cpu_regs.acc = (acc0 + m + g_cpu_regs.status.carry);
-
-            _set_alu_flags(g_cpu_regs.acc);
-
-            uint8_t a7 = (acc0 >> 7);
-            uint8_t m7 = (m >> 7);
-
-            // unsigned overflow will occur if at least two among the most significant operand bits and the carry bit are set
-            g_cpu_regs.status.carry = ((a7 & m7) | (a7 & g_cpu_regs.status.carry) | (m7 & g_cpu_regs.status.carry));
-
-            // signed overflow will occur if the sign of both inputs if different from the sign of the result
-            g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & (m ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
+            _do_adc(m);
 
             break;
         }
@@ -506,11 +539,95 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             _set_alu_flags(g_cpu_regs.acc);
 
             break;
+        case SAX: { // unofficial
+            uint8_t res = g_cpu_regs.acc & g_cpu_regs.x;
+            if (instr->addr_mode == IMM) {
+                g_cpu_regs.acc = res;
+            } else {
+                memory_write(addr, res);
+            }
+
+            break;
+        }
+        case ANC: { // unofficial
+            g_cpu_regs.acc &= m;
+            g_cpu_regs.status.carry = g_cpu_regs.acc >> 7;
+            break;
+        }
         case ASL:
             _do_shift(m, addr, instr->addr_mode == IMP, false, false);
             break;
         case LSR:
             _do_shift(m, addr, instr->addr_mode == IMP, true, false);
+            break;
+        case ROL:
+            _do_shift(m, addr, instr->addr_mode == IMP, false, true);
+            break;
+        case ROR:
+            _do_shift(m, addr, instr->addr_mode == IMP, true, true);
+            break;
+        case ALR: // unofficial
+            _do_shift(m, addr, true, true, false);
+            break;
+        case SLO: { // unofficial
+            // as far as I can tell, SLO performs two read/write cycles
+            _do_shift(m, addr, false, false, false);
+            uint8_t res = memory_read(m) | g_cpu_regs.acc;
+            memory_write(addr, res);
+
+            _set_alu_flags(res);
+
+            break;
+        }
+        case RLA: { // unofficial
+            // I think this performs two r/w cycles too
+            _do_shift(m, addr, false, false, true);
+            
+            uint8_t res = memory_read(m) & g_cpu_regs.acc;
+            memory_write(addr, res);
+
+            _set_alu_flags(res);
+
+            break;
+        }
+        case ARR: // unofficial
+            g_cpu_regs.acc &= m;
+
+            _do_shift(g_cpu_regs.acc, addr, true, true, true);
+
+            _set_alu_flags(g_cpu_regs.acc);
+
+            g_cpu_regs.status.overflow = (g_cpu_regs.acc >> 5) & 1;
+            g_cpu_regs.status.carry = !((g_cpu_regs.acc >> 6) & 1);
+            
+            break;
+        case SRE: { // unofficial
+            _do_shift(m, addr, false, true, false);
+
+            uint8_t res = memory_read(m);
+            memory_write(addr, res);
+
+            _set_alu_flags(res);
+
+            break;
+        }
+        case RRA: { // unofficial
+            _do_shift(m, addr, false, true, true);
+
+            _do_adc(g_cpu_regs.acc + memory_read(addr));
+
+            break;
+        }
+        case AXS: // unofficial
+            g_cpu_regs.x &= g_cpu_regs.acc;
+            uint8_t res = g_cpu_regs.x - m;
+
+            g_cpu_regs.status.carry = res > m;
+
+            g_cpu_regs.x = res;
+
+            _set_alu_flags(g_cpu_regs.x);
+
             break;
         case EOR:
             g_cpu_regs.acc = g_cpu_regs.acc ^ m;
@@ -523,12 +640,6 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 
             _set_alu_flags(g_cpu_regs.acc);
 
-            break;
-        case ROL:
-            _do_shift(m, addr, instr->addr_mode == IMP, false, true);
-            break;
-        case ROR:
-            _do_shift(m, addr, instr->addr_mode == IMP, true, true);
             break;
         case BIT:
             // set negative and overflow flags from memory
@@ -641,6 +752,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case PHP: {
             uint8_t serial;
             memcpy(&serial, &g_cpu_regs.status, 1);
+            serial |= 0x30;
             stack_push(serial);
             break;
         }
@@ -668,7 +780,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             memcpy(&g_cpu_regs.status, &status_serial, 1);
 
             // ORDER IS IMPORTANT
-            g_cpu_regs.pc = stack_pop() | (stack_pop() << 8);
+            g_cpu_regs.pc = (stack_pop() | (stack_pop() << 8)) - 2;
 
             break;
         }
@@ -678,10 +790,6 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         default:
         case KIL:
             printf("Encountered %s instruction @ $%x\n", mnemonic_to_str(instr->mnemonic), g_cpu_regs.pc - 1);
-            printf("Error codes: %02x %02x\n", memory_read(0x02), memory_read(0x03));
-            for (unsigned int i = 0x200; i < 0x400; i++) {
-
-            }
             exit(-1);
         //default:
             //TODO
@@ -705,7 +813,6 @@ void _exec_next_instr(void) {
     InstructionParameter param = _get_next_m(opcode, instr);
 
     #if PRINT_INSTRS
-    extern unsigned int g_scanline;
     extern unsigned int g_scanline_tick;
     uint8_t status;
     memcpy(&status, &g_cpu_regs.status, 1);
