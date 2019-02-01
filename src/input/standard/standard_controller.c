@@ -23,57 +23,59 @@
  * THE SOFTWARE.
  */
 
-#include "cartridge.h"
-#include "renderer.h"
-#include "util.h"
-#include "cpu/cpu.h"
-#include "input/input_device.h"
-#include "input/standard/sc_driver.h"
 #include "input/standard/standard_controller.h"
-#include "ppu/ppu.h"
 
 #include <stdbool.h>
-#include <time.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define FRAMES_PER_SECOND 60.0988
-#define CYCLES_PER_FRAME 29780.5
-#define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
+typedef struct {
+    bool button_states[8];
+    bool strobe;
+    unsigned int bit;
+} ScState;
 
-#define SLEEP_INTERVAL 10 // milliseconds
+static PollingCallback g_poll_callback;
 
-static void _init_controllers() {
-    init_controllers();
-
-    connect_controller(0, create_standard_controller());
-
-    sc_attach_driver(sc_poll_input);
+void sc_attach_driver(PollingCallback callback) {
+    g_poll_callback = callback;
 }
 
-void start_main_loop(Cartridge *cart) {
-    initialize_cpu();
-    initialize_ppu(cart, cart->mirror_mode);
-    load_cartridge(cart);
+uint8_t _sc_poll(void *state) {
+    ScState *state_cast = (ScState*) state;
 
-    _init_controllers();
+    if (state_cast->strobe) {
+        state_cast->bit = 0;
 
-    initialize_renderer();
-
-    unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;
-
-    unsigned int cycles_since_sleep = 0;
-
-    time_t last_sleep = 0;
-
-    while (true) {
-        cycle_cpu();
-        cycle_ppu();
-        cycle_ppu();
-        cycle_ppu();
-
-        if (++cycles_since_sleep > cycles_per_interval) {
-            sleep_cp(SLEEP_INTERVAL - (clock() - last_sleep) / 1000);
-            cycles_since_sleep = 0;
-            last_sleep = clock();
-        }
+        g_poll_callback();
     }
+
+    bool res = state_cast->button_states[state_cast->bit];
+    state_cast->bit += 1;
+    return res;
+}
+
+void _sc_push(void *state, uint8_t data) {
+    ScState *state_cast = (ScState*) state;
+
+    state_cast->strobe = data & 1;
+
+    if (state_cast->strobe) {
+        state_cast->bit = 0;
+        g_poll_callback();
+    }
+}
+
+Controller *create_standard_controller(void) {
+    Controller *controller = malloc(sizeof(Controller));
+    controller->poller = _sc_poll;
+    controller->pusher = _sc_push;
+    controller->state = malloc(sizeof(ScState));
+
+    return controller;
+}
+
+void sc_set_state(Controller *controller, bool button_states[]) {
+    memcpy(((ScState*) controller->state)->button_states, button_states, sizeof(bool) * 8);
 }

@@ -26,6 +26,7 @@
 #include "cartridge.h"
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
+#include "input/input_device.h"
 #include "ppu/ppu.h"
 
 #include <stdint.h>
@@ -95,8 +96,7 @@ uint8_t memory_read(uint16_t addr) {
             return 0;
         }
         case 0x4016 ... 0x4017: {
-            //TODO: controller input
-            return 0;
+            return poll_controller(addr - 0x4016);
         }
         case 0x8000 ... 0xFFFF: {
             addr -= 0x8000;
@@ -133,7 +133,7 @@ void memory_write(uint16_t addr, uint8_t val) {
             return;
         }
         case 0x4016 ... 0x4017: {
-            //TODO: controller input
+            push_controller(addr - 0x4016, val);
             return;
         }
         case 0x8000 ... 0xFFFF: {

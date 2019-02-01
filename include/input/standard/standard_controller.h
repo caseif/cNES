@@ -23,57 +23,24 @@
  * THE SOFTWARE.
  */
 
-#include "cartridge.h"
-#include "renderer.h"
-#include "util.h"
-#include "cpu/cpu.h"
+#pragma once
+
 #include "input/input_device.h"
-#include "input/standard/sc_driver.h"
-#include "input/standard/standard_controller.h"
-#include "ppu/ppu.h"
 
 #include <stdbool.h>
-#include <time.h>
+#include <stdint.h>
 
-#define FRAMES_PER_SECOND 60.0988
-#define CYCLES_PER_FRAME 29780.5
-#define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
+#define STD_BTN_A      0
+#define STD_BTN_B      1
+#define STD_BTN_SELECT 2
+#define STD_BTN_START  3
+#define STD_BTN_UP     4
+#define STD_BTN_DOWN   5
+#define STD_BTN_LEFT   6
+#define STD_BTN_RIGHT  7
 
-#define SLEEP_INTERVAL 10 // milliseconds
+void sc_attach_driver(PollingCallback callback);
 
-static void _init_controllers() {
-    init_controllers();
+Controller *create_standard_controller(void);
 
-    connect_controller(0, create_standard_controller());
-
-    sc_attach_driver(sc_poll_input);
-}
-
-void start_main_loop(Cartridge *cart) {
-    initialize_cpu();
-    initialize_ppu(cart, cart->mirror_mode);
-    load_cartridge(cart);
-
-    _init_controllers();
-
-    initialize_renderer();
-
-    unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;
-
-    unsigned int cycles_since_sleep = 0;
-
-    time_t last_sleep = 0;
-
-    while (true) {
-        cycle_cpu();
-        cycle_ppu();
-        cycle_ppu();
-        cycle_ppu();
-
-        if (++cycles_since_sleep > cycles_per_interval) {
-            sleep_cp(SLEEP_INTERVAL - (clock() - last_sleep) / 1000);
-            cycles_since_sleep = 0;
-            last_sleep = clock();
-        }
-    }
-}
+void sc_set_state(Controller *controller, bool button_states[]);
