@@ -100,6 +100,7 @@ typedef struct {
     uint8_t sprite_y_latch; // stores the sprite y-position during fetching
     SpriteAttributes sprite_attr_latches[8]; // latches for sprite attribute data
     uint8_t sprite_x_counters[8]; // counters for sprite x-positions
+    uint8_t sprite_death_counters[8];
     uint8_t sprite_tile_shift_l[8]; // shift registers for sprite tile data
     uint8_t sprite_tile_shift_h[8]; // shift registers for sprite tile data
 

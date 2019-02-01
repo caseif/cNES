@@ -727,6 +727,8 @@ void _do_sprite_evaluation(void) {
                     }
                     case 3: {
                         g_ppu_internal_regs.sprite_x_counters[index] = g_secondary_oam_ram[index].x;
+                        // set the death counter latch to the sprite width
+                        g_ppu_internal_regs.sprite_death_counters[index] = 8;
 
                         break;
                     }
@@ -742,7 +744,7 @@ void _do_sprite_evaluation(void) {
                                 cur_y = 8 - cur_y;
                             }
 
-                            uint16_t addr = (g_ppu_control.background_table ? PT_LEFT_ADDR : PT_RIGHT_ADDR)
+                            uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                     | (tile_index * 16 + cur_y + 8);
 
                             uint8_t res = ppu_memory_read(addr);
@@ -771,7 +773,7 @@ void _do_sprite_evaluation(void) {
                                 cur_y = 8 - cur_y;
                             }
 
-                            uint16_t addr = (g_ppu_control.background_table ? PT_LEFT_ADDR : PT_RIGHT_ADDR)
+                            uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                     | (tile_index * 16 + cur_y + 8);
 
                             uint8_t res = ppu_memory_read(addr);
@@ -835,13 +837,20 @@ void cycle_ppu(void) {
 
         // time to read sprite data
 
+        unsigned int sprite = 0xFF;
         // iterate all sprites for the current scanline
-        for (int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
+        for (unsigned int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
             // if the x counter hasn't run down to zero, skip it
             if (g_ppu_internal_regs.sprite_x_counters[i]) {
                 continue;
             }
 
+            // if the death counter went to zero, this sprite is done rendering
+            if (!g_ppu_internal_regs.sprite_death_counters[i]) {
+                continue;
+            }
+
+            //printf("h/l: %d | %02x/%02x\n", i, g_ppu_internal_regs.sprite_tile_shift_h[i], g_ppu_internal_regs.sprite_tile_shift_l[i]);
             unsigned int palette_low = ((g_ppu_internal_regs.sprite_tile_shift_h[i] & 1) << 1)
                                         | (g_ppu_internal_regs.sprite_tile_shift_l[i] & 1);
 
@@ -863,20 +872,26 @@ void cycle_ppu(void) {
             if (attrs.priority) {
                 final_palette_offset = sprite_palette_offset;
                 // since it's high priority, we can stop looking for a better sprite
-                printf("spr%d\n | rendered high-priority sprite\n", i);
                 break;
             } else if (transparent_background) {
                 // just set the offset and continue looking
                 final_palette_offset = sprite_palette_offset;
-                printf("spr%d\n | rendered sprite on transparent bg\n", i);
             }
+
+            final_palette_offset = 0xFF;
+            sprite = i;
         }
 
         uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + final_palette_offset;
 
         uint8_t palette_index = ppu_memory_read(palette_entry_addr);
 
-        const RGBValue rgb = g_palette[palette_index];
+        RGBValue rgb;
+        if (final_palette_offset == 0xFF) {
+            rgb = (RGBValue) {255 * (sprite % 2), 255 * (sprite % 3), 255 * (sprite % 5)};
+        } else {
+            rgb = g_palette[palette_index];
+        }
 
         set_pixel(g_scanline_tick, g_scanline, rgb);
 
@@ -889,9 +904,12 @@ void cycle_ppu(void) {
         for (int i = 0; i < 8; i++) {
             if (g_ppu_internal_regs.sprite_x_counters[i]) {
                 g_ppu_internal_regs.sprite_x_counters[i]--;
-
-                g_ppu_internal_regs.sprite_tile_shift_l[i] >>= 1;
-                g_ppu_internal_regs.sprite_tile_shift_h[i] >>= 1;
+            } else {
+                if (g_ppu_internal_regs.sprite_death_counters[i]) {
+                    g_ppu_internal_regs.sprite_death_counters[i]--;
+                    g_ppu_internal_regs.sprite_tile_shift_l[i] >>= 1;
+                    g_ppu_internal_regs.sprite_tile_shift_h[i] >>= 1;
+                }
             }
         }
     }
