@@ -57,6 +57,30 @@ typedef struct {
 } PpuStatus;
 
 typedef struct {
+    unsigned int palette_index:2 PACKED;
+    unsigned int :3 PACKED; // unused
+    unsigned int priority:1 PACKED;
+    unsigned int flip_hor:1 PACKED;
+    unsigned int flip_ver:1 PACKED;
+} SpriteAttributes;
+
+typedef struct {
+    uint8_t y;
+    union {
+        struct {
+            unsigned int tile_bank:1 PACKED;
+            unsigned int tile_num:7 PACKED;
+        } tall_tile_info;
+        uint8_t tile_num;
+    };
+    union {
+        SpriteAttributes attrs;
+        uint8_t attrs_serial;
+    };
+    uint8_t x;
+} Sprite;
+
+typedef struct {
     unsigned int v:15;  // current VRAM address
     unsigned int t:15;  // temporary VRAM address
     unsigned int x:8;   // fine x-scroll
@@ -66,9 +90,17 @@ typedef struct {
 
     unsigned int m:3;   // sprite data index, used for sprite evaluation
     unsigned int n:6;   // primary OAM index, used for sprite evaluation
-    unsigned int o:4;   // secondary OAM index, used for sprite evaluation
+    unsigned int o:4;   // secondary OAM index, used for sprite evaluation/tile fetching
     uint8_t sprite_attr_latch; // latch for sprite during evaluation
     bool has_latched_sprite;   // whether a byte is latched
+    uint8_t loaded_sprites; // number of currently loaded sprites
+
+    uint8_t sprite_tile_index_latch; // stores the tile index during fetching
+    uint8_t sprite_y_latch; // stores the sprite y-position during fetching
+    SpriteAttributes sprite_attr_latches[8]; // latches for sprite attribute data
+    uint8_t sprite_x_counters[8]; // counters for sprite x-positions
+    uint8_t sprite_tile_shift_l[8]; // shift registers for sprite tile data
+    uint8_t sprite_tile_shift_h[8]; // shift registers for sprite tile data
 
     uint8_t read_buf;
 
@@ -83,28 +115,6 @@ typedef struct {
     uint16_t palette_shift_l;
     uint16_t palette_shift_h;
 } PpuInternalRegisters;
-
-typedef struct {
-    uint8_t y;
-    union {
-        struct {
-            unsigned int tile_bank:1 PACKED;
-            unsigned int tile_num:7 PACKED;
-        } tall_tile_info;
-        uint8_t tile_num;
-    };
-    union {
-        struct {
-            unsigned int palette_index:2 PACKED;
-            unsigned int :3 PACKED; // unused
-            unsigned int priority:1 PACKED;
-            unsigned int flip_hor:1 PACKED;
-            unsigned int flip_ver:1 PACKED;
-        } attrs;
-        uint8_t attrs_serial;
-    };
-    uint8_t x;
-} Sprite;
 
 void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode);
 

@@ -365,9 +365,9 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
 }
 
 void initiate_oam_dma(uint8_t page) {
-    for (uint8_t i = 0; i < 0xFF; i++) {
+    for (unsigned int i = 0; i <= 0xFF; i++) {
         uint16_t addr = (page << 8) | i;
-        ((char*) g_oam_ram)[addr] = memory_read(addr);
+        ((unsigned char*) g_oam_ram)[g_ppu_internal_regs.s + i] = memory_read(addr);
     }
 }
 
@@ -580,6 +580,8 @@ void _do_general_cycle_routine(void) {
                 g_ppu_internal_regs.v &= ~0x7BE0; // clear vertical bits
                 g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x7BE0; // copy vertical bits to v from t
             }
+
+            break;
         }
     }
 }
@@ -593,6 +595,7 @@ void _do_sprite_evaluation(void) {
                 g_ppu_internal_regs.m = 0;
                 g_ppu_internal_regs.n = 0;
                 g_ppu_internal_regs.o = 0;
+                g_ppu_internal_regs.loaded_sprites = 0;
                 break;
             case 1 ... 64:
                 // clear secondary OAM byte-by-byte, but only on even ticks
@@ -610,14 +613,13 @@ void _do_sprite_evaluation(void) {
                     // read from primary OAM on odd ticks
                     Sprite sprite = g_oam_ram[g_ppu_internal_regs.n];
 
-                    uint8_t val;
                     switch (g_ppu_internal_regs.m) {
-                        case 0:
+                        case 0: {
                             uint8_t val = sprite.y;
 
                             // check if the sprite is on the current scanline
-                            // we add 1 since sprites aren't rendered until the next line
-                            if (val + 1 >= g_scanline - 7 && val + 1 <= g_scanline) {
+                            // we add 2 since sprites are rendered one line late, and we're fetching a line early
+                            if (val + 2 >= g_scanline - 7 && val + 2 <= g_scanline) {
                                 // increment m if it is
                                 g_ppu_internal_regs.m++;
 
@@ -629,10 +631,14 @@ void _do_sprite_evaluation(void) {
                                 if (g_ppu_internal_regs.o >= 8) {
                                     g_ppu_status.sprite_overflow = 1;
                                 }
+                            } else {
+                                // move to next sprite
+                                g_ppu_internal_regs.n++;
                             }
 
                             break;
-                        case 1:
+                        }
+                        case 1: {
                             uint8_t val = sprite.tile_num;
 
                             // store the byte in a latch for writing on the next cycle
@@ -641,8 +647,10 @@ void _do_sprite_evaluation(void) {
 
                             // increment m since we've already decided to copy this sprite
                             g_ppu_internal_regs.m++;
+
                             break;
-                        case 2:
+                        }
+                        case 2: {
                             uint8_t val = sprite.attrs_serial;
 
                             // store the byte in a latch for writing on the next cycle
@@ -651,31 +659,140 @@ void _do_sprite_evaluation(void) {
 
                             // increment m, same as above
                             g_ppu_internal_regs.m++;
+
                             break;
-                        case 3:
+                        }
+                        case 3: {
                             uint8_t val = sprite.x;
 
                             // store the byte in a latch for writing on the next cycle
                             g_ppu_internal_regs.sprite_attr_latch = val;
                             g_ppu_internal_regs.has_latched_sprite = true;
 
-                            // reset m and increment n
-                            g_ppu_internal_regs.n++;
-
-                            // bit of a hack - keep m set as a marker for when we reach the end of OAM
-                            if (g_ppu_internal_regs.n != 0) {
-                                g_ppu_internal_regs.m = 0;
-                            }
+                            // increment m, same as above
+                            g_ppu_internal_regs.m++;
 
                             break;
+                        }
                     }
                 } else {
-                    // if it's not zero, write the latched byte to secondary OAM
+                    // write the latched byte to secondary oam, if applicable
                     if (g_ppu_internal_regs.has_latched_sprite) {
-                        ((char*) &(g_secondary_oam_ram[g_ppu_internal_regs.o++]))[g_ppu_internal_regs.m] = g_ppu_internal_regs.sprite_attr_latch;
+                        ((unsigned char*) &(g_secondary_oam_ram[g_ppu_internal_regs.o]))[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
                         g_ppu_internal_regs.has_latched_sprite = false;
                     }
+
+                    // reset our registers
+                    if (g_ppu_internal_regs.m == 4) {
+                        // increment sprite count
+                        g_ppu_internal_regs.loaded_sprites++;
+
+                        // reset m and increment n/o
+                        g_ppu_internal_regs.n++;
+                        g_ppu_internal_regs.o++;
+
+                        // bit of a hack - keep m set as a marker for when we reach the end of OAM
+                        if (g_ppu_internal_regs.n != 0) {
+                            g_ppu_internal_regs.m = 0;
+                        }
+                    }
                 }
+
+                break;
+            }
+            case 257 ... 320: {
+                // sprite tile fetching
+
+                if (g_scanline_tick == 257) {
+                    // reset secondary oam index
+                    //g_ppu_internal_regs.o = 0;
+                }
+
+                unsigned int index = g_ppu_internal_regs.o;
+                switch ((g_scanline_tick + 7) % 8) {
+                    case 1: {
+                        g_ppu_internal_regs.sprite_tile_index_latch = g_secondary_oam_ram[index].tile_num;
+
+                        break;
+                    }
+                    case 2: {
+                        g_ppu_internal_regs.sprite_attr_latches[index] = g_secondary_oam_ram[index].attrs;
+
+                        break;
+                    }
+                    case 3: {
+                        g_ppu_internal_regs.sprite_x_counters[index] = g_secondary_oam_ram[index].x;
+
+                        break;
+                    }
+                    case 5: {
+                        // fetch tile upper byte
+                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+                        //printf("loaded: %d\n", g_ppu_internal_regs.loaded_sprites);
+                        if (index < g_ppu_internal_regs.loaded_sprites) {
+                            uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
+
+                            uint8_t cur_y = g_ppu_internal_regs.sprite_y_latch - g_scanline;
+                            if (attrs.flip_ver) {
+                                cur_y = 8 - cur_y;
+                            }
+
+                            uint16_t addr = (g_ppu_control.background_table ? PT_LEFT_ADDR : PT_RIGHT_ADDR)
+                                    | (tile_index * 16 + cur_y + 8);
+
+                            uint8_t res = ppu_memory_read(addr);
+
+                            if (attrs.flip_hor) {
+                                res = reverse_bits(res);
+                            }
+
+                            g_ppu_internal_regs.sprite_tile_shift_l[index] = res;
+
+                            //printf("%d | low res: %d\n", index, res);
+                        } else {
+                            // load transparent bitmap
+                            g_ppu_internal_regs.sprite_tile_shift_l[index] = 0;
+                        }
+
+                        break;
+                    }
+                    case 7: {
+                        // fetch tile upper byte
+                        // same as above, but we add 8 to the address
+                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+                        if (index < g_ppu_internal_regs.loaded_sprites) {
+                            uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
+
+                            uint8_t cur_y = g_ppu_internal_regs.sprite_y_latch - g_scanline;
+                            if (attrs.flip_ver) {
+                                cur_y = 8 - cur_y;
+                            }
+
+                            uint16_t addr = (g_ppu_control.background_table ? PT_LEFT_ADDR : PT_RIGHT_ADDR)
+                                    | (tile_index * 16 + cur_y + 8);
+
+                            uint8_t res = ppu_memory_read(addr);
+
+                            if (attrs.flip_hor) {
+                                res = reverse_bits(res);
+                            }
+
+                            g_ppu_internal_regs.sprite_tile_shift_h[index] = res;
+                        } else {
+                            // load transparent bitmap
+                            g_ppu_internal_regs.sprite_tile_shift_h[index] = 0;
+                        }
+
+                        g_ppu_internal_regs.o++;
+
+                        break;
+                    }
+                    default: {
+                        // twiddle our thumbs
+                    }
+                }
+
+                break;
             }
         }
     }
@@ -689,30 +806,73 @@ void cycle_ppu(void) {
 
     _do_general_cycle_routine();
 
-    _do_sprite_evaluation();
+    if (g_ppu_mask.show_sprites) {
+        _do_sprite_evaluation();
+    }
 
     if (g_scanline < RESOLUTION_V && g_scanline_tick < RESOLUTION_H) {
         unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)
                 | (g_ppu_internal_regs.pattern_shift_l & 1);
         
-        unsigned int palette_offset;
+        unsigned int bg_palette_offset;
 
         if (palette_low) {
             // if the palette low bits are not zero, we select the color normally
             unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
                     | (g_ppu_internal_regs.palette_shift_l & 1);
-            palette_offset = (palette_high << 2) | palette_low;
-
-            if (g_oam_ram[0].x == g_scanline - 1 && g_oam_ram[0].y == g_scanline_tick) {
-                g_ppu_status.sprite_0_hit = 1;
-            }
+            bg_palette_offset = (palette_high << 2) | palette_low;
         } else {
             // otherwise, we use the default background color
-            palette_offset = 0;
+            bg_palette_offset = 0;
         }
 
-        uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + palette_offset;
-        const RGBValue rgb = g_palette[ppu_memory_read(palette_entry_addr)];
+        bool transparent_background = bg_palette_offset != 0;
+
+        uint8_t final_palette_offset = bg_palette_offset;
+
+        // time to read sprite data
+
+        // iterate all sprites for the current scanline
+        for (int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
+            // if the x counter hasn't run down to zero, skip it
+            if (g_ppu_internal_regs.sprite_x_counters[i]) {
+                continue;
+            }
+
+            if (g_ppu_internal_regs.sprite_tile_shift_h[i] != 0) {
+                //printf("%d | h/l: %02x/%02x\n", i, g_ppu_internal_regs.sprite_tile_shift_h[i], g_ppu_internal_regs.sprite_tile_shift_l[i]);
+            }
+
+            unsigned int palette_low = ((g_ppu_internal_regs.sprite_tile_shift_h[i] & 1) << 1)
+                                        | (g_ppu_internal_regs.sprite_tile_shift_l[i] & 1);
+
+            // if the pixel is transparent, just continue
+            if (!palette_low) {
+                continue;
+            }
+
+            SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[i];
+
+            uint8_t palette_high = attrs.palette_index;
+            uint8_t sprite_palette_offset = (palette_high << 2) | palette_low;
+
+            if (attrs.priority) {
+                final_palette_offset = sprite_palette_offset;
+                // since it's high priority, we can stop looking for a better sprite
+                printf("spr%d\n | rendered high-priority sprite\n", i);
+                break;
+            } else if (transparent_background) {
+                // just set the offset and continue looking
+                final_palette_offset = sprite_palette_offset;
+                printf("spr%d\n | rendered sprite on transparent bg\n", i);
+            }
+        }
+
+        uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + final_palette_offset;
+
+        uint8_t palette_index = ppu_memory_read(palette_entry_addr);
+
+        const RGBValue rgb = g_palette[palette_index];
 
         set_pixel(g_scanline_tick, g_scanline, rgb);
 
@@ -721,6 +881,15 @@ void cycle_ppu(void) {
         g_ppu_internal_regs.pattern_shift_l >>= 1;
         g_ppu_internal_regs.palette_shift_h >>= 1;
         g_ppu_internal_regs.palette_shift_l >>= 1;
+
+        for (int i = 0; i < 8; i++) {
+            if (g_ppu_internal_regs.sprite_x_counters[i]) {
+                g_ppu_internal_regs.sprite_x_counters[i]--;
+
+                g_ppu_internal_regs.sprite_tile_shift_l[i] >>= 1;
+                g_ppu_internal_regs.sprite_tile_shift_h[i] >>= 1;
+            }
+        }
     }
 
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {
