@@ -29,12 +29,11 @@
 
 #include <assert.h>
 #include <SDL2/SDL_events.h>
-#include <SDL2/SDL_keyboard.h>
 
 void sc_poll_input(void) {
     SDL_PumpEvents();
 
-    uint8_t key_count;
+    int key_count;
 
     const uint8_t *key_states = SDL_GetKeyboardState(&key_count);
 

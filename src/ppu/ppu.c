@@ -36,6 +36,12 @@
 #define SCANLINE_COUNT 262
 #define CYCLES_PER_SCANLINE 341
 
+#define PRE_RENDER_LINE 261
+#define FIRST_VISIBLE_LINE 0
+#define LAST_VISIBLE_LINE 239
+#define FIRST_VISIBLE_CYCLE 0
+#define LAST_VISIBLE_CYCLE 256
+
 #define NAME_TABLE_GRANULARITY 8
 #define NAME_TABLE_WIDTH (RESOLUTION_H / (double) NAME_TABLE_GRANULARITY)
 #define NAME_TABLE_HEIGHT (RESOLUTION_V / (double) NAME_TABLE_GRANULARITY)
@@ -98,6 +104,7 @@ unsigned char g_pattern_table_right[0x1000];
 unsigned char g_name_table_mem[0x800];
 unsigned char g_palette_ram[0x20];
 Sprite g_oam_ram[0x40];
+Sprite g_secondary_oam_ram[8];
 
 static bool g_odd_frame;
 uint16_t g_scanline;
@@ -412,19 +419,14 @@ void _update_v_horizontal(void) {
     g_ppu_internal_regs.v = v;
 }
 
-void cycle_ppu(void) {
-    // if the frame is odd and background rendering is enabled, skip the first cycle
-    if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
-        g_scanline_tick = 1;
-    }
-
+void _do_general_cycle_routine(void) {
     switch (g_scanline) {
         // visible screen
-        case 0 ... 239: {
+        case FIRST_VISIBLE_LINE ... LAST_VISIBLE_LINE: {
             if (g_scanline_tick == 0) {
                 // idle tick
                 break;
-            } else if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
+            } else if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick <= 320) {
                 // hori(v) = hori(t)
                 if (g_scanline_tick == 257 && _is_rendering_enabled()) {
                     g_ppu_internal_regs.v &= ~0x41F; // clear horizontal bits
@@ -436,11 +438,12 @@ void cycle_ppu(void) {
                 unsigned int fetch_pixel_x;
                 unsigned int fetch_pixel_y;
 
-                if ((g_scanline_tick >= 1 && g_scanline_tick <= 256)) {
+                if ((g_scanline_tick >= 1 && g_scanline_tick <= LAST_VISIBLE_CYCLE)) {
                     fetch_pixel_x = g_scanline_tick + 15; // we fetch two tiles ahead
                     fetch_pixel_y = g_scanline;
                 } else if (g_scanline_tick <= 336) { // start fetching for the next scanline
-                    if (g_scanline == 239) {
+                    // it's guaranteed that g_scanline_tick > 320
+                    if (g_scanline == LAST_VISIBLE_LINE) {
                         // nothing to do since we're on the last scanline
                         break;
                     }
@@ -564,7 +567,7 @@ void cycle_ppu(void) {
             break;
         }
         // pre-render line
-        case 261: {
+        case PRE_RENDER_LINE: {
             // clear status
             if (g_scanline_tick == 1) {
                 g_ppu_status.vblank = 0;
@@ -579,6 +582,114 @@ void cycle_ppu(void) {
             }
         }
     }
+}
+
+void _do_sprite_evaluation(void) {
+    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) || g_scanline == PRE_RENDER_LINE) {
+        switch (g_scanline_tick) {
+            // idle tick
+            case 0:
+                // reset some registers
+                g_ppu_internal_regs.m = 0;
+                g_ppu_internal_regs.n = 0;
+                g_ppu_internal_regs.o = 0;
+                break;
+            case 1 ... 64:
+                // clear secondary OAM byte-by-byte, but only on even ticks
+                if (g_scanline_tick % 2 == 0) {
+                    ((char*) g_secondary_oam_ram)[g_scanline_tick / 2 - 1] = 0xFF;
+                }
+                break;
+            case 65 ... 256: {
+                if (g_ppu_internal_regs.n == 0 && g_ppu_internal_regs.m != 0) {
+                    // if n has overflowed and m hasn't reset, we've reached the end of OAM
+                    break;
+                }
+
+                if (g_scanline_tick % 2 == 1) {
+                    // read from primary OAM on odd ticks
+                    Sprite sprite = g_oam_ram[g_ppu_internal_regs.n];
+
+                    uint8_t val;
+                    switch (g_ppu_internal_regs.m) {
+                        case 0:
+                            uint8_t val = sprite.y;
+
+                            // check if the sprite is on the current scanline
+                            // we add 1 since sprites aren't rendered until the next line
+                            if (val + 1 >= g_scanline - 7 && val + 1 <= g_scanline) {
+                                // increment m if it is
+                                g_ppu_internal_regs.m++;
+
+                                // store the byte in a latch for writing on the next cycle
+                                g_ppu_internal_regs.sprite_attr_latch = val;
+                                g_ppu_internal_regs.has_latched_sprite = true;
+
+                                // if we've already hit the max sprites per line, set the overflow flag
+                                if (g_ppu_internal_regs.o >= 8) {
+                                    g_ppu_status.sprite_overflow = 1;
+                                }
+                            }
+
+                            break;
+                        case 1:
+                            uint8_t val = sprite.tile_num;
+
+                            // store the byte in a latch for writing on the next cycle
+                            g_ppu_internal_regs.sprite_attr_latch = val;
+                            g_ppu_internal_regs.has_latched_sprite = true;
+
+                            // increment m since we've already decided to copy this sprite
+                            g_ppu_internal_regs.m++;
+                            break;
+                        case 2:
+                            uint8_t val = sprite.attrs_serial;
+
+                            // store the byte in a latch for writing on the next cycle
+                            g_ppu_internal_regs.sprite_attr_latch = val;
+                            g_ppu_internal_regs.has_latched_sprite = true;
+
+                            // increment m, same as above
+                            g_ppu_internal_regs.m++;
+                            break;
+                        case 3:
+                            uint8_t val = sprite.x;
+
+                            // store the byte in a latch for writing on the next cycle
+                            g_ppu_internal_regs.sprite_attr_latch = val;
+                            g_ppu_internal_regs.has_latched_sprite = true;
+
+                            // reset m and increment n
+                            g_ppu_internal_regs.n++;
+
+                            // bit of a hack - keep m set as a marker for when we reach the end of OAM
+                            if (g_ppu_internal_regs.n != 0) {
+                                g_ppu_internal_regs.m = 0;
+                            }
+
+                            break;
+                    }
+                } else {
+                    // if it's not zero, write the latched byte to secondary OAM
+                    if (g_ppu_internal_regs.has_latched_sprite) {
+                        ((char*) &(g_secondary_oam_ram[g_ppu_internal_regs.o++]))[g_ppu_internal_regs.m] = g_ppu_internal_regs.sprite_attr_latch;
+                        g_ppu_internal_regs.has_latched_sprite = false;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void cycle_ppu(void) {
+    // if the frame is odd and background rendering is enabled, skip the first cycle
+    if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
+        g_scanline_tick = 1;
+    }
+
+    _do_general_cycle_routine();
+
+    _do_sprite_evaluation();
 
     if (g_scanline < RESOLUTION_V && g_scanline_tick < RESOLUTION_H) {
         unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)

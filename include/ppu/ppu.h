@@ -59,9 +59,16 @@ typedef struct {
 typedef struct {
     unsigned int v:15;  // current VRAM address
     unsigned int t:15;  // temporary VRAM address
+    unsigned int x:8;   // fine x-scroll
+    unsigned int w:1;   // write flag (for twice-writable registers)
+
     uint16_t s;         // sprite address
-    uint8_t x;          // fine x-scroll
-    uint8_t w:1;        // write flag (for twice-writable registers)
+
+    unsigned int m:3;   // sprite data index, used for sprite evaluation
+    unsigned int n:6;   // primary OAM index, used for sprite evaluation
+    unsigned int o:4;   // secondary OAM index, used for sprite evaluation
+    uint8_t sprite_attr_latch; // latch for sprite during evaluation
+    bool has_latched_sprite;   // whether a byte is latched
 
     uint8_t read_buf;
 
@@ -86,13 +93,16 @@ typedef struct {
         } tall_tile_info;
         uint8_t tile_num;
     };
-    struct {
-        unsigned int palette_index:2 PACKED;
-        unsigned int :3 PACKED; // unused
-        unsigned int priority:1 PACKED;
-        unsigned int flip_hor:1 PACKED;
-        unsigned int flip_ver:1 PACKED;
-    } attrs;
+    union {
+        struct {
+            unsigned int palette_index:2 PACKED;
+            unsigned int :3 PACKED; // unused
+            unsigned int priority:1 PACKED;
+            unsigned int flip_hor:1 PACKED;
+            unsigned int flip_ver:1 PACKED;
+        } attrs;
+        uint8_t attrs_serial;
+    };
     uint8_t x;
 } Sprite;
 
