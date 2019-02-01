@@ -596,6 +596,7 @@ void _do_sprite_evaluation(void) {
                 g_ppu_internal_regs.n = 0;
                 g_ppu_internal_regs.o = 0;
                 g_ppu_internal_regs.loaded_sprites = 0;
+                g_ppu_internal_regs.sprite_0_slot = 8; // set it out of bounds initially
                 break;
             case 1 ... 64:
                 // clear secondary OAM byte-by-byte, but only on even ticks
@@ -686,6 +687,10 @@ void _do_sprite_evaluation(void) {
                     if (g_ppu_internal_regs.m == 4) {
                         // increment sprite count
                         g_ppu_internal_regs.loaded_sprites++;
+
+                        if (g_ppu_internal_regs.n == 0) {
+                            g_ppu_internal_regs.sprite_0_slot = g_ppu_internal_regs.o;
+                        }
 
                         // reset m and increment n/o
                         g_ppu_internal_regs.n++;
@@ -837,16 +842,17 @@ void cycle_ppu(void) {
                 continue;
             }
 
-            if (g_ppu_internal_regs.sprite_tile_shift_h[i] != 0) {
-                //printf("%d | h/l: %02x/%02x\n", i, g_ppu_internal_regs.sprite_tile_shift_h[i], g_ppu_internal_regs.sprite_tile_shift_l[i]);
-            }
-
             unsigned int palette_low = ((g_ppu_internal_regs.sprite_tile_shift_h[i] & 1) << 1)
                                         | (g_ppu_internal_regs.sprite_tile_shift_l[i] & 1);
 
             // if the pixel is transparent, just continue
             if (!palette_low) {
                 continue;
+            }
+
+            if (!transparent_background &&i == g_ppu_internal_regs.sprite_0_slot) {
+                g_ppu_status.sprite_0_hit = 1; // set the hit flag
+                g_ppu_internal_regs.sprite_0_slot = 8; // set it out-of-bounds until the next frame
             }
 
             SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[i];
@@ -899,11 +905,6 @@ void cycle_ppu(void) {
             g_odd_frame = !g_odd_frame;
 
             flush_frame();
-
-            /*printf("PALETTE DATA\n");
-            for (unsigned int i = 0; i < 0x20; i++) {
-                printf("$%04x: %02x\n", i, ppu_memory_read(PALETTE_DATA_BASE_ADDR + i));
-            }*/
         }
     }
 }
