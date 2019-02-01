@@ -705,7 +705,7 @@ void _do_sprite_evaluation(void) {
 
                 if (g_scanline_tick == 257) {
                     // reset secondary oam index
-                    //g_ppu_internal_regs.o = 0;
+                    g_ppu_internal_regs.o = 0;
                 }
 
                 unsigned int index = g_ppu_internal_regs.o;
@@ -728,7 +728,7 @@ void _do_sprite_evaluation(void) {
                     case 5: {
                         // fetch tile upper byte
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
-                        //printf("loaded: %d\n", g_ppu_internal_regs.loaded_sprites);
+
                         if (index < g_ppu_internal_regs.loaded_sprites) {
                             uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
@@ -747,8 +747,6 @@ void _do_sprite_evaluation(void) {
                             }
 
                             g_ppu_internal_regs.sprite_tile_shift_l[index] = res;
-
-                            //printf("%d | low res: %d\n", index, res);
                         } else {
                             // load transparent bitmap
                             g_ppu_internal_regs.sprite_tile_shift_l[index] = 0;
