@@ -360,6 +360,18 @@ static void _do_adc(uint16_t m) {
     g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & (m ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
 }
 
+static void _do_sbc(uint16_t m) {
+    uint8_t acc0 = g_cpu_regs.acc;
+
+    g_cpu_regs.acc = (acc0 - m - !g_cpu_regs.status.carry);
+
+    _set_alu_flags(g_cpu_regs.acc);
+
+    g_cpu_regs.status.carry = g_cpu_regs.acc <= acc0;
+
+    g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & ((0xFF - m) ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
+}
+
 void issue_interrupt(const InterruptType *type) {
         // check if the interrupt should be masked
         if (type->maskable && g_cpu_regs.status.interrupt_disable) {
@@ -478,15 +490,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
         }
         case SBC: {
-            uint8_t acc0 = g_cpu_regs.acc;
-
-            g_cpu_regs.acc = (acc0 - m - !g_cpu_regs.status.carry);
-
-            _set_alu_flags(g_cpu_regs.acc);
-
-            g_cpu_regs.status.carry = g_cpu_regs.acc <= acc0;
-
-            g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & ((0xFF - m) ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
+            _do_sbc(m);
 
             break;
         }
@@ -530,6 +534,16 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             g_cpu_regs.y++;
 
             _set_alu_flags(g_cpu_regs.y);
+
+            break;
+        case ISC: // unofficial
+            memory_write(addr, m + 1);
+            _do_sbc(m);
+
+            break;
+        case DCP: // unofficial
+            memory_write(addr, m - 1);
+            g_cpu_regs.status.carry = m == 0;
 
             break;
         // logic
@@ -649,6 +663,45 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             // mask accumulator with value and set zero flag appropriately
             g_cpu_regs.status.zero = (g_cpu_regs.acc & m) == 0;
             break;
+        case TAS: { // unofficial
+            // this some fkn voodo right here
+            g_cpu_regs.sp = g_cpu_regs.acc & g_cpu_regs.x;
+            memory_write(addr, g_cpu_regs.sp & ((param.raw_operand >> 8) + 1));
+
+            break;
+        }
+        case LAS: { // unofficial
+            g_cpu_regs.acc = m & g_cpu_regs.sp;
+            g_cpu_regs.x = g_cpu_regs.acc;
+            g_cpu_regs.sp = g_cpu_regs.acc;
+
+            _set_alu_flags(g_cpu_regs.acc);
+
+            break;
+        }
+        case SHX: { // unofficial
+            memory_write(addr, g_cpu_regs.x & ((param.raw_operand >> 8) + 1));
+            break;
+        }
+        case SHY: { // unofficial
+            memory_write(addr, g_cpu_regs.y & ((param.raw_operand >> 8) + 1));
+            break;
+        }
+        case AHX: { // unofficial
+            memory_write(addr, (g_cpu_regs.acc & g_cpu_regs.x) & 7);;
+            break;
+        }
+        case ATX: { // unofficial
+            g_cpu_regs.x = g_cpu_regs.acc & m;
+            _set_alu_flags(g_cpu_regs.x);
+
+            break;
+        }
+        case XAA: { // unofficial
+            // even more voodoo
+            g_cpu_regs.acc = (g_cpu_regs.x & 0xEE) | ((g_cpu_regs.x & g_cpu_regs.acc) & 0x11);
+            break;
+        }
         // branching
         case BCC:
             if (!g_cpu_regs.status.carry) {

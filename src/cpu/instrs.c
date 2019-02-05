@@ -53,7 +53,7 @@ static const Instruction g_instr_list[] = {
     {BCC, REL}, {STA, IZY}, {KIL, IMP}, {AHX, IZY}, {STY, ZPX}, {STA, ZPX}, {STX, ZPY}, {SAX, ZPY},
     {TYA, IMP}, {STA, ABY}, {TXS, IMP}, {TAS, ABY}, {SHY, ABX}, {STA, ABX}, {SHX, ABY}, {AHX, ABY},
     {LDY, IMM}, {LDA, IZX}, {LDX, IMM}, {LAX, IZX}, {LDY, ZRP}, {LDA, ZRP}, {LDX, ZRP}, {LAX, ZRP},
-    {TAY, IMP}, {LDA, IMM}, {TAX, IMP}, {LAX, IMM}, {LDY, ABS}, {LDA, ABS}, {LDX, ABS}, {LAX, ABS},
+    {TAY, IMP}, {LDA, IMM}, {TAX, IMP}, {ATX, IMM}, {LDY, ABS}, {LDA, ABS}, {LDX, ABS}, {LAX, ABS},
     {BCS, REL}, {LDA, IZY}, {KIL, IMP}, {LAX, IZY}, {LDY, ZPX}, {LDA, ZPX}, {LDX, ZPY}, {LAX, ZPY},
     {CLV, IMP}, {LDA, ABY}, {TSX, IMP}, {LAS, ABY}, {LDY, ABX}, {LDA, ABX}, {LDX, ABY}, {LAX, ABY},
     {CPY, IMM}, {CMP, IZX}, {NOP, IMM}, {DCP, IZX}, {CPY, ZRP}, {CMP, ZRP}, {DEC, ZRP}, {DCP, ZRP},
@@ -95,7 +95,7 @@ const char *g_mnemonic_strs[] = {
     "SED", "SEI", "PHA", "PHP", "PLA", "PLP", "BRK", "NOP",
     "KIL", "ANC", "SLO", "RLA", "SRE", "RRA", "SAX", "LAX",
     "DCP", "ALR", "XAA", "TAS", "SHY", "SHX", "AHX", "ARR",
-    "LAS", "ISC", "AXS"
+    "LAS", "ISC", "AXS", "ATX"
 };
 
 const char *g_addr_mode_strs[] = {

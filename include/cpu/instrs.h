@@ -37,7 +37,7 @@ typedef enum {
     SED, SEI, PHA, PHP, PLA, PLP, BRK, NOP,
     KIL, ANC, SLO, RLA, SRE, RRA, SAX, LAX,
     DCP, ALR, XAA, TAS, SHY, SHX, AHX, ARR,
-    LAS, ISC, AXS
+    LAS, ISC, AXS, ATX
 } Mnemonic;
 
 typedef enum {
