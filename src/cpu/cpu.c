@@ -39,7 +39,7 @@
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
 
-#define PRINT_INSTRS 0
+#define PRINT_INSTRS 1
 
 const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
 const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};
@@ -75,7 +75,7 @@ void load_cartridge(Cartridge *cartridge) {
     base_pc = memory_read(0xFFFC) | (memory_read(0xFFFD) << 8);
     g_cpu_regs.pc = base_pc;
 
-    printf("Starting execution at $%04x\n", base_pc);
+    printf("Starting execution at $%04x\n", g_cpu_regs.pc);
 }
 
 void load_program(DataBlob program_blob) {
@@ -298,6 +298,12 @@ static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr
 }
 
 static void _do_branch(int8_t offset) {
+    // determine if branch crosses page boundary
+    uint8_t pc_low = g_cpu_regs.pc & 0xFF;
+    if ((offset >= 0 && offset > 0xFF - pc_low)
+            || (offset < 0 && -offset > pc_low)) {
+        g_burn_cycles++;
+    }
     g_cpu_regs.pc += offset;
     g_burn_cycles++; // taking a branch incurs a 1-cycle penalty
 }
@@ -307,7 +313,7 @@ static void _set_alu_flags(uint16_t val) {
     g_cpu_regs.status.negative = (val & 0x80) ? 1 : 0;
 }
 
-static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, bool rot) {
+static uint8_t _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, bool rot) {
     if (implicit) {
         m = g_cpu_regs.acc;
     }
@@ -335,6 +341,8 @@ static void _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right, b
     }
 
     _set_alu_flags(res);
+
+    return res;
 }
 
 static void _do_cmp(uint8_t reg, uint16_t m) {
@@ -538,12 +546,12 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
         case ISC: // unofficial
             memory_write(addr, m + 1);
-            _do_sbc(m);
+            _do_sbc((uint8_t) (m + 1));
 
             break;
         case DCP: // unofficial
             memory_write(addr, m - 1);
-            g_cpu_regs.status.carry = m == 0;
+            _do_cmp(g_cpu_regs.acc, (uint8_t) (m - 1));
 
             break;
         // logic
@@ -584,23 +592,20 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             _do_shift(m, addr, true, true, false);
             break;
         case SLO: { // unofficial
-            // as far as I can tell, SLO performs two read/write cycles
-            _do_shift(m, addr, false, false, false);
-            uint8_t res = memory_read(m) | g_cpu_regs.acc;
-            memory_write(addr, res);
+            uint8_t res = _do_shift(m, addr, false, false, false);
+            g_cpu_regs.acc |= res;
 
-            _set_alu_flags(res);
+            _set_alu_flags(g_cpu_regs.acc);
 
             break;
         }
         case RLA: { // unofficial
             // I think this performs two r/w cycles too
-            _do_shift(m, addr, false, false, true);
-            
-            uint8_t res = memory_read(m) & g_cpu_regs.acc;
-            memory_write(addr, res);
+            uint8_t res =_do_shift(m, addr, false, false, true);
 
-            _set_alu_flags(res);
+            g_cpu_regs.acc &= res;
+
+            _set_alu_flags(g_cpu_regs.acc);
 
             break;
         }
@@ -616,19 +621,18 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             
             break;
         case SRE: { // unofficial
-            _do_shift(m, addr, false, true, false);
+            uint8_t res = _do_shift(m, addr, false, true, false);
 
-            uint8_t res = memory_read(m);
-            memory_write(addr, res);
+            g_cpu_regs.acc ^= res;
 
-            _set_alu_flags(res);
+            _set_alu_flags(g_cpu_regs.acc);
 
             break;
         }
         case RRA: { // unofficial
             _do_shift(m, addr, false, true, true);
 
-            _do_adc(g_cpu_regs.acc + memory_read(addr));
+            _do_adc(memory_read(addr));
 
             break;
         }
@@ -833,7 +837,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             memcpy(&g_cpu_regs.status, &status_serial, 1);
 
             // ORDER IS IMPORTANT
-            g_cpu_regs.pc = (stack_pop() | (stack_pop() << 8)) - 2;
+            g_cpu_regs.pc = (stack_pop() | (stack_pop() << 8));
 
             break;
         }
