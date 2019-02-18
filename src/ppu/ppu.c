@@ -42,6 +42,9 @@
 #define FIRST_VISIBLE_CYCLE 0
 #define LAST_VISIBLE_CYCLE 256
 
+#define VBL_SCANLINE 241
+#define VBL_SCANLINE_TICK 1
+
 #define NAME_TABLE_GRANULARITY 8
 #define NAME_TABLE_WIDTH (RESOLUTION_H / (double) NAME_TABLE_GRANULARITY)
 #define NAME_TABLE_HEIGHT (RESOLUTION_V / (double) NAME_TABLE_GRANULARITY)
@@ -144,6 +147,8 @@ uint8_t read_ppu_mmio(uint8_t index) {
             g_ppu_internal_regs.w = 0;
             // and the vblank flag
             g_ppu_status.vblank = 0;
+
+            clear_nmi_line();
 
             return res;
         }
@@ -559,8 +564,9 @@ void _do_general_cycle_routine(void) {
         case 241: {
             if (g_scanline_tick == 1) {
                 g_ppu_status.vblank = 1;
+
                 if (g_ppu_control.gen_nmis) {
-                    issue_interrupt(INT_NMI);
+                    set_nmi_line();
                 }
             }
 

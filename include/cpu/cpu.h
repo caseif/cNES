@@ -74,6 +74,10 @@ uint8_t memory_read(uint16_t addr);
 
 void memory_write(uint16_t addr, uint8_t val);
 
+void set_nmi_line();
+
+void clear_nmi_line();
+
 void issue_interrupt(const InterruptType *type);
 
 void cycle_cpu(void);

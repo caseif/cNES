@@ -39,7 +39,7 @@
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
 
-#define PRINT_INSTRS 1
+#define PRINT_INSTRS 0
 
 const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
 const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};
@@ -60,6 +60,8 @@ uint16_t base_pc;
 uint8_t g_burn_cycles = 0;
 
 unsigned int g_total_cycles = 7;
+
+static bool g_nmi_line;
 
 void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
@@ -378,6 +380,14 @@ static void _do_sbc(uint16_t m) {
     g_cpu_regs.status.carry = g_cpu_regs.acc <= acc0;
 
     g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & ((0xFF - m) ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
+}
+
+void set_nmi_line() {
+    g_nmi_line = true;
+}
+
+void clear_nmi_line() {
+    g_nmi_line = false;
 }
 
 void issue_interrupt(const InterruptType *type) {
@@ -886,6 +896,11 @@ void _exec_next_instr(void) {
 }
 
 void cycle_cpu(void) {
+    if (g_nmi_line) {
+        issue_interrupt(INT_NMI);
+        g_nmi_line = false;
+    }
+
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
     } else {
