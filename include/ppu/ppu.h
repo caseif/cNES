@@ -39,7 +39,7 @@ typedef struct {
 } PpuControl;
 
 typedef struct {
-    unsigned char grayscale:1 PACKED;
+    unsigned char monochrome:1 PACKED;
     unsigned char clip_background:1 PACKED;
     unsigned char clip_sprites:1 PACKED;
     unsigned char show_background:1 PACKED;

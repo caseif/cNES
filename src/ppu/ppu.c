@@ -314,14 +314,18 @@ uint8_t ppu_memory_read(uint16_t addr) {
         case 0x3F00 ... 0x3FFF: {
             unsigned int index = (addr - 0x3F00) % 0x20;
 
-            // certain indices are just mirrors
-            switch (index) {
-                case 0x10:
-                case 0x14:
-                case 0x18:
-                case 0x1C:
-                    index -= 0x10;
-                    break;
+            if (g_ppu_mask.monochrome) {
+                index &= 0xF0;
+            } else {
+                // certain indices are just mirrors
+                switch (index) {
+                    case 0x10:
+                    case 0x14:
+                    case 0x18:
+                    case 0x1C:
+                        index -= 0x10;
+                        break;
+                }
             }
 
             return g_palette_ram[index];

@@ -65,10 +65,10 @@ void start_main_loop(Cartridge *cart) {
     time_t last_sleep = 0;
 
     while (true) {
+        cycle_ppu();
+        cycle_ppu();
+        cycle_ppu();
         cycle_cpu();
-        cycle_ppu();
-        cycle_ppu();
-        cycle_ppu();
 
         if (++cycles_since_sleep > cycles_per_interval) {
             sleep_cp(SLEEP_INTERVAL - (clock() - last_sleep) / 1000);
