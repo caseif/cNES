@@ -37,6 +37,8 @@ static unsigned char g_pixel_rgb_data[RESOLUTION_V][RESOLUTION_H][RGB_CHANNELS];
 static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
 
+static SDL_Texture *g_texture;
+
 void initialize_renderer(void) {
     SDL_Init(SDL_INIT_VIDEO);
 
@@ -49,15 +51,15 @@ void initialize_renderer(void) {
     if (!g_window) {
         printf("SDL_CreateWindow failed: %s\n", SDL_GetError());
     }
+
+    g_texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
+            RESOLUTION_H, RESOLUTION_V);
 }
 
 void _render_frame(void) {
-    SDL_Texture *texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
-            RESOLUTION_H, RESOLUTION_V);
+    SDL_UpdateTexture(g_texture, NULL, g_pixel_rgb_data, RESOLUTION_H * RGB_CHANNELS);
 
-    SDL_UpdateTexture(texture, NULL, g_pixel_rgb_data, RESOLUTION_H * RGB_CHANNELS);
-
-    SDL_RenderCopy(g_renderer, texture, NULL, NULL);
+    SDL_RenderCopy(g_renderer, g_texture, NULL, NULL);
 
     SDL_RenderPresent(g_renderer);
 
