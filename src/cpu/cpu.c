@@ -39,7 +39,7 @@
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
 
-#define PRINT_INSTRS 1
+#define PRINT_INSTRS 0
 
 const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
 const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};

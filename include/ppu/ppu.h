@@ -118,6 +118,10 @@ typedef struct {
     uint16_t palette_shift_h;
 } PpuInternalRegisters;
 
+typedef enum {
+    RM_NORMAL, RM_NT0, RM_NT1, RM_NT2, RM_NT3, RM_PT
+} RenderMode;
+
 void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode);
 
 uint8_t read_ppu_mmio(uint8_t index);
@@ -131,3 +135,7 @@ void ppu_memory_write(uint16_t addr, uint8_t val);
 void initiate_oam_dma(uint8_t page);
 
 void cycle_ppu(void);
+
+RenderMode get_render_mode(void);
+
+void set_render_mode(RenderMode mode);

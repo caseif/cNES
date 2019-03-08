@@ -23,54 +23,49 @@
  * THE SOFTWARE.
  */
 
-#include "cartridge.h"
-#include "loader.h"
-#include "system.h"
 #include "input/global/toggles.h"
+#include "ppu/ppu.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <pthread.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_events.h>
 
-int main(int argc, char **argv) {
-    if (argc < 2) {
-        printf("Too few args!\n");
-        printf("Usage: %s <ROM>\n", argv[0]);
-        exit(1);
+#define KEY_MODE_NORMAL SDLK_F1
+#define KEY_MODE_NAME_TABLE SDLK_F2
+#define KEY_MODE_PATTERN_TABLE SDLK_F3
+
+static void *_toggle_listener(void *_) {
+    SDL_Event event;
+
+    while (SDL_WaitEvent(&event)) {
+        switch (event.type) {
+            case SDL_KEYDOWN:
+                switch (event.key.keysym.sym) {
+                    case KEY_MODE_NORMAL:
+                        set_render_mode(RM_NORMAL);
+                        break;
+                    case KEY_MODE_NAME_TABLE:
+                        set_render_mode(get_render_mode() == RM_NT3 ? RM_NT0 : (RenderMode) ((unsigned int) get_render_mode() + 1));
+                        break;
+                    case KEY_MODE_PATTERN_TABLE:
+                        set_render_mode(RM_PT);
+                        break;
+                }
+                break;
+        }
     }
 
-    if (argc > 2) {
-        printf("Too many args!\n");
-        printf("Usage: %s <ROM>\n", argv[0]);
-        exit(1);
+    return NULL;
+}
+
+int init_toggle_listener(void) {
+    pthread_t listener_thread;
+
+    int rc;
+    if ((rc = pthread_create(&listener_thread, NULL, &_toggle_listener, NULL)) != 0) {
+        fprintf(stderr, "Failed to initialize toggle listener (error code %d)\n", rc);
+        return 1;
     }
-
-    char *rom_file_name = argv[1];
-
-    FILE *rom_file = fopen(rom_file_name, "rb");
-
-    if (!rom_file) {
-        printf("Could not open ROM file %s.\n", rom_file_name);
-        return -1;
-    }
-
-    Cartridge *cart = load_rom(rom_file);
-
-    if (!cart) {
-        printf("Failed to load ROM.\n");
-        return -1;
-    }
-
-    printf("Successfully loaded ROM file %s.\n", rom_file_name);
-
-    printf("Initializing global input handlers...\n");
-
-    if (init_toggle_listener() != 0) {
-        return -1;
-    }
-
-    printf("Starting execution...\n");
-
-    start_main_loop(cart);
 
     return 0;
 }

@@ -102,8 +102,6 @@ PpuMask g_ppu_mask;
 PpuStatus g_ppu_status;
 PpuInternalRegisters g_ppu_internal_regs;
 
-unsigned char g_pattern_table_left[0x1000];
-unsigned char g_pattern_table_right[0x1000];
 unsigned char g_name_table_mem[0x800];
 unsigned char g_palette_ram[0x20];
 Sprite g_oam_ram[0x40];
@@ -112,6 +110,8 @@ Sprite g_secondary_oam_ram[8];
 static bool g_odd_frame;
 uint16_t g_scanline;
 uint16_t g_scanline_tick;
+
+static RenderMode g_render_mode;
 
 static inline bool _is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
@@ -813,6 +813,37 @@ void _do_sprite_evaluation(void) {
     }
 }
 
+RenderMode get_render_mode(void) {
+    return g_render_mode;
+}
+
+void set_render_mode(RenderMode mode) {
+    g_render_mode = mode;
+}
+
+void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
+    switch (g_render_mode) {
+        case RM_NORMAL:
+        default:
+            set_pixel(x, y, rgb);
+            break;
+        case RM_PT: {
+            uint8_t sprite = (y / 8) * 16 + (x % 128) / 8;
+            uint16_t pattern_offset = sprite * 16 + (y % 8);
+
+            uint16_t pattern_addr = (x >= 128 ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                    + pattern_offset;
+
+            uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
+            uint8_t pixel_rgb = pattern_pixel * 64 + 32;
+
+            set_pixel(x, y, (RGBValue) {0, pixel_rgb, 0});
+            
+            break;
+        }
+    }
+}
+
 void cycle_ppu(void) {
     // if the frame is odd and background rendering is enabled, skip the first cycle
     if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
@@ -903,7 +934,7 @@ void cycle_ppu(void) {
             rgb = g_palette[palette_index];
         }
 
-        set_pixel(g_scanline_tick, g_scanline, rgb);
+        render_pixel(g_scanline_tick, g_scanline, rgb);
 
         // shift the internal registers
         g_ppu_internal_regs.pattern_shift_h >>= 1;
