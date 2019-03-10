@@ -46,16 +46,16 @@
 #define VBL_SCANLINE_TICK 1
 
 #define NAME_TABLE_GRANULARITY 8
-#define NAME_TABLE_WIDTH (RESOLUTION_H / (double) NAME_TABLE_GRANULARITY)
-#define NAME_TABLE_HEIGHT (RESOLUTION_V / (double) NAME_TABLE_GRANULARITY)
+#define NAME_TABLE_WIDTH (RESOLUTION_H / NAME_TABLE_GRANULARITY)
+#define NAME_TABLE_HEIGHT (RESOLUTION_V / NAME_TABLE_GRANULARITY)
 
 #define NAME_TABLE_BASE_ADDR 0x2000
 #define NAME_TABLE_INTERVAL 0x400
 #define NAME_TABLE_SIZE 0x3C0
 
 #define ATTR_TABLE_GRANULARITY 32
-#define ATTR_TABLE_WIDTH (RESOLUTION_H / (double) ATTR_TABLE_GRANULARITY)
-#define ATTR_TABLE_HEIGHT (RESOLUTION_V / (double) ATTR_TABLE_GRANULARITY)
+#define ATTR_TABLE_WIDTH (RESOLUTION_H / ATTR_TABLE_GRANULARITY)
+#define ATTR_TABLE_HEIGHT (RESOLUTION_V / ATTR_TABLE_GRANULARITY)
 
 #define ATTR_TABLE_BASE_ADDR 0x23C0
 
@@ -303,11 +303,11 @@ uint16_t _translate_name_table_address(uint16_t addr) {
 
 uint8_t ppu_memory_read(uint16_t addr) {
     switch (addr) {
-        // pattern table
+        // pattern tables
         case 0x0000 ... 0x1FFF: {
             return g_cartridge->chr_rom[addr];
         }
-        // name table
+        // name tables
         case 0x2000 ... 0x3EFF: {
             return g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)];
         }
@@ -340,12 +340,12 @@ uint8_t ppu_memory_read(uint16_t addr) {
 void ppu_memory_write(uint16_t addr, uint8_t val) {
     //printf("writing %02x to addr %04x\n", val, addr);
     switch (addr) {
-        // pattern table left
+        // pattern tables
         case 0x0000 ... 0x0FFF: {
             //TODO: unsupported altogether for now
             break;
         }
-        // name table 0
+        // name tables
         case 0x2000 ... 0x3EFF: {
             g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)] = val;
             break;
@@ -504,12 +504,12 @@ void _do_general_cycle_routine(void) {
                         uint8_t attr_table_byte = ppu_memory_read(attr_table_addr);
 
                         // check if it's in the bottom half of the table cell
-                        if ((fetch_pixel_y % 2) >= 16) {
+                        if ((fetch_pixel_y % 32) >= 16) {
                             attr_table_byte >>= 4;
                         }
 
                         // check if it's in the right half of the table cell
-                        if ((fetch_pixel_x % 2) >= 16) {
+                        if ((fetch_pixel_x % 32) >= 16) {
                             attr_table_byte >>= 2;
                         }
 
@@ -822,22 +822,43 @@ void set_render_mode(RenderMode mode) {
 }
 
 void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
+    bool use_nt = false;
+    uint8_t pt_tile = 0;
+    uint8_t palette_num = 0;
+
     switch (g_render_mode) {
         case RM_NORMAL:
         default:
             set_pixel(x, y, rgb);
             break;
+        case RM_NT0:
+            use_nt = true;
+            pt_tile = ppu_memory_read(NAME_TABLE_BASE_ADDR | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
+            palette_num = ppu_memory_read(ATTR_TABLE_BASE_ADDR | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
+            if ((y % 32) >= 16) {
+                palette_num >>= 4;
+            }
+            if ((x % 32) >= 16) {
+                palette_num >>= 2;
+            }
+            palette_num &= 0b11;
         case RM_PT: {
-            uint8_t sprite = (y / 8) * 16 + (x % 128) / 8;
-            uint16_t pattern_offset = sprite * 16 + (y % 8);
+            if (!use_nt) {
+                pt_tile = (y / NAME_TABLE_HEIGHT) * 16 + (x % 128) / NAME_TABLE_WIDTH;
+            }
 
-            uint16_t pattern_addr = (x >= 128 ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+            uint16_t pattern_offset = pt_tile * 16 + (y % NAME_TABLE_GRANULARITY);
+
+            uint16_t pattern_addr = ((use_nt ? g_ppu_control.background_table : x >= 128)
+                    ? PT_RIGHT_ADDR
+                    : PT_LEFT_ADDR)
                     + pattern_offset;
 
             uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
-            uint8_t pixel_rgb = pattern_pixel * 64 + 32;
+            
+            RGBValue pixel_rgb = g_palette[ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel)];
 
-            set_pixel(x, y, (RGBValue) {0, pixel_rgb, 0});
+            set_pixel(x, y, pixel_rgb);
             
             break;
         }
@@ -859,7 +880,7 @@ void cycle_ppu(void) {
     if (g_scanline < RESOLUTION_V && g_scanline_tick < RESOLUTION_H) {
         unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)
                 | (g_ppu_internal_regs.pattern_shift_l & 1);
-        
+
         unsigned int bg_palette_offset;
 
         if (palette_low) {

@@ -43,12 +43,17 @@ static void *_toggle_listener(void *_) {
                 switch (event.key.keysym.sym) {
                     case KEY_MODE_NORMAL:
                         set_render_mode(RM_NORMAL);
+                        printf("Showing normal output\n");
                         break;
                     case KEY_MODE_NAME_TABLE:
-                        set_render_mode(get_render_mode() == RM_NT3 ? RM_NT0 : (RenderMode) ((unsigned int) get_render_mode() + 1));
+                        set_render_mode((int) get_render_mode() < RM_NT0 || (int) get_render_mode() >= RM_NT3
+                                ? RM_NT0
+                                : (RenderMode) ((unsigned int) get_render_mode() + 1));
+                        printf("Showing name table %d\n", ((int) get_render_mode() - (int) RM_NT0));
                         break;
                     case KEY_MODE_PATTERN_TABLE:
                         set_render_mode(RM_PT);
+                        printf("Showing pattern tables\n");
                         break;
                 }
                 break;
