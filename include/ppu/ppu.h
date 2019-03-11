@@ -86,7 +86,7 @@ typedef struct {
     unsigned int x:8;   // fine x-scroll
     unsigned int w:1;   // write flag (for twice-writable registers)
 
-    uint16_t s;         // sprite address
+    uint8_t s;         // sprite address
 
     unsigned int m:3;   // sprite data index, used for sprite evaluation
     unsigned int n:6;   // primary OAM index, used for sprite evaluation

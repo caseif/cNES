@@ -314,10 +314,10 @@ uint8_t ppu_memory_read(uint16_t addr) {
         }
         // name tables
         case 0x2000 ... 0x3EFF: {
-            return g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)];
+            return g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x800)];
         }
         case 0x3F00 ... 0x3FFF: {
-            unsigned int index = (addr - 0x3F00) % 0x20;
+            uint8_t index = (addr - 0x3F00) % 0x20;
 
             if (g_ppu_mask.monochrome) {
                 index &= 0xF0;
@@ -357,7 +357,7 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
             break;
         }
         case 0x3F00 ... 0x3FFF: {
-            unsigned int index = (addr - 0x3F00) % 0x20;
+            uint8_t index = (addr - 0x3F00) % 0x20;
 
             // certain indices are just mirrors
             switch (index) {
@@ -382,7 +382,7 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
 void initiate_oam_dma(uint8_t page) {
     for (unsigned int i = 0; i <= 0xFF; i++) {
         uint16_t addr = (page << 8) | i;
-        ((unsigned char*) g_oam_ram)[g_ppu_internal_regs.s + i] = memory_read(addr);
+        ((unsigned char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = memory_read(addr);
     }
 }
 
@@ -415,8 +415,6 @@ void _update_v_vertical(void) {
     }
 
     g_ppu_internal_regs.v = v;
-
-    _update_v_horizontal();
 }
 
 // this code was shamelessly lifted from https://wiki.nesdev.com/w/index.php/PPU_scrolling
@@ -619,7 +617,7 @@ void _do_sprite_evaluation(void) {
             case 1 ... 64:
                 // clear secondary OAM byte-by-byte, but only on even ticks
                 if (g_scanline_tick % 2 == 0) {
-                    ((char*) g_secondary_oam_ram)[g_scanline_tick / 2 - 1] = 0xFF;
+                    ((char*) g_secondary_oam_ram)[(uint8_t) (g_scanline_tick / 2 - 1)] = 0xFF;
                 }
                 break;
             case 65 ... 256: {
@@ -960,7 +958,7 @@ void cycle_ppu(void) {
         if (final_palette_offset == 0xFF) {
             rgb = (RGBValue) {255 * (sprite % 2), 255 * (sprite % 3), 255 * (sprite % 5)};
         } else {
-            rgb = g_palette[palette_index];
+            rgb = g_palette[palette_index % 64];
         }
 
         render_pixel(g_scanline_tick, g_scanline, rgb);
