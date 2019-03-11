@@ -160,12 +160,12 @@ uint8_t read_ppu_mmio(uint8_t index) {
                 g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v);
 
                 g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
-                
+
                 return res;
             } else {
-                // palette reading bypasses buffer entirely, but still updates it
+                // palette reading bypasses buffer, but still updates it in a weird way
 
-                // address is offset due to mirroring
+                // address is offset since the buffer is updated with the mirrored NT data "under" the palette data
                 g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v - 0x1000);
 
                 return ppu_memory_read(g_ppu_internal_regs.v);
@@ -188,7 +188,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
 
             memcpy(&g_ppu_control, &val, 1);
             g_ppu_internal_regs.t &= ~(0b11 << 10); // clear bits 10-11
-            g_ppu_internal_regs.t |= val & 0b11; // set bits 10-11 to current nametable
+            g_ppu_internal_regs.t |= (val & 0b11) << 10; // set bits 10-11 to current nametable
 
             if (!old_gen_nmis && g_ppu_control.gen_nmis && g_ppu_status.vblank) {
                 issue_interrupt(INT_NMI);
@@ -211,6 +211,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
         case 5:
             // set either x- or y-scroll, depending on whether this is the first or second write
             if (g_ppu_internal_regs.w) {
+                // setting y-scroll
                 g_ppu_internal_regs.t &= ~(0b11111 << 5); // clear bits 5-9
                 g_ppu_internal_regs.t |= (val & 0b11111000) << 2; // set bits 5-9
 
@@ -242,6 +243,8 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
                 g_ppu_internal_regs.t &= ~0x7F00;
                 // set upper bits
                 g_ppu_internal_regs.t |= (val & 0b111111) << 8;
+                // set MSB to 0
+                g_ppu_internal_regs.t &= ~0x4000;
             }
 
             // flip w flag
@@ -302,6 +305,8 @@ uint16_t _translate_name_table_address(uint16_t addr) {
 }
 
 uint8_t ppu_memory_read(uint16_t addr) {
+    addr %= 0x4000;
+
     switch (addr) {
         // pattern tables
         case 0x0000 ... 0x1FFF: {
@@ -338,7 +343,8 @@ uint8_t ppu_memory_read(uint16_t addr) {
 }
 
 void ppu_memory_write(uint16_t addr, uint8_t val) {
-    //printf("writing %02x to addr %04x\n", val, addr);
+    addr %= 0x4000;
+
     switch (addr) {
         // pattern tables
         case 0x0000 ... 0x0FFF: {
@@ -409,6 +415,8 @@ void _update_v_vertical(void) {
     }
 
     g_ppu_internal_regs.v = v;
+
+    _update_v_horizontal();
 }
 
 // this code was shamelessly lifted from https://wiki.nesdev.com/w/index.php/PPU_scrolling
