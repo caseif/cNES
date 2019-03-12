@@ -265,7 +265,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
 }
 
 uint16_t _translate_name_table_address(uint16_t addr) {
-    assert(addr <= 0xFFF);
+    assert(addr < 0x1000);
 
     switch (addr) {
         // name table 0
@@ -314,7 +314,7 @@ uint8_t ppu_memory_read(uint16_t addr) {
         }
         // name tables
         case 0x2000 ... 0x3EFF: {
-            return g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x800)];
+            return g_name_table_mem[_translate_name_table_address(addr % 0x1000)];
         }
         case 0x3F00 ... 0x3FFF: {
             uint8_t index = (addr - 0x3F00) % 0x20;
@@ -353,7 +353,7 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
         }
         // name tables
         case 0x2000 ... 0x3EFF: {
-            g_name_table_mem[_translate_name_table_address((addr - 0x2000) % 0x1000)] = val;
+            g_name_table_mem[_translate_name_table_address(addr % 0x1000)] = val;
             break;
         }
         case 0x3F00 ... 0x3FFF: {
@@ -382,7 +382,7 @@ void ppu_memory_write(uint16_t addr, uint8_t val) {
 void initiate_oam_dma(uint8_t page) {
     for (unsigned int i = 0; i <= 0xFF; i++) {
         uint16_t addr = (page << 8) | i;
-        ((unsigned char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = memory_read(addr);
+        ((char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = memory_read(addr);
     }
 }
 
@@ -695,8 +695,12 @@ void _do_sprite_evaluation(void) {
                 } else {
                     // write the latched byte to secondary oam, if applicable
                     if (g_ppu_internal_regs.has_latched_sprite) {
-                        ((unsigned char*) &(g_secondary_oam_ram[g_ppu_internal_regs.o]))[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
-                        g_ppu_internal_regs.has_latched_sprite = false;
+                        if (g_ppu_internal_regs.o < 8) {
+                            Sprite sprite = g_secondary_oam_ram[g_ppu_internal_regs.o];
+                            assert(g_ppu_internal_regs.m <= 4);
+                            ((char*) &sprite)[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
+                            g_ppu_internal_regs.has_latched_sprite = false;
+                        }
                     }
 
                     // reset our registers
@@ -861,8 +865,9 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                     + pattern_offset;
 
             uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
-            
-            RGBValue pixel_rgb = g_palette[ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel)];
+
+            uint8_t palette_index = ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
+            RGBValue pixel_rgb = g_palette[palette_index];
 
             set_pixel(x, y, pixel_rgb);
             
