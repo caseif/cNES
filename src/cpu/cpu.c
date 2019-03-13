@@ -398,7 +398,7 @@ void issue_interrupt(const InterruptType *type) {
 
         // push PC and P
         if (type->push_pc) {
-            uint16_t pc_to_push = g_cpu_regs.pc;
+            uint16_t pc_to_push = g_cpu_regs.pc + (type == INT_BRK ? 2 : 0);
 
             stack_push(pc_to_push >> 8);      // push MSB
             stack_push(pc_to_push & 0xFF);    // push LSB
@@ -408,7 +408,7 @@ void issue_interrupt(const InterruptType *type) {
 
             status_serial |= 0x30;
 
-            stack_push(status_serial);;
+            stack_push(status_serial);
         }
 
         // set B flag
