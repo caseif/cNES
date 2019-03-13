@@ -398,7 +398,7 @@ void issue_interrupt(const InterruptType *type) {
 
         // push PC and P
         if (type->push_pc) {
-            uint16_t pc_to_push = g_cpu_regs.pc + 2;
+            uint16_t pc_to_push = g_cpu_regs.pc;
 
             stack_push(pc_to_push >> 8);      // push MSB
             stack_push(pc_to_push & 0xFF);    // push LSB
@@ -847,7 +847,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             memcpy(&g_cpu_regs.status, &status_serial, 1);
 
             // ORDER IS IMPORTANT
-            g_cpu_regs.pc = (stack_pop() | (stack_pop() << 8)) - 2;
+            g_cpu_regs.pc = (stack_pop() | (stack_pop() << 8));
 
             break;
         }

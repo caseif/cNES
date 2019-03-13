@@ -571,8 +571,8 @@ void _do_general_cycle_routine(void) {
             break;
         }
         // set vblank flag
-        case 241: {
-            if (g_scanline_tick == 1) {
+        case VBL_SCANLINE: {
+            if (g_scanline_tick == VBL_SCANLINE_TICK) {
                 g_ppu_status.vblank = 1;
 
                 if (g_ppu_control.gen_nmis) {
@@ -868,6 +868,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
 
             uint8_t palette_index = ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
             RGBValue pixel_rgb = g_palette[palette_index];
+            pixel_rgb = (RGBValue) {0, pattern_pixel * 64 + 32, 0};
 
             set_pixel(x, y, pixel_rgb);
             
@@ -879,7 +880,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
 void cycle_ppu(void) {
     // if the frame is odd and background rendering is enabled, skip the first cycle
     if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
-        g_scanline_tick = 1;
+        //g_scanline_tick = 1;
     }
 
     _do_general_cycle_routine();
