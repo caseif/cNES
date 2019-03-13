@@ -391,42 +391,42 @@ void clear_nmi_line() {
 }
 
 void issue_interrupt(const InterruptType *type) {
-        // check if the interrupt should be masked
-        if (type->maskable && g_cpu_regs.status.interrupt_disable) {
-            return;
-        }
-
-        // push PC and P
-        if (type->push_pc) {
-            uint16_t pc_to_push = g_cpu_regs.pc + (type == INT_BRK ? 2 : 0);
-
-            stack_push(pc_to_push >> 8);      // push MSB
-            stack_push(pc_to_push & 0xFF);    // push LSB
-
-            uint8_t status_serial;
-            memcpy(&status_serial, &g_cpu_regs.status, 1);
-
-            status_serial |= 0x30;
-
-            stack_push(status_serial);
-        }
-
-        // set B flag
-        if (type->set_b) {
-            g_cpu_regs.status.break_command = 1;
-        }
-
-        // set I flag
-        if (type->set_i) {
-            g_cpu_regs.status.interrupt_disable = 1;
-        }
-
-        // little-Endian, so the LSB comes first
-        uint16_t vector = memory_read(type->vector_loc) | ((memory_read(type->vector_loc + 1)) << 8);
-
-        // set the PC
-        g_cpu_regs.pc = vector;
+    // check if the interrupt should be masked
+    if (type->maskable && g_cpu_regs.status.interrupt_disable) {
+        return;
     }
+
+    // push PC and P
+    if (type->push_pc) {
+        uint16_t pc_to_push = g_cpu_regs.pc + (type == INT_BRK ? 2 : 0);
+
+        stack_push(pc_to_push >> 8);      // push MSB
+        stack_push(pc_to_push & 0xFF);    // push LSB
+
+        uint8_t status_serial;
+        memcpy(&status_serial, &g_cpu_regs.status, 1);
+
+        status_serial |= 0x30;
+
+        stack_push(status_serial);
+    }
+
+    // set B flag
+    if (type->set_b) {
+        g_cpu_regs.status.break_command = 1;
+    }
+
+    // set I flag
+    if (type->set_i) {
+        g_cpu_regs.status.interrupt_disable = 1;
+    }
+
+    // little-Endian, so the LSB comes first
+    uint16_t vector = memory_read(type->vector_loc) | ((memory_read(type->vector_loc + 1)) << 8);
+
+    // set the PC
+    g_cpu_regs.pc = vector;
+}
 
 void _exec_instr(const Instruction *instr, InstructionParameter param) {
     uint16_t m = param.value;
