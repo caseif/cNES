@@ -77,8 +77,5 @@ Controller *create_standard_controller(void) {
 }
 
 void sc_set_state(Controller *controller, bool button_states[]) {
-    if (button_states[3] && !((ScState*) controller->state)->button_states[3]) {
-        printf("START\n");
-    }
     memcpy(((ScState*) controller->state)->button_states, button_states, sizeof(bool) * 8);
 }
