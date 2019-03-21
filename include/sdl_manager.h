@@ -23,4 +23,16 @@
  * THE SOFTWARE.
  */
 
-int init_toggle_listener(void);
+#include <SDL2/SDL.h>
+
+typedef void (EventCallback)(SDL_Event*);
+
+void initialize_window(void);
+
+void do_window_loop(void);
+
+SDL_Window *get_window(void);
+
+void close_window(void);
+
+void add_event_callback(EventCallback callback);

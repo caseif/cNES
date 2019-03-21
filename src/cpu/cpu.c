@@ -29,6 +29,7 @@
 #include "input/input_device.h"
 #include "ppu/ppu.h"
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,13 +41,14 @@
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
 
 #define PRINT_INSTRS 0
+#define PRINT_MEMORY_ACCESS 0
 
 const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
 const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};
 const InterruptType *INT_IRQ   = &(InterruptType) {0xFFFE, true,  true,  false, true};
 const InterruptType *INT_BRK   = &(InterruptType) {0xFFFE, false, true,  true,  true};
 
-static Cartridge *g_cartridge;
+static Cartridge g_cartridge;
 
 static DataBlob g_prg_rom;
 
@@ -57,7 +59,7 @@ unsigned char g_debug_buffer[0x1000];
 
 uint16_t base_pc;
 
-uint8_t g_burn_cycles = 0;
+uint16_t g_burn_cycles = 0;
 
 unsigned int g_total_cycles = 7;
 
@@ -67,12 +69,13 @@ void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
 
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
-    memset(g_sys_memory, 0xFF, SYSTEM_MEMORY);
+    memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
 }
 
 void load_cartridge(Cartridge *cartridge) {
-    g_cartridge = cartridge;
-    load_program((DataBlob) {cartridge->prg_rom, cartridge->prg_size});
+    g_cartridge = *cartridge;
+
+    load_program(&(DataBlob) {g_cartridge.prg_rom, g_cartridge.prg_size});
 
     base_pc = memory_read(0xFFFC) | (memory_read(0xFFFD) << 8);
     g_cpu_regs.pc = base_pc;
@@ -80,46 +83,65 @@ void load_cartridge(Cartridge *cartridge) {
     printf("Starting execution at $%04x\n", g_cpu_regs.pc);
 }
 
-void load_program(DataBlob program_blob) {
-    g_prg_rom = program_blob;
+void load_program(DataBlob *program_blob) {
+    g_prg_rom = *program_blob;
 }
 
 uint8_t memory_read(uint16_t addr) {
+    uint8_t val;
+
     switch (addr) {
         case 0 ... 0x1FFF: {
-            return g_sys_memory[addr % 0x800];
+            val = g_sys_memory[addr % 0x800];
+            break;
         }
         case 0x2000 ... 0x3FFF: {
-            return read_ppu_mmio((uint8_t) (addr % 8));
+            val = read_ppu_mmio((uint8_t) (addr % 8));
+            break;
         }
         case 0x4014: {
             //TODO: DMA register
-            return 0;
+            val = 0;
+            break;
         }
         case 0x4000 ... 0x4013:
         case 0x4015: {
             //TODO: APU MMIO
-            return 0;
+            val = 0;
+            break;
         }
         case 0x4016 ... 0x4017: {
-            return poll_controller(addr - 0x4016);
+            val = poll_controller(addr - 0x4016);
+            break;
         }
         case 0x8000 ... 0xFFFF: {
-            addr -= 0x8000;
+            uint16_t adj_addr = addr - 0x8000;
             // ROM is mirrored if cartridge only has 1 bank
             if (g_prg_rom.size <= 16384) {
-                addr %= 0x4000;
+                adj_addr %= 0x4000;
             }
-            return g_prg_rom.data[addr];
+            val = g_prg_rom.data[adj_addr];
+            break;
         }
         default: {
             // nothing here
-            return 0;
+            val = 0;
+            break;
         }
     }
+
+    #if PRINT_MEMORY_ACCESS
+    printf("Memory read:  $%04x -> %02x\n", addr, val);
+    #endif
+
+    return val;
 }
 
 void memory_write(uint16_t addr, uint8_t val) {
+    #if PRINT_MEMORY_ACCESS
+    printf("Memory write: $%04x <- %02x\n", addr, val);
+    #endif
+
     switch (addr) {
         case 0 ... 0x1FFF: {
             g_sys_memory[addr % 0x800] = val;
@@ -131,6 +153,7 @@ void memory_write(uint16_t addr, uint8_t val) {
         }
         case 0x4014: {
             initiate_oam_dma(val);
+            g_burn_cycles += 514;
             return;
         }
         case 0x4000 ... 0x4013:
@@ -426,6 +449,8 @@ void issue_interrupt(const InterruptType *type) {
 
     // set the PC
     g_cpu_regs.pc = vector;
+
+    g_burn_cycles += 7;
 }
 
 void _exec_instr(const Instruction *instr, InstructionParameter param) {
@@ -858,10 +883,6 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case KIL:
             printf("Encountered %s instruction @ $%x\n", mnemonic_to_str(instr->mnemonic), g_cpu_regs.pc - 1);
             exit(-1);
-        //default:
-            //TODO
-            // no-op
-            //break;
     }
 
     if (g_cpu_regs.pc >= g_prg_rom.size + base_pc) {
@@ -883,10 +904,19 @@ void _exec_next_instr(void) {
     extern unsigned int g_scanline_tick;
     uint8_t status;
     memcpy(&status, &g_cpu_regs.status, 1);
-    printf("%04x  %s:%s $%04x (a=%02x,x=%02x,y=%02x,sp=%02x,p=%02x,ppu=%d,cyc=%d)\n",
-            g_cpu_regs.pc - get_instr_len(instr), mnemonic_to_str(instr->mnemonic), addr_mode_to_str(instr->addr_mode),
-            param.raw_operand, g_cpu_regs.acc, g_cpu_regs.x, g_cpu_regs.y, g_cpu_regs.sp, status,
-            g_scanline_tick, g_total_cycles);
+    printf("%04x  %02x %s:%s $%04x -> $%04x (a=%02x,x=%02x,y=%02x,sp=%02x,p=%02x,cyc=%d)\n",
+            g_cpu_regs.pc - get_instr_len(instr),
+            opcode,
+            mnemonic_to_str(instr->mnemonic),
+            addr_mode_to_str(instr->addr_mode),
+            param.raw_operand,
+            param.adj_operand,
+            g_cpu_regs.acc,
+            g_cpu_regs.x,
+            g_cpu_regs.y,
+            g_cpu_regs.sp,
+            status,
+            g_total_cycles);
     #endif
 
     // we increment, since decoding the instruction can modify the value
@@ -907,4 +937,17 @@ void cycle_cpu(void) {
         _exec_next_instr();
     }
     g_total_cycles++;
+}
+
+void dump_ram(void) {
+    FILE *out_file = fopen("ram.bin", "w+");
+
+    if (!out_file) {
+        printf("Failed to dump RAM (couldn't open file: %s)\n", strerror(errno));
+        return;
+    }
+
+    fwrite(g_sys_memory, SYSTEM_MEMORY, 1, out_file);
+
+    fclose(out_file);
 }

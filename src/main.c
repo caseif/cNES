@@ -25,11 +25,25 @@
 
 #include "cartridge.h"
 #include "loader.h"
+#include "renderer.h"
+#include "sdl_manager.h"
 #include "system.h"
-#include "input/global/toggles.h"
+#include "input/global/hotkeys.h"
 
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+void interrupt_handler(int signum) {
+    kill_execution();
+    close_window();
+}
+
+void *_start_system_thread(void *_) {
+    do_system_loop();
+    return NULL;
+}
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -43,6 +57,8 @@ int main(int argc, char **argv) {
         printf("Usage: %s <ROM>\n", argv[0]);
         exit(1);
     }
+
+    signal(SIGINT, interrupt_handler);
 
     char *rom_file_name = argv[1];
 
@@ -62,15 +78,25 @@ int main(int argc, char **argv) {
 
     printf("Successfully loaded ROM file %s.\n", rom_file_name);
 
-    printf("Initializing global input handlers...\n");
+    printf("Initializing global input handler...\n");
 
-    if (init_toggle_listener() != 0) {
-        return -1;
-    }
+    init_global_hotkeys();
 
     printf("Starting execution...\n");
 
-    start_main_loop(cart);
+    initialize_window();
+    initialize_renderer();
+
+    initialize_system(cart);
+
+    pthread_t system_thread;
+    int rc;
+    if ((rc = pthread_create(&system_thread, NULL, &_start_system_thread, NULL)) != 0) {
+        fprintf(stderr, "Failed to create system thread (error code %d)\n", rc);
+        return 1;
+    }
+
+    do_window_loop();
 
     return 0;
 }

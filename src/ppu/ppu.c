@@ -29,6 +29,7 @@
 #include "ppu/ppu.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +45,11 @@
 
 #define VBL_SCANLINE 241
 #define VBL_SCANLINE_TICK 1
+
+#define VRAM_SIZE 0x800
+#define PALETTE_RAM_SIZE 0x20
+#define OAM_PRIMARY_SIZE 0x100
+#define OAM_SECONDARY_SIZE 0x20
 
 #define NAME_TABLE_GRANULARITY 8
 #define NAME_TABLE_WIDTH (RESOLUTION_H / NAME_TABLE_GRANULARITY)
@@ -63,6 +69,8 @@
 #define PT_RIGHT_ADDR 0x1000
 
 #define PALETTE_DATA_BASE_ADDR 0x3F00
+
+#define PRINT_VRAM_WRITES false
 
 typedef union {
     struct sections {
@@ -102,10 +110,10 @@ PpuMask g_ppu_mask;
 PpuStatus g_ppu_status;
 PpuInternalRegisters g_ppu_internal_regs;
 
-unsigned char g_name_table_mem[0x800];
-unsigned char g_palette_ram[0x20];
-Sprite g_oam_ram[0x40];
-Sprite g_secondary_oam_ram[8];
+unsigned char g_name_table_mem[VRAM_SIZE];
+unsigned char g_palette_ram[PALETTE_RAM_SIZE];
+Sprite g_oam_ram[OAM_PRIMARY_SIZE / sizeof(Sprite)];
+Sprite g_secondary_oam_ram[OAM_SECONDARY_SIZE / sizeof(Sprite)];
 
 static bool g_odd_frame;
 uint16_t g_scanline;
@@ -230,6 +238,10 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             break;
         case 6:
             // set either the upper or lower address bits, depending on which write this is
+
+            #if PRINT_VRAM_WRITES
+            printf("PPU address (%s): %02x\n", g_ppu_internal_regs.w ? "low" : "high", val);
+            #endif
             if (g_ppu_internal_regs.w) {
                 // clear lower bits
                 g_ppu_internal_regs.t &= ~0x00FF;
@@ -253,6 +265,11 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             break;
         case 7: {
             // write to the stored address
+
+            #if PRINT_VRAM_WRITES
+            printf("PPU write: $%04x, %02x\n", g_ppu_internal_regs.v, val);
+            #endif
+
             ppu_memory_write(g_ppu_internal_regs.v, val);
 
             g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
@@ -262,6 +279,8 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
         default:
             assert(false);
     }
+
+    g_ppu_status.last_write = val & 0x10;
 }
 
 uint16_t _translate_name_table_address(uint16_t addr) {
@@ -462,7 +481,6 @@ void _do_general_cycle_routine(void) {
                         // nothing to do since we're on the last scanline
                         break;
                     }
-                    printf("v: %04x\n", g_ppu_internal_regs.v);
                     fetch_pixel_x = g_scanline_tick - 321; // fetching starts at cycle 321
                     fetch_pixel_y = g_scanline + 1; // we're on the next line
                 } else {
@@ -1000,3 +1018,18 @@ void cycle_ppu(void) {
         }
     }
 }
+
+void dump_vram(void) {
+    FILE *out_file = fopen("vram.bin", "w+");
+
+    if (!out_file) {
+        printf("Failed to dump VRAM (couldn't open file: %s)\n", strerror(errno));
+        return;
+    }
+
+    fwrite(g_name_table_mem, VRAM_SIZE, 1, out_file);
+    fwrite(g_palette_ram, PALETTE_RAM_SIZE, 1, out_file);
+
+    fclose(out_file);
+}
+

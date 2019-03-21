@@ -28,6 +28,9 @@
 #include "cartridge.h"
 #include "util.h"
 
+#define RESOLUTION_H 256
+#define RESOLUTION_V 240
+
 typedef struct {
     unsigned char name_table:2 PACKED;
     unsigned char vertical_increment:1 PACKED;
@@ -50,7 +53,7 @@ typedef struct {
 } PpuMask;
 
 typedef struct {
-    unsigned char :5 PACKED;
+    unsigned char last_write:5 PACKED;
     unsigned char sprite_overflow:1 PACKED;
     unsigned char sprite_0_hit:1 PACKED;
     unsigned char vblank:1 PACKED;
@@ -139,3 +142,5 @@ void cycle_ppu(void);
 RenderMode get_render_mode(void);
 
 void set_render_mode(RenderMode mode);
+
+void dump_vram(void);

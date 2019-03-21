@@ -27,4 +27,16 @@
 
 #include "cartridge.h"
 
-void start_main_loop(Cartridge *cart);
+void initialize_system();
+
+void do_system_loop();
+
+void break_execution(void);
+
+void continue_execution(void);
+
+void step_execution(void);
+
+bool is_execution_halted(void);
+
+void kill_execution(void);

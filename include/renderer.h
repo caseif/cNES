@@ -27,9 +27,6 @@
 
 #include <stdint.h>
 
-#define RESOLUTION_H 256
-#define RESOLUTION_V 240
-
 typedef struct {
     uint8_t r;
     uint8_t g;
@@ -41,3 +38,5 @@ void initialize_renderer(void);
 void set_pixel(unsigned int x, unsigned int y, const RGBValue rgb);
 
 void flush_frame(void);
+
+void close_window(void);

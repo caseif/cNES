@@ -25,8 +25,10 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #ifdef WINDOWS
 #include <windows.h>
@@ -43,6 +45,19 @@ typedef struct {
     unsigned char *data;
     size_t size;
 } DataBlob;
+
+typedef struct linked_list_t {
+    void *value;
+    struct linked_list_t *next;
+} LinkedList;
+
+static inline void add_to_linked_list(LinkedList *list, void *value) {
+    while (list->next != NULL) {
+        list = list->next;
+    }
+    list->next = malloc(sizeof(LinkedList));
+    list->next->value = value;
+}
 
 static inline uint32_t endian_swap(uint32_t x) {
     return (x >> 24)               | 

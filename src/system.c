@@ -41,6 +41,10 @@
 
 #define SLEEP_INTERVAL 10 // milliseconds
 
+bool halted = false;
+bool stepping = false;
+bool dead = false;
+
 static void _init_controllers() {
     init_controllers();
 
@@ -49,15 +53,15 @@ static void _init_controllers() {
     sc_attach_driver(sc_poll_input);
 }
 
-void start_main_loop(Cartridge *cart) {
+void initialize_system(Cartridge *cart) {
     initialize_cpu();
     initialize_ppu(cart, cart->mirror_mode);
     load_cartridge(cart);
 
     _init_controllers();
+}
 
-    initialize_renderer();
-
+void do_system_loop(void) {
     unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;
 
     unsigned int cycles_since_sleep = 0;
@@ -65,10 +69,21 @@ void start_main_loop(Cartridge *cart) {
     time_t last_sleep = 0;
 
     while (true) {
-        cycle_ppu();
-        cycle_ppu();
-        cycle_ppu();
-        cycle_cpu();
+        if (dead) {
+            break;
+        }
+
+        if (!halted) {
+            cycle_ppu();
+            cycle_ppu();
+            cycle_ppu();
+            cycle_cpu();
+
+            if (stepping) {
+                halted = true;
+                stepping = false;
+            }
+        }
 
         if (++cycles_since_sleep > cycles_per_interval) {
             sleep_cp(SLEEP_INTERVAL - (clock() - last_sleep) / 1000);
@@ -76,4 +91,25 @@ void start_main_loop(Cartridge *cart) {
             last_sleep = clock();
         }
     }
+}
+
+void break_execution(void) {
+    halted = true;
+}
+
+void continue_execution(void) {
+    halted = false;
+}
+
+void step_execution(void) {
+    halted = false;
+    stepping = true;
+}
+
+bool is_execution_halted(void) {
+    return halted;
+}
+
+void kill_execution(void) {
+    dead = true;
 }

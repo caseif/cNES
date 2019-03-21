@@ -31,8 +31,6 @@
 #include <SDL2/SDL_events.h>
 
 void sc_poll_input(void) {
-    SDL_PumpEvents();
-
     int key_count;
 
     const uint8_t *key_states = SDL_GetKeyboardState(&key_count);
