@@ -855,7 +855,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
             palette_num &= 0b11;
         case RM_PT: {
             if (!use_nt) {
-                pt_tile = (y / NAME_TABLE_HEIGHT) * 16 + (x % 128) / NAME_TABLE_WIDTH;
+                pt_tile = (y / 8) * 16 + (x % 128) / 8;
             }
 
             uint16_t pattern_offset = pt_tile * 16 + (y % NAME_TABLE_GRANULARITY);
@@ -865,7 +865,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                     : PT_LEFT_ADDR)
                     + pattern_offset;
 
-            uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (x % 8)) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (x % 8)) & 1) << 1);
+            uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
 
             uint8_t palette_index = ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
             RGBValue pixel_rgb = g_palette[palette_index];
