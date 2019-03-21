@@ -462,6 +462,7 @@ void _do_general_cycle_routine(void) {
                         // nothing to do since we're on the last scanline
                         break;
                     }
+                    printf("v: %04x\n", g_ppu_internal_regs.v);
                     fetch_pixel_x = g_scanline_tick - 321; // fetching starts at cycle 321
                     fetch_pixel_y = g_scanline + 1; // we're on the next line
                 } else {
@@ -473,7 +474,7 @@ void _do_general_cycle_routine(void) {
                     break;
                 }
 
-                switch ((g_scanline_tick - 1) % 8) {
+                switch (fetch_pixel_x % 8) {
                     case 0: {
                         // flush the palette select data into the primary shift registers
                         g_ppu_internal_regs.palette_shift_l = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch & 1);
@@ -503,7 +504,7 @@ void _do_general_cycle_routine(void) {
                         break;
                     }
                     case 3: {
-                        // address = attr table base + (voodo)
+                        // address = attr table base + (name table offset) + (shifted v)
                         unsigned int v = g_ppu_internal_regs.v;
                         uint16_t attr_table_addr = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
@@ -864,11 +865,10 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                     : PT_LEFT_ADDR)
                     + pattern_offset;
 
-            uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
+            uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (x % 8)) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (x % 8)) & 1) << 1);
 
             uint8_t palette_index = ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
             RGBValue pixel_rgb = g_palette[palette_index];
-            pixel_rgb = (RGBValue) {0, pattern_pixel * 64 + 32, 0};
 
             set_pixel(x, y, pixel_rgb);
             
