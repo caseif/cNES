@@ -387,7 +387,7 @@ static void _do_adc(uint16_t m) {
     uint8_t m7 = (m >> 7);
 
     // unsigned overflow will occur if at least two among the most significant operand bits and the carry bit are set
-    g_cpu_regs.status.carry = ((a7 & m7) | (a7 & g_cpu_regs.status.carry) | (m7 & g_cpu_regs.status.carry));
+    g_cpu_regs.status.carry = ((acc0 + m + g_cpu_regs.status.carry) & 0x100) ? 1 : 0;
 
     // signed overflow will occur if the sign of both inputs if different from the sign of the result
     g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & (m ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;

@@ -70,7 +70,7 @@
 
 #define PALETTE_DATA_BASE_ADDR 0x3F00
 
-#define PRINT_VRAM_WRITES false
+#define PRINT_VRAM_WRITES 0
 
 typedef union {
     struct sections {
@@ -242,6 +242,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             #if PRINT_VRAM_WRITES
             printf("PPU address (%s): %02x\n", g_ppu_internal_regs.w ? "low" : "high", val);
             #endif
+
             if (g_ppu_internal_regs.w) {
                 // clear lower bits
                 g_ppu_internal_regs.t &= ~0x00FF;
@@ -485,10 +486,6 @@ void _do_general_cycle_routine(void) {
                     fetch_pixel_y = g_scanline + 1; // we're on the next line
                 } else {
                     // these cycles are for garbage NT fetches
-                    break;
-                }
-
-                if (!_is_rendering_enabled()) {
                     break;
                 }
 
@@ -979,10 +976,14 @@ void cycle_ppu(void) {
         uint8_t palette_index = ppu_memory_read(palette_entry_addr);
 
         RGBValue rgb;
-        if (final_palette_offset == 0xFF) {
-            rgb = (RGBValue) {255 * (sprite % 2), 255 * (sprite % 3), 255 * (sprite % 5)};
+        if (g_ppu_mask.show_background) {
+            if (final_palette_offset == 0xFF) {
+                rgb = (RGBValue) {255 * (sprite % 2), 255 * (sprite % 3), 255 * (sprite % 5)};
+            } else {
+                rgb = g_palette[palette_index % 64];
+            }
         } else {
-            rgb = g_palette[palette_index % 64];
+            rgb = (RGBValue) {0, 0, 0};
         }
 
         render_pixel(g_scanline_tick, g_scanline, rgb);
