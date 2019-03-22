@@ -416,6 +416,12 @@ void issue_interrupt(const InterruptType *type) {
         return;
     }
 
+    // set B flag
+    if (type->set_b) {
+        g_cpu_regs.status.break_command = 1;
+        g_cpu_regs.status.unused = 1;
+    }
+
     // push PC and P
     if (type->push_pc) {
         uint16_t pc_to_push = g_cpu_regs.pc + (type == INT_BRK ? 2 : 0);
@@ -429,11 +435,6 @@ void issue_interrupt(const InterruptType *type) {
         status_serial |= 0x30;
 
         stack_push(status_serial);
-    }
-
-    // set B flag
-    if (type->set_b) {
-        g_cpu_regs.status.break_command = 1;
     }
 
     // set I flag
