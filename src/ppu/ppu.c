@@ -166,9 +166,7 @@ uint8_t read_ppu_mmio(uint8_t index) {
             if (g_scanline == VBL_SCANLINE) {
                 if (g_scanline_tick == VBL_SCANLINE_TICK) {
                     nmi_suppression = true;
-                }/* else if (g_scanline_tick >= VBL_SCANLINE_TICK + 1 && g_scanline_tick <= VBL_SCANLINE_TICK + 3) {
-                    nmi_countdown = -1;
-                }*/
+                }
             }
 
             return res;
@@ -469,6 +467,23 @@ void _update_v_horizontal(void) {
 
 void _do_general_cycle_routine(void) {
     switch (g_scanline) {
+        // pre-render line
+        case PRE_RENDER_LINE: {
+            // clear status
+            if (g_scanline_tick == 1) {
+                g_ppu_status.vblank = 0;
+                g_ppu_status.sprite_0_hit = 0;
+                g_ppu_status.sprite_overflow = 0;
+            }
+
+            // vert(v) = vert(t)
+            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && _is_rendering_enabled()) {
+                g_ppu_internal_regs.v &= ~0x7BE0; // clear vertical bits
+                g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x7BE0; // copy vertical bits to v from t
+            }
+
+            // intentional fall-through
+        }
         // visible screen
         case FIRST_VISIBLE_LINE ... LAST_VISIBLE_LINE: {
             if (g_scanline_tick == 0) {
@@ -486,16 +501,12 @@ void _do_general_cycle_routine(void) {
                 unsigned int fetch_pixel_x;
                 unsigned int fetch_pixel_y;
 
-                if ((g_scanline_tick >= 1 && g_scanline_tick <= LAST_VISIBLE_CYCLE)) {
+                if (g_scanline_tick >= 321) { // start fetching for the next scanline
+                    fetch_pixel_x = g_scanline_tick - 321; // fetching starts at cycle 321
+                    fetch_pixel_y = g_scanline == PRE_RENDER_LINE ? g_scanline + 1 : 0; // we're on the next line
+                } else if ((g_scanline_tick >= 1 && g_scanline_tick <= LAST_VISIBLE_CYCLE)) {
                     fetch_pixel_x = g_scanline_tick + 15; // we fetch two tiles ahead
                     fetch_pixel_y = g_scanline;
-                } else if (g_scanline_tick >= 321 && g_scanline_tick <= 336) { // start fetching for the next scanline
-                    if (g_scanline == LAST_VISIBLE_LINE) {
-                        // nothing to do since we're on the last scanline
-                        break;
-                    }
-                    fetch_pixel_x = g_scanline_tick - 321; // fetching starts at cycle 321
-                    fetch_pixel_y = g_scanline + 1; // we're on the next line
                 } else {
                     // these cycles are for garbage NT fetches
                     break;
@@ -510,12 +521,12 @@ void _do_general_cycle_routine(void) {
                         // flush the pattern bitmap latches into the upper halves of the primary shift registers
 
                         // clear upper bits
-                        g_ppu_internal_regs.pattern_shift_l &= 0xFF;
+                        g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
                         // set upper bits
                         g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
                         
                         // clear upper bits
-                        g_ppu_internal_regs.pattern_shift_h &= 0xFF;
+                        g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
                         // set upper bits
                         g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
 
@@ -612,23 +623,6 @@ void _do_general_cycle_routine(void) {
                 if (g_ppu_control.gen_nmis) {
                     nmi_countdown = NMI_DELAY;
                 }
-            }
-
-            break;
-        }
-        // pre-render line
-        case PRE_RENDER_LINE: {
-            // clear status
-            if (g_scanline_tick == 1) {
-                g_ppu_status.vblank = 0;
-                g_ppu_status.sprite_0_hit = 0;
-                g_ppu_status.sprite_overflow = 0;
-            }
-
-            // vert(v) = vert(t)
-            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && _is_rendering_enabled()) {
-                g_ppu_internal_regs.v &= ~0x7BE0; // clear vertical bits
-                g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x7BE0; // copy vertical bits to v from t
             }
 
             break;
