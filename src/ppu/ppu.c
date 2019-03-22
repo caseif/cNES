@@ -926,7 +926,10 @@ void cycle_ppu(void) {
         _do_sprite_evaluation();
     }
 
-    if (g_scanline < RESOLUTION_V && g_scanline_tick < RESOLUTION_H) {
+    unsigned int draw_pixel_x = g_scanline_tick - 1;
+    unsigned int draw_pixel_y = g_scanline;
+
+    if (g_scanline < RESOLUTION_V && g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H) {
         unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)
                 | (g_ppu_internal_regs.pattern_shift_l & 1);
 
@@ -1008,13 +1011,14 @@ void cycle_ppu(void) {
             rgb = (RGBValue) {0, 0, 0};
         }
 
-        render_pixel(g_scanline_tick, g_scanline, rgb);
+        render_pixel(draw_pixel_x, draw_pixel_y, rgb);
 
         // shift the internal registers
         g_ppu_internal_regs.pattern_shift_h >>= 1;
         g_ppu_internal_regs.pattern_shift_l >>= 1;
         g_ppu_internal_regs.palette_shift_h >>= 1;
         g_ppu_internal_regs.palette_shift_l >>= 1;
+        // feed the attribute registers from the latch(es)
         g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
         g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
 
