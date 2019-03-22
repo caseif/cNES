@@ -111,6 +111,7 @@ typedef struct {
 
     uint8_t name_table_entry_latch;
     unsigned int attr_table_entry_latch:2;
+    unsigned int attr_table_entry_latch_secondary:2;
 
     uint8_t pattern_bitmap_l_latch;
     uint8_t pattern_bitmap_h_latch;

@@ -515,8 +515,10 @@ void _do_general_cycle_routine(void) {
                 switch (fetch_pixel_x % 8) {
                     case 0: {
                         // flush the palette select data into the primary shift registers
-                        g_ppu_internal_regs.palette_shift_l = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch & 1);
-                        g_ppu_internal_regs.palette_shift_h = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch >> 1);
+                        //g_ppu_internal_regs.palette_shift_l = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch & 1);
+                        //g_ppu_internal_regs.palette_shift_h = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch >> 1);
+
+                        g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
 
                         // flush the pattern bitmap latches into the upper halves of the primary shift registers
 
@@ -564,7 +566,7 @@ void _do_general_cycle_routine(void) {
                             attr_table_byte >>= 2;
                         }
 
-                        g_ppu_internal_regs.attr_table_entry_latch = attr_table_byte & 0b11;
+                        g_ppu_internal_regs.attr_table_entry_latch_secondary = attr_table_byte & 0b11;
 
                         break;
                     }
@@ -1013,6 +1015,8 @@ void cycle_ppu(void) {
         g_ppu_internal_regs.pattern_shift_l >>= 1;
         g_ppu_internal_regs.palette_shift_h >>= 1;
         g_ppu_internal_regs.palette_shift_l >>= 1;
+        g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
+        g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
 
         for (int i = 0; i < 8; i++) {
             if (g_ppu_internal_regs.sprite_x_counters[i]) {
