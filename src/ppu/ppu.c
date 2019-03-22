@@ -46,6 +46,8 @@
 #define VBL_SCANLINE 241
 #define VBL_SCANLINE_TICK 1
 
+#define NMI_DELAY 14
+
 #define VRAM_SIZE 0x800
 #define PALETTE_RAM_SIZE 0x20
 #define OAM_PRIMARY_SIZE 0x100
@@ -119,6 +121,9 @@ static bool g_odd_frame;
 uint16_t g_scanline;
 uint16_t g_scanline_tick;
 
+static bool nmi_suppression = false;
+static int nmi_countdown = -1;
+
 static RenderMode g_render_mode;
 
 static inline bool _is_rendering_enabled(void) {
@@ -157,6 +162,14 @@ uint8_t read_ppu_mmio(uint8_t index) {
             g_ppu_status.vblank = 0;
 
             clear_nmi_line();
+
+            if (g_scanline == VBL_SCANLINE) {
+                if (g_scanline_tick == VBL_SCANLINE_TICK) {
+                    nmi_suppression = true;
+                }/* else if (g_scanline_tick >= VBL_SCANLINE_TICK + 1 && g_scanline_tick <= VBL_SCANLINE_TICK + 3) {
+                    nmi_countdown = -1;
+                }*/
+            }
 
             return res;
         }
@@ -199,7 +212,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             g_ppu_internal_regs.t |= (val & 0b11) << 10; // set bits 10-11 to current nametable
 
             if (!old_gen_nmis && g_ppu_control.gen_nmis && g_ppu_status.vblank) {
-                issue_interrupt(INT_NMI);
+                nmi_countdown = NMI_DELAY;
             }
 
             break;
@@ -589,10 +602,15 @@ void _do_general_cycle_routine(void) {
         // set vblank flag
         case VBL_SCANLINE: {
             if (g_scanline_tick == VBL_SCANLINE_TICK) {
+                if (nmi_suppression) {
+                    nmi_suppression = false;
+                    break;
+                }
+
                 g_ppu_status.vblank = 1;
 
                 if (g_ppu_control.gen_nmis) {
-                    set_nmi_line();
+                    nmi_countdown = NMI_DELAY;
                 }
             }
 
@@ -615,6 +633,10 @@ void _do_general_cycle_routine(void) {
 
             break;
         }
+    }
+
+    if (nmi_countdown-- == 0) {
+        set_nmi_line();
     }
 }
 
