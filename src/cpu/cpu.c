@@ -383,9 +383,6 @@ static void _do_adc(uint16_t m) {
 
     _set_alu_flags(g_cpu_regs.acc);
 
-    uint8_t a7 = (acc0 >> 7);
-    uint8_t m7 = (m >> 7);
-
     // unsigned overflow will occur if at least two among the most significant operand bits and the carry bit are set
     g_cpu_regs.status.carry = ((acc0 + m + g_cpu_regs.status.carry) & 0x100) ? 1 : 0;
 

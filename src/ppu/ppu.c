@@ -476,8 +476,7 @@ void _do_general_cycle_routine(void) {
                 if ((g_scanline_tick >= 1 && g_scanline_tick <= LAST_VISIBLE_CYCLE)) {
                     fetch_pixel_x = g_scanline_tick + 15; // we fetch two tiles ahead
                     fetch_pixel_y = g_scanline;
-                } else if (g_scanline_tick <= 336) { // start fetching for the next scanline
-                    // it's guaranteed that g_scanline_tick > 320
+                } else if (g_scanline_tick >= 321 && g_scanline_tick <= 336) { // start fetching for the next scanline
                     if (g_scanline == LAST_VISIBLE_LINE) {
                         // nothing to do since we're on the last scanline
                         break;
@@ -521,17 +520,18 @@ void _do_general_cycle_routine(void) {
                     case 3: {
                         // address = attr table base + (name table offset) + (shifted v)
                         unsigned int v = g_ppu_internal_regs.v;
+
                         uint16_t attr_table_addr = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
                         uint8_t attr_table_byte = ppu_memory_read(attr_table_addr);
 
                         // check if it's in the bottom half of the table cell
-                        if ((fetch_pixel_y % 32) >= 16) {
+                        if ((fetch_pixel_y % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
                             attr_table_byte >>= 4;
                         }
 
                         // check if it's in the right half of the table cell
-                        if ((fetch_pixel_x % 32) >= 16) {
+                        if ((fetch_pixel_x % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
                             attr_table_byte >>= 2;
                         }
 
@@ -566,7 +566,7 @@ void _do_general_cycle_routine(void) {
                         // only update v if rendering is enabled
                         if (_is_rendering_enabled()) {
                             // only update vertical v at the end of the visible part of the scanline
-                            if (g_scanline_tick == 256) {
+                            if (g_scanline_tick == LAST_VISIBLE_CYCLE) {
                                 _update_v_vertical();
                             }
 
