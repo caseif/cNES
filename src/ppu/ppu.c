@@ -503,7 +503,7 @@ void _do_general_cycle_routine(void) {
 
                 if (g_scanline_tick >= 321) { // start fetching for the next scanline
                     fetch_pixel_x = g_scanline_tick - 321; // fetching starts at cycle 321
-                    fetch_pixel_y = g_scanline == PRE_RENDER_LINE ? g_scanline + 1 : 0; // we're on the next line
+                    fetch_pixel_y = g_scanline == PRE_RENDER_LINE ? 0 : g_scanline + 1; // we're on the next line
                 } else if ((g_scanline_tick >= 1 && g_scanline_tick <= LAST_VISIBLE_CYCLE)) {
                     fetch_pixel_x = g_scanline_tick + 15; // we fetch two tiles ahead
                     fetch_pixel_y = g_scanline;
@@ -536,6 +536,8 @@ void _do_general_cycle_routine(void) {
                     case 1: {
                         // address = name table base + (v except fine y)
                         uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v & 0x0FFF);
+
+                        printf("(%03d, %03d) @ (%03d, %03d) -> %04x\n", fetch_pixel_x, fetch_pixel_y, g_scanline_tick, g_scanline, name_table_addr);
 
                         g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr);
 
@@ -585,7 +587,6 @@ void _do_general_cycle_routine(void) {
                                 + pattern_offset;
 
                         g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(ppu_memory_read(pattern_addr));
-
 
                         // only update v if rendering is enabled
                         if (_is_rendering_enabled()) {
