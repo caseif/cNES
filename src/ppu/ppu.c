@@ -520,15 +520,18 @@ void _do_general_cycle_routine(void) {
 
                         // flush the pattern bitmap latches into the upper halves of the primary shift registers
 
-                        // clear upper bits
-                        g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
-                        // set upper bits
-                        g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
-                        
-                        // clear upper bits
-                        g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
-                        // set upper bits
-                        g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
+                        // special case since the register has to be preloaded before any shifting happens
+                        if (fetch_pixel_x == 8) {
+                            g_ppu_internal_regs.pattern_shift_l = g_ppu_internal_regs.pattern_bitmap_l_latch;
+                            g_ppu_internal_regs.pattern_shift_h = g_ppu_internal_regs.pattern_bitmap_h_latch;
+                        } else {
+                            // clear upper bits
+                            g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
+                            g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
+                            // set upper bits
+                            g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
+                            g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
+                        }
 
                         break;
                     }
@@ -537,7 +540,7 @@ void _do_general_cycle_routine(void) {
                         // address = name table base + (v except fine y)
                         uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v & 0x0FFF);
 
-                        printf("(%03d, %03d) @ (%03d, %03d) -> %04x\n", fetch_pixel_x, fetch_pixel_y, g_scanline_tick, g_scanline, name_table_addr);
+                        //printf("(%03d, %03d) @ (%03d, %03d) -> %04x\n", fetch_pixel_x, fetch_pixel_y, g_scanline_tick, g_scanline, name_table_addr);
 
                         g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr);
 
