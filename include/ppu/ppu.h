@@ -145,3 +145,5 @@ RenderMode get_render_mode(void);
 void set_render_mode(RenderMode mode);
 
 void dump_vram(void);
+
+void dump_oam(void);

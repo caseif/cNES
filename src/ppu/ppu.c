@@ -514,18 +514,17 @@ void _do_general_cycle_routine(void) {
 
                 switch (fetch_pixel_x % 8) {
                     case 0: {
-                        // flush the palette select data into the primary shift registers
-                        //g_ppu_internal_regs.palette_shift_l = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch & 1);
-                        //g_ppu_internal_regs.palette_shift_h = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch >> 1);
-
+                        // copy the palette data from the secondary latch to the primary
                         g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
-
-                        // flush the pattern bitmap latches into the upper halves of the primary shift registers
 
                         // special case since the register has to be preloaded before any shifting happens
                         if (fetch_pixel_x == 8) {
                             g_ppu_internal_regs.pattern_shift_l = g_ppu_internal_regs.pattern_bitmap_l_latch;
                             g_ppu_internal_regs.pattern_shift_h = g_ppu_internal_regs.pattern_bitmap_h_latch;
+
+                            // load the shift register directly
+                            g_ppu_internal_regs.palette_shift_l = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch & 1);
+                            g_ppu_internal_regs.palette_shift_h = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch >> 1);
                         } else {
                             // clear upper bits
                             g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
@@ -970,10 +969,14 @@ void cycle_ppu(void) {
 
             // if the pixel is transparent, just continue
             if (!palette_low) {
-                continue;
+                //continue;
+            }
+            if (i == g_ppu_internal_regs.sprite_0_slot) {
+                printf("%d: (%02d, %02d)\n", i, draw_pixel_x, draw_pixel_y);
+                final_palette_offset = 1;
             }
 
-            if (!transparent_background &&i == g_ppu_internal_regs.sprite_0_slot) {
+            if (!transparent_background && i == g_ppu_internal_regs.sprite_0_slot) {
                 g_ppu_status.sprite_0_hit = 1; // set the hit flag
                 g_ppu_internal_regs.sprite_0_slot = 8; // set it out-of-bounds until the next frame
             }
@@ -992,7 +995,6 @@ void cycle_ppu(void) {
                 final_palette_offset = sprite_palette_offset;
             }
 
-            final_palette_offset = 0xFF;
             sprite = i;
         }
 
@@ -1002,11 +1004,7 @@ void cycle_ppu(void) {
 
         RGBValue rgb;
         if (g_ppu_mask.show_background) {
-            if (final_palette_offset == 0xFF) {
-                rgb = (RGBValue) {255 * (sprite % 2), 255 * (sprite % 3), 255 * (sprite % 5)};
-            } else {
-                rgb = g_palette[palette_index % 64];
-            }
+            rgb = g_palette[palette_index % (sizeof(g_palette) / sizeof(RGBValue))];
         } else {
             rgb = (RGBValue) {0, 0, 0};
         }
@@ -1062,3 +1060,15 @@ void dump_vram(void) {
     fclose(out_file);
 }
 
+void dump_oam(void) {
+    FILE *out_file = fopen("oam.bin", "w+");
+
+    if (!out_file) {
+        printf("Failed to dump OAM (couldn't open file: %s)\n", strerror(errno));
+        return;
+    }
+
+    fwrite(g_oam_ram, OAM_PRIMARY_SIZE, 1, out_file);
+
+    fclose(out_file);
+}

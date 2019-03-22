@@ -41,6 +41,7 @@
 #define KEY_ACTION_BREAK SDLK_F8
 #define KEY_ACTION_DUMP_RAM SDLK_F9
 #define KEY_ACTION_DUMP_VRAM SDLK_F10
+#define KEY_ACTION_DUMP_OAM SDLK_F11
 
 static void _global_hotkey_callback(SDL_Event *event) {
     switch (event->type) {
@@ -88,12 +89,16 @@ static void _global_hotkey_callback(SDL_Event *event) {
                     break_execution();
                     break;
                 case KEY_ACTION_DUMP_RAM:
-                    dump_ram();
                     printf("Dumping system RAM\n");
+                    dump_ram();
                     break;
                 case KEY_ACTION_DUMP_VRAM:
-                    dump_vram();
                     printf("Dumping VRAM\n");
+                    dump_vram();
+                    break;
+                case KEY_ACTION_DUMP_OAM:
+                    printf("Dumping OAM\n");
+                    dump_oam();
                     break;
                     
             }
