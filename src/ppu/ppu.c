@@ -770,6 +770,9 @@ void _do_sprite_evaluation(void) {
 
                 unsigned int index = g_ppu_internal_regs.o;
                 switch ((g_scanline_tick + 7) % 8) {
+                    case 0: {
+                        g_ppu_internal_regs.sprite_y_latch = g_secondary_oam_ram[index].y;
+                    }
                     case 1: {
                         g_ppu_internal_regs.sprite_tile_index_latch = g_secondary_oam_ram[index].tile_num;
 
@@ -794,13 +797,13 @@ void _do_sprite_evaluation(void) {
                         if (index < g_ppu_internal_regs.loaded_sprites) {
                             uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
-                            uint8_t cur_y = g_ppu_internal_regs.sprite_y_latch - g_scanline;
+                            uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch - 2;
                             if (attrs.flip_ver) {
                                 cur_y = 8 - cur_y;
                             }
 
                             uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                    | (tile_index * 16 + cur_y + 8);
+                                    | (tile_index * 16 + cur_y);
 
                             uint8_t res = ppu_memory_read(addr);
 
@@ -820,10 +823,11 @@ void _do_sprite_evaluation(void) {
                         // fetch tile upper byte
                         // same as above, but we add 8 to the address
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+
                         if (index < g_ppu_internal_regs.loaded_sprites) {
                             uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
-                            uint8_t cur_y = g_ppu_internal_regs.sprite_y_latch - g_scanline;
+                            uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch - 2;
                             if (attrs.flip_ver) {
                                 cur_y = 8 - cur_y;
                             }
@@ -962,7 +966,6 @@ void cycle_ppu(void) {
                 continue;
             }
 
-            //printf("h/l: %d | %02x/%02x\n", i, g_ppu_internal_regs.sprite_tile_shift_h[i], g_ppu_internal_regs.sprite_tile_shift_l[i]);
             unsigned int palette_low = ((g_ppu_internal_regs.sprite_tile_shift_h[i] & 1) << 1)
                                         | (g_ppu_internal_regs.sprite_tile_shift_l[i] & 1);
 
