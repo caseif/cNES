@@ -736,7 +736,7 @@ void _do_sprite_evaluation(void) {
                         if (g_ppu_internal_regs.o < 8) {
                             Sprite sprite = g_secondary_oam_ram[g_ppu_internal_regs.o];
                             assert(g_ppu_internal_regs.m <= 4);
-                            ((char*) &sprite)[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
+                            ((char*) &g_secondary_oam_ram[g_ppu_internal_regs.o])[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
                             g_ppu_internal_regs.has_latched_sprite = false;
                         }
                     }
@@ -754,10 +754,7 @@ void _do_sprite_evaluation(void) {
                         g_ppu_internal_regs.n++;
                         g_ppu_internal_regs.o++;
 
-                        // bit of a hack - keep m set as a marker for when we reach the end of OAM
-                        if (g_ppu_internal_regs.n != 0) {
-                            g_ppu_internal_regs.m = 0;
-                        }
+                        g_ppu_internal_regs.m = 0;
                     }
                 }
 
@@ -791,7 +788,7 @@ void _do_sprite_evaluation(void) {
                         break;
                     }
                     case 5: {
-                        // fetch tile upper byte
+                        // fetch tile lower byte
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                         if (index < g_ppu_internal_regs.loaded_sprites) {
@@ -951,13 +948,14 @@ void cycle_ppu(void) {
 
         // time to read sprite data
 
-        unsigned int sprite = 0xFF;
+        unsigned int sprite;
         // iterate all sprites for the current scanline
         for (unsigned int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
             // if the x counter hasn't run down to zero, skip it
             if (g_ppu_internal_regs.sprite_x_counters[i]) {
                 continue;
             }
+            //printf("Rendering sprite pixel at (%03d, %03d)\n", g_scanline_tick, g_scanline);
 
             // if the death counter went to zero, this sprite is done rendering
             if (!g_ppu_internal_regs.sprite_death_counters[i]) {
@@ -973,7 +971,6 @@ void cycle_ppu(void) {
                 //continue;
             }
             if (i == g_ppu_internal_regs.sprite_0_slot) {
-                printf("%d: (%02d, %02d)\n", i, draw_pixel_x, draw_pixel_y);
                 final_palette_offset = 1;
             }
 
