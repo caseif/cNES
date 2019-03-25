@@ -658,8 +658,9 @@ void _do_sprite_evaluation(void) {
                 }
                 break;
             case 65 ... 256: {
-                if (g_ppu_internal_regs.n == 0 && g_ppu_internal_regs.m != 0) {
-                    // if n has overflowed and m hasn't reset, we've reached the end of OAM
+                //TODO: THIS IS WRONG
+                if (g_ppu_internal_regs.n >= sizeof(g_oam_ram) / sizeof(Sprite)) {
+                    // we've reached the end of OAM
                     break;
                 }
 

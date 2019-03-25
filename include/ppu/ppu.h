@@ -92,7 +92,7 @@ typedef struct {
     uint8_t s;         // sprite address
 
     unsigned int m:3;   // sprite data index, used for sprite evaluation
-    unsigned int n:6;   // primary OAM index, used for sprite evaluation
+    unsigned int n:7;   // primary OAM index, used for sprite evaluation
     unsigned int o:4;   // secondary OAM index, used for sprite evaluation/tile fetching
     uint8_t sprite_attr_latch; // latch for sprite during evaluation
     bool has_latched_sprite;   // whether a byte is latched
