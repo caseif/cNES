@@ -52,7 +52,7 @@ void initialize_window() {
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
     g_window = SDL_CreateWindow("cNES", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            RESOLUTION_H * 4, RESOLUTION_V * 4, SDL_WINDOW_SHOWN);
+            RESOLUTION_H * 2, RESOLUTION_V * 2, SDL_WINDOW_SHOWN);
 
     if (!g_window) {
         printf("Failed to create window: %s\n", SDL_GetError());
