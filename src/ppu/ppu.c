@@ -807,7 +807,7 @@ void _do_sprite_evaluation(void) {
 
                             uint8_t res = ppu_memory_read(addr);
 
-                            if (attrs.flip_hor) {
+                            if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
                             }
 
@@ -837,7 +837,7 @@ void _do_sprite_evaluation(void) {
 
                             uint8_t res = ppu_memory_read(addr);
 
-                            if (attrs.flip_hor) {
+                            if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
                             }
 
