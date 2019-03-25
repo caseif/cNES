@@ -62,7 +62,7 @@ typedef struct {
 typedef struct {
     unsigned int palette_index:2 PACKED;
     unsigned int :3 PACKED; // unused
-    unsigned int priority:1 PACKED;
+    unsigned int low_priority:1 PACKED;
     unsigned int flip_hor:1 PACKED;
     unsigned int flip_ver:1 PACKED;
 } SpriteAttributes;

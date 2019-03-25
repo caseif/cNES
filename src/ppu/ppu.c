@@ -936,6 +936,8 @@ void cycle_ppu(void) {
 
         unsigned int bg_palette_offset;
 
+        bool transparent_background = true;
+
         if (palette_low) {
             // if the palette low bits are not zero, we select the color normally
             unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
@@ -944,9 +946,8 @@ void cycle_ppu(void) {
         } else {
             // otherwise, we use the default background color
             bg_palette_offset = 0;
+            transparent_background = false;
         }
-
-        bool transparent_background = bg_palette_offset != 0;
 
         uint8_t final_palette_offset = bg_palette_offset;
 
@@ -973,6 +974,7 @@ void cycle_ppu(void) {
             if (!palette_low) {
                 //continue;
             }
+
             if (i == g_ppu_internal_regs.sprite_0_slot) {
                 final_palette_offset = 1;
             }
@@ -984,10 +986,10 @@ void cycle_ppu(void) {
 
             SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[i];
 
-            uint8_t palette_high = attrs.palette_index;
+            uint8_t palette_high = 0x4 | attrs.palette_index;
             uint8_t sprite_palette_offset = (palette_high << 2) | palette_low;
 
-            if (attrs.priority) {
+            if (!attrs.low_priority) {
                 final_palette_offset = sprite_palette_offset;
                 // since it's high priority, we can stop looking for a better sprite
                 break;
