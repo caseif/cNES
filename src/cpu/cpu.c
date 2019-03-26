@@ -924,15 +924,15 @@ void _exec_next_instr(void) {
 }
 
 void cycle_cpu(void) {
-    if (g_nmi_line) {
-        issue_interrupt(INT_NMI);
-        g_nmi_line = false;
-    }
-
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
     } else {
-        _exec_next_instr();
+        if (g_nmi_line) {
+            issue_interrupt(INT_NMI);
+            g_nmi_line = false;
+        } else {
+            _exec_next_instr();
+        }
     }
     g_total_cycles++;
 }
