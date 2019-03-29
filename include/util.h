@@ -33,7 +33,9 @@
 #ifdef WINDOWS
 #include <windows.h>
 #else
+#ifndef __USE_POSIX199309
 #define __USE_POSIX199309
+#endif
 #include <time.h>
 #endif
 
