@@ -55,7 +55,7 @@ static inline void add_to_linked_list(LinkedList *list, void *value) {
     while (list->next != NULL) {
         list = list->next;
     }
-    list->next = malloc(sizeof(LinkedList));
+    list->next = (LinkedList*) malloc(sizeof(LinkedList));
     list->next->value = value;
 }
 
@@ -70,7 +70,8 @@ static inline void sleep_cp(int ms) {
     #ifdef WINDOWS
     Sleep(ms);
     #else
-    nanosleep((struct timespec[]) {{0, ms * 1000000L}}, NULL);
+    struct timespec spec[] = {{0, ms * 1000000L}};
+    nanosleep(spec, NULL);
     #endif
 }
 

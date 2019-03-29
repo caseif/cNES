@@ -68,10 +68,10 @@ void _sc_push(void *state, uint8_t data) {
 }
 
 Controller *create_standard_controller(void) {
-    Controller *controller = malloc(sizeof(Controller));
+    Controller *controller = (Controller*) malloc(sizeof(Controller));
     controller->poller = _sc_poll;
     controller->pusher = _sc_push;
-    controller->state = malloc(sizeof(ScState));
+    controller->state = (ScState*) malloc(sizeof(ScState));
 
     return controller;
 }

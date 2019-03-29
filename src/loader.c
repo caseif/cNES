@@ -70,9 +70,9 @@ Cartridge *load_rom(FILE *file) {
     // extract the CHR ROM size
     size_t chr_size = buffer[5];
 
-    Flag6 flag6 = {0};
+    Flag6 flag6 = (Flag6) {};
     memcpy(&flag6, &(buffer[6]), 1);
-    Flag7 flag7 = {0};
+    Flag7 flag7 = (Flag7) {};
     memcpy(&flag7, &(buffer[7]), 1);
 
     /*if (flag7.nes2) {
@@ -97,7 +97,7 @@ Cartridge *load_rom(FILE *file) {
 
     size_t read_items;
 
-    unsigned char *prg_data = malloc(prg_size * PRG_CHUNK_SIZE);
+    unsigned char *prg_data = (unsigned char*) malloc(prg_size * PRG_CHUNK_SIZE);
 
     printf("Attempting to read %ld PRG chunks\n", prg_size);
 
@@ -109,7 +109,7 @@ Cartridge *load_rom(FILE *file) {
         return NULL;
     }
 
-    unsigned char *chr_data = malloc(chr_size * CHR_CHUNK_SIZE);
+    unsigned char *chr_data = (unsigned char*) malloc(chr_size * CHR_CHUNK_SIZE);
 
     printf("Attempting to read %ld CHR chunks\n", chr_size);
 
@@ -122,7 +122,7 @@ Cartridge *load_rom(FILE *file) {
         return NULL;
     }
 
-    Cartridge *cart = malloc(sizeof(Cartridge));
+    Cartridge *cart = (Cartridge*) malloc(sizeof(Cartridge));
 
     cart->prg_rom = prg_data;
     cart->chr_rom = chr_data;

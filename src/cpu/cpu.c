@@ -43,10 +43,10 @@
 #define PRINT_INSTRS 0
 #define PRINT_MEMORY_ACCESS 0
 
-const InterruptType *INT_NMI   = &(InterruptType) {0xFFFA, false, true, false, false};
-const InterruptType *INT_RESET = &(InterruptType) {0xFFFC, false, true,  false, false};
-const InterruptType *INT_IRQ   = &(InterruptType) {0xFFFE, true,  true,  false, true};
-const InterruptType *INT_BRK   = &(InterruptType) {0xFFFE, false, true,  true,  true};
+const InterruptType INT_NMI   = (InterruptType) {0xFFFA, false, true, false, false};
+const InterruptType INT_RESET = (InterruptType) {0xFFFC, false, true,  false, false};
+const InterruptType INT_IRQ   = (InterruptType) {0xFFFE, true,  true,  false, true};
+const InterruptType INT_BRK   = (InterruptType) {0xFFFE, false, true,  true,  true};
 
 static Cartridge g_cartridge;
 
@@ -75,7 +75,8 @@ void initialize_cpu(void) {
 void load_cartridge(Cartridge *cartridge) {
     g_cartridge = *cartridge;
 
-    load_program(&(DataBlob) {g_cartridge.prg_rom, g_cartridge.prg_size});
+    DataBlob blob = {g_cartridge.prg_rom, g_cartridge.prg_size};
+    load_program(&blob);
 
     base_pc = memory_read(0xFFFC) | (memory_read(0xFFFD) << 8);
     g_cpu_regs.pc = base_pc;
@@ -424,7 +425,7 @@ void issue_interrupt(const InterruptType *type) {
 
     // push PC and P
     if (type->push_pc) {
-        uint16_t pc_to_push = g_cpu_regs.pc + (type == INT_BRK ? 2 : 0);
+        uint16_t pc_to_push = g_cpu_regs.pc + (type->set_b ? 2 : 0);
 
         stack_push(pc_to_push >> 8);      // push MSB
         stack_push(pc_to_push & 0xFF);    // push LSB
@@ -669,7 +670,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 
             break;
         }
-        case AXS: // unofficial
+        case AXS: { // unofficial
             g_cpu_regs.x &= g_cpu_regs.acc;
             uint8_t res = g_cpu_regs.x - m;
 
@@ -680,6 +681,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             _set_alu_flags(g_cpu_regs.x);
 
             break;
+        }
         case EOR:
             g_cpu_regs.acc = g_cpu_regs.acc ^ m;
 
@@ -861,7 +863,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         }
         // system
         case BRK: {
-            issue_interrupt(INT_BRK);
+            issue_interrupt(&INT_BRK);
             break;
         }
         case RTI: {
@@ -928,7 +930,7 @@ void cycle_cpu(void) {
         g_burn_cycles--;
     } else {
         if (g_nmi_line) {
-            issue_interrupt(INT_NMI);
+            issue_interrupt(&INT_NMI);
             g_nmi_line = false;
         } else {
             _exec_next_instr();

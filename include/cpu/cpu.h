@@ -59,10 +59,10 @@ typedef struct {
     bool set_i;
 } InterruptType;
 
-extern const InterruptType *INT_RESET;
-extern const InterruptType *INT_NMI;
-extern const InterruptType *INT_IRQ;
-extern const InterruptType *INT_BRK;
+extern const InterruptType INT_RESET;
+extern const InterruptType INT_NMI;
+extern const InterruptType INT_IRQ;
+extern const InterruptType INT_BRK;
 
 void initialize_cpu(void);
 

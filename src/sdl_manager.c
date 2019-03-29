@@ -89,5 +89,5 @@ void close_window(void) {
 }
 
 void add_event_callback(EventCallback *callback) {
-    add_to_linked_list(&g_callbacks, callback);
+    add_to_linked_list(&g_callbacks, (void*) callback);
 }

@@ -658,7 +658,6 @@ void _do_sprite_evaluation(void) {
                 }
                 break;
             case 65 ... 256: {
-                //TODO: THIS IS WRONG
                 if (g_ppu_internal_regs.n >= sizeof(g_oam_ram) / sizeof(Sprite)) {
                     // we've reached the end of OAM
                     break;
@@ -734,7 +733,6 @@ void _do_sprite_evaluation(void) {
                     // write the latched byte to secondary oam, if applicable
                     if (g_ppu_internal_regs.has_latched_sprite) {
                         if (g_ppu_internal_regs.o < 8) {
-                            Sprite sprite = g_secondary_oam_ram[g_ppu_internal_regs.o];
                             assert(g_ppu_internal_regs.m <= 4);
                             ((char*) &g_secondary_oam_ram[g_ppu_internal_regs.o])[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
                             g_ppu_internal_regs.has_latched_sprite = false;
@@ -769,7 +767,7 @@ void _do_sprite_evaluation(void) {
                 }
 
                 unsigned int index = g_ppu_internal_regs.o;
-                switch ((g_scanline_tick + 7) % 8) {
+                switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
                         g_ppu_internal_regs.sprite_y_latch = g_secondary_oam_ram[index].y;
                     }
@@ -829,7 +827,7 @@ void _do_sprite_evaluation(void) {
 
                             uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
                             if (attrs.flip_ver) {
-                                cur_y = 8 - cur_y;
+                                cur_y = 7 - cur_y;
                             }
 
                             uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
