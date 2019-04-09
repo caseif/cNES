@@ -517,7 +517,7 @@ void _do_general_cycle_routine(void) {
                         // copy the palette data from the secondary latch to the primary
                         g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
 
-                        // special case since the register has to be preloaded before any shifting happens
+                        // special case since the registers need to be preloaded before any shifting happens
                         if (fetch_pixel_x == 8) {
                             g_ppu_internal_regs.pattern_shift_l = g_ppu_internal_regs.pattern_bitmap_l_latch;
                             g_ppu_internal_regs.pattern_shift_h = g_ppu_internal_regs.pattern_bitmap_h_latch;
@@ -561,7 +561,7 @@ void _do_general_cycle_routine(void) {
                         }
 
                         // check if it's in the right half of the table cell
-                        if ((fetch_pixel_x % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
+                        if (((fetch_pixel_x + g_ppu_internal_regs.x) % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
                             attr_table_byte >>= 2;
                         }
 
@@ -929,8 +929,8 @@ void cycle_ppu(void) {
     unsigned int draw_pixel_y = g_scanline;
 
     if (g_scanline < RESOLUTION_V && g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H) {
-        unsigned int palette_low = ((g_ppu_internal_regs.pattern_shift_h & 1) << 1)
-                | (g_ppu_internal_regs.pattern_shift_l & 1);
+        unsigned int palette_low = (((g_ppu_internal_regs.pattern_shift_h >> g_ppu_internal_regs.x) & 1) << 1)
+                | ((g_ppu_internal_regs.pattern_shift_l >> g_ppu_internal_regs.x) & 1);
 
         unsigned int bg_palette_offset;
 
@@ -938,8 +938,8 @@ void cycle_ppu(void) {
 
         if (palette_low) {
             // if the palette low bits are not zero, we select the color normally
-            unsigned int palette_high = ((g_ppu_internal_regs.palette_shift_h & 1) << 1)
-                    | (g_ppu_internal_regs.palette_shift_l & 1);
+            unsigned int palette_high = (((g_ppu_internal_regs.palette_shift_h >> g_ppu_internal_regs.x) & 1) << 1)
+                    | ((g_ppu_internal_regs.palette_shift_l >> g_ppu_internal_regs.x) & 1);
             bg_palette_offset = (palette_high << 2) | palette_low;
         } else {
             // otherwise, we use the default background color
@@ -1023,7 +1023,6 @@ void cycle_ppu(void) {
                 g_ppu_internal_regs.sprite_x_counters[i]--;
             } else {
                 if (g_ppu_internal_regs.sprite_death_counters[i]) {
-                    //render_pixel(draw_pixel_x, draw_pixel_y, (RGBValue) {255, 0, 0});
                     g_ppu_internal_regs.sprite_death_counters[i]--;
                     g_ppu_internal_regs.sprite_tile_shift_l[i] >>= 1;
                     g_ppu_internal_regs.sprite_tile_shift_h[i] >>= 1;
