@@ -648,7 +648,6 @@ void _do_sprite_evaluation(void) {
                 g_ppu_internal_regs.m = 0;
                 g_ppu_internal_regs.n = 0;
                 g_ppu_internal_regs.o = 0;
-                g_ppu_internal_regs.loaded_sprites = 0;
                 g_ppu_internal_regs.sprite_0_slot = 8; // set it out of bounds initially
                 break;
             case 1 ... 64:
@@ -741,9 +740,6 @@ void _do_sprite_evaluation(void) {
 
                     // reset our registers
                     if (g_ppu_internal_regs.m == 4) {
-                        // increment sprite count
-                        g_ppu_internal_regs.loaded_sprites++;
-
                         if (g_ppu_internal_regs.n == 0) {
                             g_ppu_internal_regs.sprite_0_slot = g_ppu_internal_regs.o;
                         }
@@ -760,6 +756,10 @@ void _do_sprite_evaluation(void) {
             }
             case 257 ... 320: {
                 // sprite tile fetching
+
+                if (g_scanline_tick == 257) {
+                    g_ppu_internal_regs.loaded_sprites = g_ppu_internal_regs.o;
+                }
 
                 if (g_scanline_tick == 257) {
                     // reset secondary oam index
@@ -988,7 +988,6 @@ void cycle_ppu(void) {
 
             if (!attrs.low_priority) {
                 final_palette_offset = sprite_palette_offset;
-                //final_palette_offset = 1;
                 // since it's high priority, we can stop looking for a better sprite
                 break;
             } else if (transparent_background) {
@@ -1024,6 +1023,7 @@ void cycle_ppu(void) {
                 g_ppu_internal_regs.sprite_x_counters[i]--;
             } else {
                 if (g_ppu_internal_regs.sprite_death_counters[i]) {
+                    //render_pixel(draw_pixel_x, draw_pixel_y, (RGBValue) {255, 0, 0});
                     g_ppu_internal_regs.sprite_death_counters[i]--;
                     g_ppu_internal_regs.sprite_tile_shift_l[i] >>= 1;
                     g_ppu_internal_regs.sprite_tile_shift_h[i] >>= 1;
