@@ -24,6 +24,7 @@
  */
 
 #include "cartridge.h"
+#include "system.h"
 #include "cpu/cpu.h"
 #include "input/input_device.h"
 #include "mappers/mappers.h"
@@ -31,24 +32,8 @@
 
 static uint8_t _nrom_ram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
-        case 0 ... 0x1FFF: {
-            return cpu_ram_read(addr % 0x800);
-        }
-        case 0x2000 ... 0x3FFF: {
-            return ppu_read_mmio((uint8_t) (addr % 8));
-        }
-        case 0x4014: {
-            //TODO: DMA register
-            return 0;
-        }
-        case 0x4000 ... 0x4013:
-        case 0x4015: {
-            //TODO: APU MMIO
-            return 0;
-        }
-        case 0x4016 ... 0x4017: {
-            return controller_poll(addr - 0x4016);
-        }
+        case 0x0000 ... 0x7FFF:
+            return system_lower_memory_read(addr);
         case 0x8000 ... 0xFFFF: {
             uint16_t adj_addr = addr - 0x8000;
             // ROM is mirrored if cartridge only has 1 bank
@@ -65,47 +50,12 @@ static uint8_t _nrom_ram_read(Cartridge *cart, uint16_t addr) {
 }
 
 static void _nrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    switch (addr) {
-        case 0 ... 0x1FFF: {
-            cpu_ram_write(addr % 0x800, val);
-            return;
-        }
-        case 0x2000 ... 0x3FFF: {
-            ppu_write_mmio((uint8_t) (addr % 8), val);
-            return;
-        }
-        case 0x4014: {
-            cpu_start_oam_dma(val);
-            return;
-        }
-        case 0x4000 ... 0x4013:
-        case 0x4015: {
-            //TODO: APU MMIO
-            return;
-        }
-        case 0x4016 ... 0x4017: {
-            controller_push(addr - 0x4016, val);
-            return;
-        }
-        case 0x6000 ... 0x6FFF: {
-            /*g_debug_buffer[addr - 0x6000] = val;
-
-            if (g_debug_buffer[1] == 0xDE && g_debug_buffer[2] == 0xB0 && g_debug_buffer[3]) {
-                if (addr == 0x6000 && val != 0x80) {
-                    printf("Error code %02x written\n", val);
-                    if (g_debug_buffer[4]) {
-                        printf("Error message: %s\n", (char*) (g_debug_buffer + 4));
-                    }
-                }
-            }*/
-
-            return;
-        }
-        case 0x8000 ... 0xFFFF: {
-            // attempts to write to ROM fail silently
-            return;
-        }
+    if (addr < 0x8000) {
+        system_lower_memory_write(addr, val);
     }
+
+    // otherwise, attempts to write to ROM fail silently
+    return;
 }
 
 static uint8_t _nrom_vram_read(Cartridge *cart, uint16_t addr) {

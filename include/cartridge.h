@@ -39,8 +39,8 @@ typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL} MirroringMode;
 typedef struct cartridge {
     unsigned char *prg_rom;
     unsigned char *chr_rom;
-    size_t prg_size;
-    size_t chr_size;
+    size_t prg_size; // in bytes
+    size_t chr_size; // in bytes
     MirroringMode mirror_mode;
     bool has_prg_ram;
     bool ignore_mirror_ctrl;

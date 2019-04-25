@@ -37,6 +37,10 @@ uint8_t system_vram_read(uint16_t addr);
 
 void system_vram_write(uint16_t addr, uint8_t val);
 
+uint8_t system_lower_memory_read(uint16_t addr);
+
+void system_lower_memory_write(uint16_t addr, uint8_t val);
+
 void do_system_loop(void);
 
 void break_execution(void);

@@ -126,7 +126,9 @@ typedef enum {
     RM_NORMAL, RM_NT0, RM_NT1, RM_NT2, RM_NT3, RM_PT
 } RenderMode;
 
-void initialize_ppu(MirroringMode mirror_mode);
+void initialize_ppu();
+
+void ppu_set_mirroring_mode(MirroringMode mirror_mode);
 
 uint8_t ppu_read_mmio(uint8_t index);
 

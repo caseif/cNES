@@ -129,9 +129,7 @@ static inline bool _is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
 }
 
-void initialize_ppu(MirroringMode mirror_mode) {
-    g_mirror_mode = mirror_mode;
-    
+void initialize_ppu() {
     g_ppu_control = (PpuControl) {0};
     g_ppu_mask = (PpuMask) {0};
 
@@ -142,6 +140,10 @@ void initialize_ppu(MirroringMode mirror_mode) {
     g_odd_frame = false;
     g_scanline = 0;
     g_scanline_tick = 0;
+}
+
+void ppu_set_mirroring_mode(MirroringMode mirror_mode) {
+    g_mirror_mode = mirror_mode;
 }
 
 uint8_t ppu_read_mmio(uint8_t index) {

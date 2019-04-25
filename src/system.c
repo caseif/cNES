@@ -33,7 +33,9 @@
 #include "input/standard/standard_controller.h"
 #include "ppu/ppu.h"
 
+#include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <time.h>
 
 #define FRAMES_PER_SECOND 60.0988
@@ -60,7 +62,8 @@ void initialize_system(Cartridge *cart) {
     g_cart = cart;
 
     initialize_cpu();
-    initialize_ppu(g_cart->mirror_mode);
+    initialize_ppu();
+    ppu_set_mirroring_mode(g_cart->mirror_mode);
     cpu_init_pc(system_ram_read(0xFFFC) | (system_ram_read(0xFFFD) << 8));
 
     _init_controllers();
@@ -80,6 +83,58 @@ uint8_t system_vram_read(uint16_t addr) {
 
 void system_vram_write(uint16_t addr, uint8_t val) {
     g_cart->mapper->vram_write_func(g_cart, addr, val);
+}
+
+uint8_t system_lower_memory_read(uint16_t addr) {
+    assert(addr < 0x8000);
+
+    switch (addr) {
+        case 0 ... 0x1FFF:
+            return cpu_ram_read(addr % 0x800);
+        case 0x2000 ... 0x3FFF:
+            return ppu_read_mmio((uint8_t) (addr % 8));
+        case 0x4014:
+            //TODO: DMA register
+            return 0;
+        case 0x4000 ... 0x4013:
+        case 0x4015:
+            //TODO: APU MMIO
+            return 0;
+        case 0x4016 ... 0x4017:
+            return controller_poll(addr - 0x4016);
+        default:
+            return 0; // open bus
+    }
+}
+
+void system_lower_memory_write(uint16_t addr, uint8_t val) {
+    assert(addr < 0x8000);
+
+    switch (addr) {
+        case 0 ... 0x1FFF: {
+            cpu_ram_write(addr % 0x800, val);
+            return;
+        }
+        case 0x2000 ... 0x3FFF: {
+            ppu_write_mmio((uint8_t) (addr % 8), val);
+            return;
+        }
+        case 0x4014: {
+            cpu_start_oam_dma(val);
+            return;
+        }
+        case 0x4000 ... 0x4013:
+        case 0x4015: {
+            //TODO: APU MMIO
+            return;
+        }
+        case 0x4016 ... 0x4017: {
+            controller_push(addr - 0x4016, val);
+            return;
+        }
+        default:
+            return; // do nothing
+    }
 }
 
 void do_system_loop(void) {
