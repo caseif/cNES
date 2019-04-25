@@ -23,22 +23,31 @@
  * THE SOFTWARE.
  */
 
-#pragma once
-
 #include "cartridge.h"
+#include "cpu/cpu.h"
+#include "input/input_device.h"
+#include "mappers/mappers.h"
+#include "ppu/ppu.h"
 
-#include <stdint.h>
+static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
+    return 0; //TODO
+}
 
-typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
-typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
+static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    //TODO
+}
 
-typedef struct {
-    MemoryReadFunction ram_read_func;
-    MemoryWriteFunction ram_write_func;
-    MemoryReadFunction vram_read_func;
-    MemoryWriteFunction vram_write_func;
-} Mapper;
+static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
+    return 0; //TODO
+}
 
-void mapper_init_nrom(Mapper *mapper);
+static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    //TODO
+}
 
-void mapper_init_mmc3(Mapper *mapper);
+void mapper_init_mmc3(Mapper *mapper) {
+    mapper->ram_read_func   = *_mmc3_ram_read;
+    mapper->ram_write_func  = *_mmc3_ram_write;
+    mapper->vram_read_func  = *_mmc3_vram_read;
+    mapper->vram_write_func = *_mmc3_vram_write;
+}

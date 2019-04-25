@@ -81,12 +81,16 @@ Cartridge *load_rom(FILE *file) {
     }*/
 
     uint8_t mapper_id = (flag7.mapper_high << 4) | flag6.mapper_low;
-    Mapper *mapper = malloc(sizeof(Mapper));
+    Mapper *mapper = (Mapper*) malloc(sizeof(Mapper));
 
     switch (mapper_id) {
         case 0:
             printf("Found mapper %d (NROM)\n", mapper_id);
             mapper_init_nrom(mapper);
+            break;
+        case 4:
+            printf("Found mapper %d (MMC3)\n", mapper_id);
+            mapper_init_mmc3(mapper);
             break;
         default:
             printf("Mapper %d is not supported at this time\n", mapper_id);

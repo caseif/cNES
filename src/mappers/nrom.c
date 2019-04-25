@@ -29,7 +29,7 @@
 #include "mappers/mappers.h"
 #include "ppu/ppu.h"
 
-uint8_t ram_read(Cartridge *cart, uint16_t addr) {
+static uint8_t _nrom_ram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         case 0 ... 0x1FFF: {
             return cpu_ram_read(addr % 0x800);
@@ -64,7 +64,7 @@ uint8_t ram_read(Cartridge *cart, uint16_t addr) {
     }
 }
 
-void ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+static void _nrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     switch (addr) {
         case 0 ... 0x1FFF: {
             cpu_ram_write(addr % 0x800, val);
@@ -108,7 +108,7 @@ void ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     }
 }
 
-uint8_t vram_read(Cartridge *cart, uint16_t addr) {
+static uint8_t _nrom_vram_read(Cartridge *cart, uint16_t addr) {
     addr %= 0x4000;
 
     switch (addr) {
@@ -130,7 +130,7 @@ uint8_t vram_read(Cartridge *cart, uint16_t addr) {
     }
 }
 
-void vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+static void _nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     addr %= 0x4000;
 
     switch (addr) {
@@ -156,8 +156,8 @@ void vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }   
 
 void mapper_init_nrom(Mapper *mapper) {
-    mapper->ram_read_func = *ram_read;
-    mapper->ram_write_func = *ram_write;
-    mapper->vram_read_func = *vram_read;
-    mapper->vram_write_func = *vram_write;
+    mapper->ram_read_func   = *_nrom_ram_read;
+    mapper->ram_write_func  = *_nrom_ram_write;
+    mapper->vram_read_func  = *_nrom_vram_read;
+    mapper->vram_write_func = *_nrom_vram_write;
 }
