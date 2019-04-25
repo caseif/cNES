@@ -126,17 +126,21 @@ typedef enum {
     RM_NORMAL, RM_NT0, RM_NT1, RM_NT2, RM_NT3, RM_PT
 } RenderMode;
 
-void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode);
+void initialize_ppu(MirroringMode mirror_mode);
 
-uint8_t read_ppu_mmio(uint8_t index);
+uint8_t ppu_read_mmio(uint8_t index);
 
-void write_ppu_mmio(uint8_t addr, uint8_t val);
+void ppu_write_mmio(uint8_t addr, uint8_t val);
 
-uint8_t ppu_memory_read(uint16_t addr);
+uint8_t ppu_name_table_read(uint16_t addr);
 
-void ppu_memory_write(uint16_t addr, uint8_t val);
+void ppu_name_table_write(uint16_t addr, uint8_t val);
 
-void initiate_oam_dma(uint8_t page);
+uint8_t ppu_palette_table_read(uint8_t index);
+
+void ppu_palette_table_write(uint8_t index, uint8_t val);
+
+void ppu_start_oam_dma(uint8_t page);
 
 void cycle_ppu(void);
 

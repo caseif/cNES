@@ -24,11 +24,13 @@
  */
 
 #include "cartridge.h"
+#include "system.h"
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
 #include "input/input_device.h"
 #include "ppu/ppu.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -48,11 +50,8 @@ const InterruptType INT_RESET = (InterruptType) {0xFFFC, false, true,  false, fa
 const InterruptType INT_IRQ   = (InterruptType) {0xFFFE, true,  true,  false, true};
 const InterruptType INT_BRK   = (InterruptType) {0xFFFE, false, true,  true,  true};
 
-static Cartridge g_cartridge;
-
-static DataBlob g_prg_rom;
-
 unsigned char g_sys_memory[SYSTEM_MEMORY];
+
 CpuRegisters g_cpu_regs;
 
 unsigned char g_debug_buffer[0x1000];
@@ -72,119 +71,25 @@ void initialize_cpu(void) {
     memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
 }
 
-void load_cartridge(Cartridge *cartridge) {
-    g_cartridge = *cartridge;
+void cpu_init_pc(uint16_t addr) {
+    g_cpu_regs.pc = addr;
 
-    DataBlob blob = {g_cartridge.prg_rom, g_cartridge.prg_size};
-    load_program(&blob);
-
-    base_pc = memory_read(0xFFFC) | (memory_read(0xFFFD) << 8);
-    g_cpu_regs.pc = base_pc;
-
-    printf("Starting execution at $%04x\n", g_cpu_regs.pc);
+    printf("Initialized PC to $%04x\n", g_cpu_regs.pc);
 }
 
-void load_program(DataBlob *program_blob) {
-    g_prg_rom = *program_blob;
+uint8_t cpu_ram_read(uint16_t addr) {
+    assert(addr < 0x800);
+    return g_sys_memory[addr];
 }
 
-uint8_t memory_read(uint16_t addr) {
-    uint8_t val;
-
-    switch (addr) {
-        case 0 ... 0x1FFF: {
-            val = g_sys_memory[addr % 0x800];
-            break;
-        }
-        case 0x2000 ... 0x3FFF: {
-            val = read_ppu_mmio((uint8_t) (addr % 8));
-            break;
-        }
-        case 0x4014: {
-            //TODO: DMA register
-            val = 0;
-            break;
-        }
-        case 0x4000 ... 0x4013:
-        case 0x4015: {
-            //TODO: APU MMIO
-            val = 0;
-            break;
-        }
-        case 0x4016 ... 0x4017: {
-            val = poll_controller(addr - 0x4016);
-            break;
-        }
-        case 0x8000 ... 0xFFFF: {
-            uint16_t adj_addr = addr - 0x8000;
-            // ROM is mirrored if cartridge only has 1 bank
-            if (g_prg_rom.size <= 16384) {
-                adj_addr %= 0x4000;
-            }
-            val = g_prg_rom.data[adj_addr];
-            break;
-        }
-        default: {
-            // nothing here
-            val = 0;
-            break;
-        }
-    }
-
-    #if PRINT_MEMORY_ACCESS
-    printf("Memory read:  $%04x -> %02x\n", addr, val);
-    #endif
-
-    return val;
+void cpu_ram_write(uint16_t addr, uint8_t val) {
+    assert(addr < 0x800);
+    g_sys_memory[addr] = val;
 }
 
-void memory_write(uint16_t addr, uint8_t val) {
-    #if PRINT_MEMORY_ACCESS
-    printf("Memory write: $%04x <- %02x\n", addr, val);
-    #endif
-
-    switch (addr) {
-        case 0 ... 0x1FFF: {
-            g_sys_memory[addr % 0x800] = val;
-            return;
-        }
-        case 0x2000 ... 0x3FFF: {
-            write_ppu_mmio((uint8_t) (addr % 8), val);
-            return;
-        }
-        case 0x4014: {
-            initiate_oam_dma(val);
-            g_burn_cycles += 514;
-            return;
-        }
-        case 0x4000 ... 0x4013:
-        case 0x4015: {
-            //TODO: APU MMIO
-            return;
-        }
-        case 0x4016 ... 0x4017: {
-            push_controller(addr - 0x4016, val);
-            return;
-        }
-        case 0x6000 ... 0x6FFF: {
-            g_debug_buffer[addr - 0x6000] = val;
-
-            if (g_debug_buffer[1] == 0xDE && g_debug_buffer[2] == 0xB0 && g_debug_buffer[3]) {
-                if (addr == 0x6000 && val != 0x80) {
-                    printf("Error code %02x written\n", val);
-                    if (g_debug_buffer[4]) {
-                        printf("Error message: %s\n", (char*) (g_debug_buffer + 4));
-                    }
-                }
-            }
-
-            return;
-        }
-        case 0x8000 ... 0xFFFF: {
-            // attempts to write to ROM fail silently
-            return;
-        }
-    }
+void cpu_start_oam_dma(uint8_t page) {
+    ppu_start_oam_dma(page);
+    g_burn_cycles += 514;
 }
 
 void stack_push(char val) {
@@ -196,7 +101,7 @@ unsigned char stack_pop(void) {
 }
 
 static unsigned char _next_prg_byte(void) {
-    return memory_read(g_cpu_regs.pc++);
+    return system_ram_read(g_cpu_regs.pc++);
 }
 
 static uint16_t _next_prg_short(void) {
@@ -265,12 +170,12 @@ static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr
         case IND: {
             raw_operand = _next_prg_short();
 
-            uint8_t addr_low = memory_read(raw_operand);
+            uint8_t addr_low = system_ram_read(raw_operand);
             // if the indirect target is the last byte of a page, the target
             // high byte will incorrectly be read from the first byte of the
             // same page
             uint16_t high_target = ((raw_operand & 0xFF) == 0xFF) ? (raw_operand - 0xFF) : (raw_operand + 1);
-            uint8_t addr_high = memory_read(high_target);
+            uint8_t addr_high = system_ram_read(high_target);
 
             adj_operand = (addr_low | (addr_high << 8));
 
@@ -281,9 +186,9 @@ static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr
 
             uint16_t orig_addr = g_cpu_regs.x + raw_operand;
             // this mode wraps around to the same page
-            uint8_t addr_low = memory_read(orig_addr % 0x100);
+            uint8_t addr_low = system_ram_read(orig_addr % 0x100);
             // again, we have to handle wrapping for the second byte
-            uint8_t addr_high = memory_read((orig_addr + 1) % 0x100);
+            uint8_t addr_high = system_ram_read((orig_addr + 1) % 0x100);
 
             adj_operand = (addr_low | (addr_high << 8));
 
@@ -292,9 +197,9 @@ static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr
         case IZY: {
             raw_operand = _next_prg_byte();
 
-            uint8_t addr_low = memory_read(raw_operand);
+            uint8_t addr_low = system_ram_read(raw_operand);
             // this mode wraps around for the second address
-            uint8_t addr_high = memory_read((raw_operand + 1) % 0x100);
+            uint8_t addr_high = system_ram_read((raw_operand + 1) % 0x100);
             uint16_t base_addr = addr_low | (addr_high << 8);
 
             adj_operand = (g_cpu_regs.y + (addr_low | (addr_high << 8)));
@@ -313,7 +218,7 @@ static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr
     // don't do a read for write-only instructions
     // this is especially important because erroneous reads can mess with MMIO
     if (get_instr_type(instr->mnemonic) != INS_W) {
-        val = memory_read(adj_operand);
+        val = system_ram_read(adj_operand);
     }
 
     if (crosses_boundary && can_incur_page_boundary_penalty(opcode)) {
@@ -363,7 +268,7 @@ static uint8_t _do_shift(uint8_t m, uint16_t src_addr, bool implicit, bool right
     if (implicit) {
         g_cpu_regs.acc = res;
     } else {
-        memory_write(src_addr, res);
+        system_ram_write(src_addr, res);
     }
 
     _set_alu_flags(res);
@@ -444,7 +349,7 @@ void issue_interrupt(const InterruptType *type) {
     }
 
     // little-Endian, so the LSB comes first
-    uint16_t vector = memory_read(type->vector_loc) | ((memory_read(type->vector_loc + 1)) << 8);
+    uint16_t vector = system_ram_read(type->vector_loc) | ((system_ram_read(type->vector_loc + 1)) << 8);
 
     // set the PC
     g_cpu_regs.pc = vector;
@@ -484,13 +389,13 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 
             break;
         case STA:
-            memory_write(addr, g_cpu_regs.acc);
+            system_ram_write(addr, g_cpu_regs.acc);
             break;
         case STX:
-            memory_write(addr, g_cpu_regs.x);
+            system_ram_write(addr, g_cpu_regs.x);
             break;
         case STY:
-            memory_write(addr, g_cpu_regs.y);
+            system_ram_write(addr, g_cpu_regs.y);
             break;
         case TAX:
             g_cpu_regs.x = g_cpu_regs.acc;
@@ -539,7 +444,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case DEC: {
             uint16_t decRes = m - 1;
 
-            memory_write(addr, decRes);
+            system_ram_write(addr, decRes);
 
             _set_alu_flags(decRes);
 
@@ -560,7 +465,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case INC: {
             uint8_t incRes = m + 1;
 
-            memory_write(addr, incRes);
+            system_ram_write(addr, incRes);
 
             _set_alu_flags(incRes);
 
@@ -579,12 +484,12 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
 
             break;
         case ISC: // unofficial
-            memory_write(addr, m + 1);
+            system_ram_write(addr, m + 1);
             _do_sbc((uint8_t) (m + 1));
 
             break;
         case DCP: // unofficial
-            memory_write(addr, m - 1);
+            system_ram_write(addr, m - 1);
             _do_cmp(g_cpu_regs.acc, (uint8_t) (m - 1));
 
             break;
@@ -600,7 +505,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             if (instr->addr_mode == IMM) {
                 g_cpu_regs.acc = res;
             } else {
-                memory_write(addr, res);
+                system_ram_write(addr, res);
             }
 
             break;
@@ -666,7 +571,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case RRA: { // unofficial
             _do_shift(m, addr, false, true, true);
 
-            _do_adc(memory_read(addr));
+            _do_adc(system_ram_read(addr));
 
             break;
         }
@@ -705,7 +610,7 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case TAS: { // unofficial
             // this some fkn voodo right here
             g_cpu_regs.sp = g_cpu_regs.acc & g_cpu_regs.x;
-            memory_write(addr, g_cpu_regs.sp & ((param.raw_operand >> 8) + 1));
+            system_ram_write(addr, g_cpu_regs.sp & ((param.raw_operand >> 8) + 1));
 
             break;
         }
@@ -719,15 +624,15 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
             break;
         }
         case SHX: { // unofficial
-            memory_write(addr, g_cpu_regs.x & ((param.raw_operand >> 8) + 1));
+            system_ram_write(addr, g_cpu_regs.x & ((param.raw_operand >> 8) + 1));
             break;
         }
         case SHY: { // unofficial
-            memory_write(addr, g_cpu_regs.y & ((param.raw_operand >> 8) + 1));
+            system_ram_write(addr, g_cpu_regs.y & ((param.raw_operand >> 8) + 1));
             break;
         }
         case AHX: { // unofficial
-            memory_write(addr, (g_cpu_regs.acc & g_cpu_regs.x) & 7);;
+            system_ram_write(addr, (g_cpu_regs.acc & g_cpu_regs.x) & 7);;
             break;
         }
         case ATX: { // unofficial
@@ -883,11 +788,6 @@ void _exec_instr(const Instruction *instr, InstructionParameter param) {
         case KIL:
             printf("Encountered %s instruction @ $%x\n", mnemonic_to_str(instr->mnemonic), g_cpu_regs.pc - 1);
             exit(-1);
-    }
-
-    if (g_cpu_regs.pc >= g_prg_rom.size + base_pc) {
-        printf("Execution address exceeded PRG-ROM bounds (pc=$%x)\n", g_cpu_regs.pc);
-        exit(-1);
     }
 }
 

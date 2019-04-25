@@ -80,11 +80,18 @@ Cartridge *load_rom(FILE *file) {
         return NULL;
     }*/
 
-    uint8_t mapper = (flag7.mapper_high << 4) | flag6.mapper_low;
+    uint8_t mapper_id = (flag7.mapper_high << 4) | flag6.mapper_low;
+    Mapper *mapper = malloc(sizeof(Mapper));
 
-    if (mapper != 0) {
-        printf("Only Mapper 0 is supported at this time (found %d).\n", mapper);
-        return NULL;
+    switch (mapper_id) {
+        case 0:
+            printf("Found mapper %d (NROM)\n", mapper_id);
+            mapper_init_nrom(mapper);
+            break;
+        default:
+            printf("Mapper %d is not supported at this time\n", mapper_id);
+            free(mapper);
+            return NULL;
     }
 
     // skip next 8 bytes (we don't care about them for the moment)
@@ -124,6 +131,7 @@ Cartridge *load_rom(FILE *file) {
 
     Cartridge *cart = (Cartridge*) malloc(sizeof(Cartridge));
 
+    cart->mapper = mapper;
     cart->prg_rom = prg_data;
     cart->chr_rom = chr_data;
     cart->prg_size = prg_size * PRG_CHUNK_SIZE;
@@ -131,7 +139,6 @@ Cartridge *load_rom(FILE *file) {
     cart->mirror_mode = flag6.mirror_mode;
     cart->has_prg_ram = flag6.has_prg_ram;
     cart->ignore_mirror_ctrl = flag6.ignore_mirror_ctrl;
-    cart->mapper = mapper;
 
     return cart;
 }

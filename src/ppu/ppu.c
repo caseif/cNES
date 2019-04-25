@@ -24,6 +24,7 @@
  */
 
 #include "renderer.h"
+#include "system.h"
 #include "util.h"
 #include "cpu/cpu.h"
 #include "ppu/ppu.h"
@@ -103,8 +104,6 @@ const RGBValue g_palette[] = {
     {0x00, 0xFC, 0xFC}, {0xF8, 0xD8, 0xF8}, {0x00, 0x00, 0x00}, {0x00, 0x00, 0x00}
 };
 
-static Cartridge *g_cartridge;
-
 static MirroringMode g_mirror_mode;
 
 PpuControl g_ppu_control;
@@ -130,9 +129,7 @@ static inline bool _is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
 }
 
-void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode) {
-    g_cartridge = cartridge;
-
+void initialize_ppu(MirroringMode mirror_mode) {
     g_mirror_mode = mirror_mode;
     
     g_ppu_control = (PpuControl) {0};
@@ -147,7 +144,7 @@ void initialize_ppu(Cartridge *cartridge, MirroringMode mirror_mode) {
     g_scanline_tick = 0;
 }
 
-uint8_t read_ppu_mmio(uint8_t index) {
+uint8_t ppu_read_mmio(uint8_t index) {
     assert(index <= 7);
 
     switch (index) {
@@ -176,7 +173,7 @@ uint8_t read_ppu_mmio(uint8_t index) {
                 // most VRAM goes through a read buffer
                 uint8_t res = g_ppu_internal_regs.read_buf;
 
-                g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v);
+                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v);
 
                 g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
 
@@ -185,9 +182,9 @@ uint8_t read_ppu_mmio(uint8_t index) {
                 // palette reading bypasses buffer, but still updates it in a weird way
 
                 // address is offset since the buffer is updated with the mirrored NT data "under" the palette data
-                g_ppu_internal_regs.read_buf = ppu_memory_read(g_ppu_internal_regs.v - 0x1000);
+                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v - 0x1000);
 
-                return ppu_memory_read(g_ppu_internal_regs.v);
+                return system_vram_read(g_ppu_internal_regs.v);
             }
 
         }
@@ -198,7 +195,7 @@ uint8_t read_ppu_mmio(uint8_t index) {
     }
 }
 
-void write_ppu_mmio(uint8_t index, uint8_t val) {
+void ppu_write_mmio(uint8_t index, uint8_t val) {
     assert(index <= 7);
 
     switch (index) {
@@ -282,7 +279,7 @@ void write_ppu_mmio(uint8_t index, uint8_t val) {
             printf("PPU write: $%04x, %02x\n", g_ppu_internal_regs.v, val);
             #endif
 
-            ppu_memory_write(g_ppu_internal_regs.v, val);
+            system_vram_write(g_ppu_internal_regs.v, val);
 
             g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
 
@@ -335,85 +332,56 @@ uint16_t _translate_name_table_address(uint16_t addr) {
     }
 }
 
-uint8_t ppu_memory_read(uint16_t addr) {
-    addr %= 0x4000;
-
-    switch (addr) {
-        // pattern tables
-        case 0x0000 ... 0x1FFF: {
-            return g_cartridge->chr_rom[addr];
-        }
-        // name tables
-        case 0x2000 ... 0x3EFF: {
-            return g_name_table_mem[_translate_name_table_address(addr % 0x1000)];
-        }
-        case 0x3F00 ... 0x3FFF: {
-            uint8_t index = (addr - 0x3F00) % 0x20;
-
-            if (g_ppu_mask.monochrome) {
-                index &= 0xF0;
-            } else {
-                // certain indices are just mirrors
-                switch (index) {
-                    case 0x10:
-                    case 0x14:
-                    case 0x18:
-                    case 0x1C:
-                        index -= 0x10;
-                        break;
-                }
-            }
-
-            return g_palette_ram[index];
-        }
-        // unmapped
-        default: {
-            return 0;
-        }
-    }
+uint8_t ppu_name_table_read(uint16_t addr) {
+    assert(addr < 0x1000);
+    return g_name_table_mem[_translate_name_table_address(addr)];
 }
 
-void ppu_memory_write(uint16_t addr, uint8_t val) {
-    addr %= 0x4000;
-
-    switch (addr) {
-        // pattern tables
-        case 0x0000 ... 0x0FFF: {
-            //TODO: unsupported altogether for now
-            break;
-        }
-        // name tables
-        case 0x2000 ... 0x3EFF: {
-            g_name_table_mem[_translate_name_table_address(addr % 0x1000)] = val;
-            break;
-        }
-        case 0x3F00 ... 0x3FFF: {
-            uint8_t index = (addr - 0x3F00) % 0x20;
-
-            // certain indices are just mirrors
-            switch (index) {
-                case 0x10:
-                case 0x14:
-                case 0x18:
-                case 0x1C:
-                    index -= 0x10;
-                    break;
-            }
-
-            g_palette_ram[index] = val;
-            break;
-        }
-        // unmapped
-        default: {
-            return;
-        }
-    }
+void ppu_name_table_write(uint16_t addr, uint8_t val) {
+    assert(addr < 0x1000);
+    g_name_table_mem[_translate_name_table_address(addr)] = val;
 }
 
-void initiate_oam_dma(uint8_t page) {
+uint8_t ppu_palette_table_read(uint8_t index) {
+    assert(index < 0x20);
+
+    // certain indices are just mirrors
+    switch (index) {
+        case 0x10:
+        case 0x14:
+        case 0x18:
+        case 0x1C:
+            index -= 0x10;
+            break;
+    }
+
+    if (g_ppu_mask.monochrome) {
+        index &= 0xF0;
+    }
+
+    return g_palette_ram[index];
+}
+
+void ppu_palette_table_write(uint8_t index, uint8_t val) {
+    assert(index < 0x20);
+
+    // certain indices are just mirrors
+    switch (index) {
+        case 0x10:
+        case 0x14:
+        case 0x18:
+        case 0x1C:
+            index -= 0x10;
+            break;
+    }
+
+    g_palette_ram[index] = val;
+}
+
+void ppu_start_oam_dma(uint8_t page) {
     for (unsigned int i = 0; i <= 0xFF; i++) {
         uint16_t addr = (page << 8) | i;
-        ((char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = memory_read(addr);
+        ((char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = system_ram_read(addr);
     }
 }
 
@@ -543,7 +511,7 @@ void _do_general_cycle_routine(void) {
 
                         //printf("(%03d, %03d) @ (%03d, %03d) -> %04x\n", fetch_pixel_x, fetch_pixel_y, g_scanline_tick, g_scanline, name_table_addr);
 
-                        g_ppu_internal_regs.name_table_entry_latch = ppu_memory_read(name_table_addr);
+                        g_ppu_internal_regs.name_table_entry_latch = system_vram_read(name_table_addr);
 
                         break;
                     }
@@ -553,7 +521,7 @@ void _do_general_cycle_routine(void) {
 
                         uint16_t attr_table_addr = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
-                        uint8_t attr_table_byte = ppu_memory_read(attr_table_addr);
+                        uint8_t attr_table_byte = system_vram_read(attr_table_addr);
 
                         // check if it's in the bottom half of the table cell
                         if ((fetch_pixel_y % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
@@ -578,7 +546,7 @@ void _do_general_cycle_routine(void) {
                         uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
 
-                        g_ppu_internal_regs.pattern_bitmap_l_latch = reverse_bits(ppu_memory_read(pattern_addr));
+                        g_ppu_internal_regs.pattern_bitmap_l_latch = reverse_bits(system_vram_read(pattern_addr));
 
                         break;
                     }
@@ -590,7 +558,7 @@ void _do_general_cycle_routine(void) {
                         uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
 
-                        g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(ppu_memory_read(pattern_addr));
+                        g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(system_vram_read(pattern_addr));
 
                         // only update v if rendering is enabled
                         if (_is_rendering_enabled()) {
@@ -803,7 +771,7 @@ void _do_sprite_evaluation(void) {
                             uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                     | (tile_index * 16 + cur_y);
 
-                            uint8_t res = ppu_memory_read(addr);
+                            uint8_t res = system_vram_read(addr);
 
                             if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
@@ -833,7 +801,7 @@ void _do_sprite_evaluation(void) {
                             uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                     | (tile_index * 16 + cur_y + 8);
 
-                            uint8_t res = ppu_memory_read(addr);
+                            uint8_t res = system_vram_read(addr);
 
                             if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
@@ -880,8 +848,8 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
             break;
         case RM_NT0:
             use_nt = true;
-            pt_tile = ppu_memory_read(NAME_TABLE_BASE_ADDR | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
-            palette_num = ppu_memory_read(ATTR_TABLE_BASE_ADDR | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
+            pt_tile = system_vram_read(NAME_TABLE_BASE_ADDR | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
+            palette_num = system_vram_read(ATTR_TABLE_BASE_ADDR | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
             if ((y % 32) >= 16) {
                 palette_num >>= 4;
             }
@@ -901,9 +869,9 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                     : PT_LEFT_ADDR)
                     + pattern_offset;
 
-            uint8_t pattern_pixel = ((ppu_memory_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((ppu_memory_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
+            uint8_t pattern_pixel = ((system_vram_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((system_vram_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
 
-            uint8_t palette_index = ppu_memory_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
+            int8_t palette_index = system_vram_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
             RGBValue pixel_rgb = g_palette[palette_index];
 
             set_pixel(x, y, pixel_rgb);
@@ -998,7 +966,7 @@ void cycle_ppu(void) {
 
         uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + final_palette_offset;
 
-        uint8_t palette_index = ppu_memory_read(palette_entry_addr);
+        uint8_t palette_index = system_vram_read(palette_entry_addr);
 
         RGBValue rgb;
         if (g_ppu_mask.show_background) {

@@ -25,6 +25,7 @@
 
 #include "cartridge.h"
 #include "renderer.h"
+#include "system.h"
 #include "util.h"
 #include "cpu/cpu.h"
 #include "input/input_device.h"
@@ -45,20 +46,40 @@ bool halted = false;
 bool stepping = false;
 bool dead = false;
 
+static Cartridge *g_cart;
+
 static void _init_controllers() {
     init_controllers();
 
-    connect_controller(0, create_standard_controller());
+    controller_connect(0, create_standard_controller());
 
     sc_attach_driver(sc_poll_input);
 }
 
 void initialize_system(Cartridge *cart) {
+    g_cart = cart;
+
     initialize_cpu();
-    initialize_ppu(cart, cart->mirror_mode);
-    load_cartridge(cart);
+    initialize_ppu(g_cart->mirror_mode);
+    cpu_init_pc(system_ram_read(0xFFFC) | (system_ram_read(0xFFFD) << 8));
 
     _init_controllers();
+}
+
+uint8_t system_ram_read(uint16_t addr) {
+    return g_cart->mapper->ram_read_func(g_cart, addr);
+}
+
+void system_ram_write(uint16_t addr, uint8_t val) {
+    g_cart->mapper->ram_write_func(g_cart, addr, val);
+}
+
+uint8_t system_vram_read(uint16_t addr) {
+    return g_cart->mapper->vram_read_func(g_cart, addr);
+}
+
+void system_vram_write(uint16_t addr, uint8_t val) {
+    g_cart->mapper->vram_write_func(g_cart, addr, val);
 }
 
 void do_system_loop(void) {

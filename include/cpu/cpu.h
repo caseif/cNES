@@ -66,13 +66,13 @@ extern const InterruptType INT_BRK;
 
 void initialize_cpu(void);
 
-void load_cartridge(Cartridge *cartridge);
+void cpu_init_pc(uint16_t addr);
 
-void load_program(DataBlob *blob);
+uint8_t cpu_ram_read(uint16_t addr);
 
-uint8_t memory_read(uint16_t addr);
+void cpu_ram_write(uint16_t addr, uint8_t val);
 
-void memory_write(uint16_t addr, uint8_t val);
+void cpu_start_oam_dma(uint8_t page);
 
 void set_nmi_line();
 

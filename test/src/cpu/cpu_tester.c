@@ -88,7 +88,7 @@ void load_cpu_test(char *file_name) {
 void pump_cpu(void) {
     do {
         cycle_cpu();
-    } while (!(g_burn_cycles == 0 && decode_instr(memory_read(g_cpu_regs.pc))->mnemonic == NOP));
+    } while (!(g_burn_cycles == 0 && decode_instr(system_ram_read(g_cpu_regs.pc))->mnemonic == NOP));
 }
 
 bool do_cpu_tests(void) {

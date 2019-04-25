@@ -30,9 +30,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+struct cartridge;
+
+#include "mappers/mappers.h"
+
 typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL} MirroringMode;
 
-typedef struct {
+typedef struct cartridge {
     unsigned char *prg_rom;
     unsigned char *chr_rom;
     size_t prg_size;
@@ -40,5 +44,5 @@ typedef struct {
     MirroringMode mirror_mode;
     bool has_prg_ram;
     bool ignore_mirror_ctrl;
-    unsigned char mapper;
+    Mapper *mapper;
 } Cartridge;

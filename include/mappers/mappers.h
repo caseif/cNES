@@ -25,27 +25,18 @@
 
 #pragma once
 
+#include "cartridge.h"
+
 #include <stdint.h>
 
-typedef uint8_t (*ControllerPollFunction)(void*);
-typedef void (*ControllerPushFunction)(void*, uint8_t);
-
-typedef void (*PollingCallback)(void);
+typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
+typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
 
 typedef struct {
-    ControllerPollFunction poller;
-    ControllerPushFunction pusher;
-    void *state;
-} Controller;
+    MemoryReadFunction ram_read_func;
+    MemoryWriteFunction ram_write_func;
+    MemoryReadFunction vram_read_func;
+    MemoryWriteFunction vram_write_func;
+} Mapper;
 
-void init_controllers(void);
-
-Controller *get_controller(unsigned int port);
-
-void controller_connect(unsigned int port, Controller *controller);
-
-void controller_disconnect(unsigned int port);
-
-uint8_t controller_poll(unsigned int port);
-
-void controller_push(unsigned int port, uint8_t data);
+void mapper_init_nrom(Mapper *mapper);

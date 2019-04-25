@@ -29,6 +29,14 @@
 
 void initialize_system(Cartridge *cart);
 
+uint8_t system_ram_read(uint16_t addr);
+
+void system_ram_write(uint16_t addr, uint8_t val);
+
+uint8_t system_vram_read(uint16_t addr);
+
+void system_vram_write(uint16_t addr, uint8_t val);
+
 void do_system_loop(void);
 
 void break_execution(void);

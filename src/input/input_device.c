@@ -54,13 +54,13 @@ Controller *get_controller(unsigned int port) {
     return controllers[port];
 }
 
-void connect_controller(unsigned int port, Controller *controller) {
+void controller_connect(unsigned int port, Controller *controller) {
     assert(port >= MIN_PORT && port <= MAX_PORT);
 
     controllers[port] = controller;
 }
 
-void disconnect_controller(unsigned int port) {
+void controller_disconnect(unsigned int port) {
     assert(port >= MIN_PORT && port <= MAX_PORT);
 
     if (controllers[port] != &empty_controller) {
@@ -73,13 +73,13 @@ void disconnect_controller(unsigned int port) {
     controllers[port] = &empty_controller;
 }
 
-uint8_t poll_controller(unsigned int port) {
+uint8_t controller_poll(unsigned int port) {
     assert(port >= MIN_PORT && port <= MAX_PORT);
  
     return controllers[port]->poller(controllers[port]->state);
 }
 
-void push_controller(unsigned int port, uint8_t data) {
+void controller_push(unsigned int port, uint8_t data) {
     assert(port >= MIN_PORT && port <= MAX_PORT);
 
     controllers[port]->pusher(controllers[port]->state, data);
