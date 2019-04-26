@@ -887,9 +887,14 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
             set_pixel(x, y, rgb);
             break;
         case RM_NT0:
+        case RM_NT1:
+        case RM_NT2:
+        case RM_NT3:
             use_nt = true;
-            pt_tile = system_vram_read(NAME_TABLE_BASE_ADDR | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
-            palette_num = system_vram_read(ATTR_TABLE_BASE_ADDR | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
+            uint8_t nt_index = g_render_mode - RM_NT0;
+            uint16_t nt_base = NAME_TABLE_BASE_ADDR | (nt_index * NAME_TABLE_INTERVAL);
+            pt_tile = system_vram_read(nt_base | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
+            palette_num = system_vram_read(nt_base | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
             if ((y % 32) >= 16) {
                 palette_num >>= 4;
             }
