@@ -70,10 +70,6 @@ typedef struct {
 typedef struct {
     uint8_t y;
     union {
-        struct {
-            unsigned int tile_bank:1 PACKED;
-            unsigned int tile_num:7 PACKED;
-        } tall_tile_info;
         uint8_t tile_num;
     };
     union {

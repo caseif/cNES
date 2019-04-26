@@ -654,7 +654,7 @@ void _do_sprite_evaluation(void) {
 
                             // check if the sprite is on the next scanline
                             // we compare to the current line since sprites are rendered a line late
-                            if (val >= g_scanline - 7 && val <= g_scanline) {
+                            if (g_scanline - val <= (g_ppu_control.tall_sprites ? 15 : 7) && val <= g_scanline) {
                                 // increment m if it is
                                 g_ppu_internal_regs.m++;
 
@@ -778,12 +778,23 @@ void _do_sprite_evaluation(void) {
                             uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
                             uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                            bool bottom_tile = false;
+                            if (g_ppu_control.tall_sprites && cur_y > 7) {
+                                cur_y -= 8;
+                                bottom_tile = !attrs.flip_ver;
+                            }
                             if (attrs.flip_ver) {
                                 cur_y = 7 - cur_y;
                             }
 
-                            uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                    | (tile_index * 16 + cur_y);
+                            uint16_t addr;
+                            if (g_ppu_control.tall_sprites) {
+                                uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
+                                addr = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
+                            } else {
+                                addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                        | (tile_index * 16 + cur_y);
+                            }
 
                             uint8_t res = system_vram_read(addr);
 
@@ -808,12 +819,23 @@ void _do_sprite_evaluation(void) {
                             uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
                             uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                            bool bottom_tile = false;
+                            if (g_ppu_control.tall_sprites && cur_y > 7) {
+                                cur_y -= 8;
+                                bottom_tile = !attrs.flip_ver;
+                            }
                             if (attrs.flip_ver) {
                                 cur_y = 7 - cur_y;
                             }
 
-                            uint16_t addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                    | (tile_index * 16 + cur_y + 8);
+                            uint16_t addr;
+                            if (g_ppu_control.tall_sprites) {
+                                uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
+                                addr = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
+                            } else {
+                                addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                        | (tile_index * 16 + cur_y + 8);
+                            }
 
                             uint8_t res = system_vram_read(addr);
 
