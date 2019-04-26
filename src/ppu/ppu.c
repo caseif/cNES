@@ -779,9 +779,11 @@ void _do_sprite_evaluation(void) {
 
                             uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
                             bool bottom_tile = false;
-                            if (g_ppu_control.tall_sprites && cur_y > 7) {
-                                cur_y -= 8;
-                                bottom_tile = !attrs.flip_ver;
+                            if (g_ppu_control.tall_sprites) {
+                                bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
+                                if (cur_y > 7) {
+                                    cur_y -= 8;
+                                }
                             }
                             if (attrs.flip_ver) {
                                 cur_y = 7 - cur_y;
@@ -820,9 +822,11 @@ void _do_sprite_evaluation(void) {
 
                             uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
                             bool bottom_tile = false;
-                            if (g_ppu_control.tall_sprites && cur_y > 7) {
-                                cur_y -= 8;
-                                bottom_tile = !attrs.flip_ver;
+                            if (g_ppu_control.tall_sprites) {
+                                bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
+                                if (cur_y > 7) {
+                                    cur_y -= 8;
+                                }
                             }
                             if (attrs.flip_ver) {
                                 cur_y = 7 - cur_y;

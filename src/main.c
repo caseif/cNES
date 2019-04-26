@@ -76,8 +76,6 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    printf("mapper %p\n", cart->mapper);
-
     printf("Successfully loaded ROM file %s.\n", rom_file_name);
 
     printf("Initializing global input handler...\n");
