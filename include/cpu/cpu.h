@@ -74,9 +74,13 @@ void cpu_ram_write(uint16_t addr, uint8_t val);
 
 void cpu_start_oam_dma(uint8_t page);
 
-void set_nmi_line();
+void cpu_raise_nmi_line(void);
 
-void clear_nmi_line();
+void cpu_clear_nmi_line(void);
+
+void cpu_raise_irq_line(void);
+
+void cpu_clear_irq_line(void);
 
 void issue_interrupt(const InterruptType *type);
 

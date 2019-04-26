@@ -71,7 +71,7 @@ void do_window_loop(void) {
         LinkedList *item = &g_callbacks;
         do {
             if (item->value != NULL) {
-                ((EventCallback*) item->value)(&event);
+                ((EventCallback) item->value)(&event);
             }
             item = item->next;
         } while (item != NULL);
@@ -88,6 +88,6 @@ void close_window(void) {
     SDL_Quit();
 }
 
-void add_event_callback(EventCallback *callback) {
+void add_event_callback(EventCallback callback) {
     add_to_linked_list(&g_callbacks, (void*) callback);
 }

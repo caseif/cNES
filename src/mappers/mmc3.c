@@ -33,26 +33,34 @@
 #include <assert.h>
 #include <stdio.h>
 
+#define PRG_RAM_SIZE 0x2000
+
 #define CHR_BANK_GRANULARITY 0x400
 #define PRG_BANK_GRANULARITY 0x2000
 
+static unsigned char g_prg_ram[PRG_RAM_SIZE];
+
 // false -> $C000-DFFF fixed, $8000-9FFF swappable
 // true  -> $8000-9FFF fixed, $C000-DFFF swappable
-bool g_prg_switch_ranges = false;
+static bool g_prg_switch_ranges = false;
 // false -> 2 banks at $0000, 4 at $1000
 // true  -> 4 banks at $0000, 2 at $1000
-bool g_chr_inversion = false;
+static bool g_chr_inversion = false;
 
-uint8_t g_bank_select = 0;
+static uint8_t g_bank_select = 0;
 
-uint8_t g_chr_big_1 = 0;
-uint8_t g_chr_big_2 = 0;
-uint8_t g_chr_little_1 = 0;
-uint8_t g_chr_little_2 = 0;
-uint8_t g_chr_little_3 = 0;
-uint8_t g_chr_little_4 = 0;
-uint8_t g_prg_1 = 0;
-uint8_t g_prg_2 = 0;
+static uint8_t g_chr_big_1 = 0;
+static uint8_t g_chr_big_2 = 0;
+static uint8_t g_chr_little_1 = 0;
+static uint8_t g_chr_little_2 = 0;
+static uint8_t g_chr_little_3 = 0;
+static uint8_t g_chr_little_4 = 0;
+static uint8_t g_prg_1 = 0;
+static uint8_t g_prg_2 = 1;
+
+static uint8_t g_irq_counter;
+static uint8_t g_irq_latch;
+static bool g_irq_enabled = true;
 
 static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
     assert(addr >= 0x8000);
@@ -63,7 +71,7 @@ static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
             if (g_prg_switch_ranges) {
                 bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 2; // fixed, use second-to-last bank
             } else {
-                bank = g_prg_1 * PRG_BANK_GRANULARITY;
+                bank = g_prg_1;
             }
             break;
         case 0xA000 ... 0xBFFF:
@@ -71,7 +79,7 @@ static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
             break;
         case 0xC000 ... 0xDFFF:
             if (g_prg_switch_ranges) {
-                bank = g_prg_1 * PRG_BANK_GRANULARITY;
+                bank = g_prg_1;
             } else {
                 bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 2; // fixed, use second-to-last bank
             }
@@ -120,8 +128,10 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
 }
 
 static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
-    if (addr < 0x8000) {
+    if (addr < 0x6000) {
         return system_lower_memory_read(addr);
+    } else if (addr < 0x8000) {
+        return g_prg_ram[addr % 0x2000];
     }
 
     uint32_t prg_offset = _mmc3_get_prg_offset(cart, addr);
@@ -135,13 +145,20 @@ static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
 }
 
 static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    if (addr < 0x8000) {
+    if (addr < 0x6000) {
         system_lower_memory_write(addr, val);
+        return;
+    } else if (addr < 0x8000) {
+        g_prg_ram[addr % 0x2000] = val;
         return;
     }
 
-    switch (addr) {
+    switch (addr & 0xE001) {
         case 0x8000:
+            if (((val >> 7) & 1) ^ g_chr_inversion) {
+                g_irq_counter--;
+            }
+
             g_prg_switch_ranges = (val >> 6) & 1;
             g_chr_inversion = (val >> 7) & 1;
             g_bank_select = val & 0x7;
@@ -181,13 +198,20 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             // unimplemented for MMC3
             return;
         case 0xC000:
-            return; //TODO
+            g_irq_latch = val;
+            return;
         case 0xC001:
-            return; //TODO
+            g_irq_counter = 0;
+            return;
         case 0xE000:
-            return; //TODO
+            if (g_irq_enabled) {
+                cpu_raise_irq_line();
+                g_irq_enabled = false;
+            }
+            return;
         case 0xE001:
-            return; //TODO
+            g_irq_enabled = true;
+            return;
         default:
             return; // ignore bogus write
     }
@@ -232,9 +256,25 @@ static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     }
 }
 
+static void _mmc3_tick(void) {
+    uint16_t target_tick = ppu_get_swap_pattern_tables() ? 324 : 260;
+    if (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2) {
+        if (g_irq_counter == 0) {
+            g_irq_counter = g_irq_latch;
+        } else {
+            g_irq_counter--;
+        }
+
+        if (g_irq_counter == 0 && g_irq_enabled) {
+            cpu_raise_irq_line();
+        }
+    }
+}
+
 void mapper_init_mmc3(Mapper *mapper) {
     mapper->ram_read_func   = *_mmc3_ram_read;
     mapper->ram_write_func  = *_mmc3_ram_write;
     mapper->vram_read_func  = *_mmc3_vram_read;
     mapper->vram_write_func = *_mmc3_vram_write;
+    mapper->tick_func       = *_mmc3_tick;
 }

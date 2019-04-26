@@ -25,7 +25,7 @@
 
 #include <SDL2/SDL.h>
 
-typedef void (EventCallback)(SDL_Event*);
+typedef void (*EventCallback)(SDL_Event*);
 
 void initialize_window(void);
 

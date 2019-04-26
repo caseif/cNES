@@ -117,8 +117,8 @@ Sprite g_oam_ram[OAM_PRIMARY_SIZE / sizeof(Sprite)];
 Sprite g_secondary_oam_ram[OAM_SECONDARY_SIZE / sizeof(Sprite)];
 
 static bool g_odd_frame;
-uint16_t g_scanline;
-uint16_t g_scanline_tick;
+static uint16_t g_scanline;
+static uint16_t g_scanline_tick;
 
 static bool nmi_suppression = false;
 static int nmi_countdown = -1;
@@ -146,6 +146,18 @@ void ppu_set_mirroring_mode(MirroringMode mirror_mode) {
     g_mirror_mode = mirror_mode;
 }
 
+uint8_t ppu_get_scanline(void) {
+    return g_scanline;
+}
+
+uint16_t ppu_get_scanline_tick(void) {
+    return g_scanline_tick;
+}
+
+bool ppu_get_swap_pattern_tables(void) {
+    return g_ppu_control.background_table;
+}
+
 uint8_t ppu_read_mmio(uint8_t index) {
     assert(index <= 7);
 
@@ -160,7 +172,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
             // and the vblank flag
             g_ppu_status.vblank = 0;
 
-            clear_nmi_line();
+            cpu_clear_nmi_line();
 
             if (g_scanline == VBL_SCANLINE) {
                 if (g_scanline_tick == VBL_SCANLINE_TICK) {
@@ -605,7 +617,7 @@ void _do_general_cycle_routine(void) {
     }
 
     if (nmi_countdown-- == 0) {
-        set_nmi_line();
+        cpu_raise_nmi_line();
     }
 }
 

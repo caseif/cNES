@@ -153,6 +153,11 @@ void do_system_loop(void) {
             cycle_ppu();
             cycle_ppu();
             cycle_ppu();
+
+            if (g_cart->mapper->tick_func != NULL) {
+                g_cart->mapper->tick_func();
+            }
+
             cycle_cpu();
 
             if (stepping) {

@@ -63,6 +63,7 @@ uint16_t g_burn_cycles = 0;
 unsigned int g_total_cycles = 7;
 
 static bool g_nmi_line;
+static bool g_irq_line;
 
 void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
@@ -147,7 +148,7 @@ static InstructionParameter _get_next_m(uint8_t opcode, const Instruction *instr
             break;
         }
         case ABS: {
-            uint16_t raw_operand = _next_prg_short();
+            raw_operand = _next_prg_short();
             adj_operand = raw_operand;
             break;
         }
@@ -308,12 +309,20 @@ static void _do_sbc(uint16_t m) {
     g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & ((0xFF - m) ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
 }
 
-void set_nmi_line() {
+void cpu_raise_nmi_line(void) {
     g_nmi_line = true;
 }
 
-void clear_nmi_line() {
+void cpu_clear_nmi_line(void) {
     g_nmi_line = false;
+}
+
+void cpu_raise_irq_line(void) {
+    g_irq_line = true;
+}
+
+void cpu_clear_irq_line(void) {
+    g_irq_line = false;
 }
 
 void issue_interrupt(const InterruptType *type) {
@@ -801,16 +810,101 @@ void _exec_next_instr(void) {
     InstructionParameter param = _get_next_m(opcode, instr);
 
     #if PRINT_INSTRS
-    extern unsigned int g_scanline_tick;
     uint8_t status;
     memcpy(&status, &g_cpu_regs.status, 1);
-    printf("%04x  %02x %s:%s $%04x -> $%04x (a=%02x,x=%02x,y=%02x,sp=%02x,p=%02x,cyc=%d)\n",
+
+    char str_machine_code[9];
+    switch (get_instr_len(instr)) {
+        case 1:
+            sprintf(str_machine_code, "%02X      ", opcode);
+            break;
+        case 2:
+            sprintf(str_machine_code, "%02X %02X   ", opcode, param.raw_operand);
+            break;
+        case 3:
+            sprintf(str_machine_code, "%02X %02X %02X", opcode, param.raw_operand & 0xFF, param.raw_operand >> 8);
+            break;
+    }
+
+    char str_param[32];
+    InstructionType instr_type = get_instr_type(instr->mnemonic);
+    switch (instr->addr_mode) {
+        case IMM:
+            sprintf(str_param, "#$%02X                     ", param.raw_operand);
+            break;
+        case ZRP:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%02X     -> $%02X           ", param.raw_operand, param.value);
+                    break;
+                default:
+                    sprintf(str_param, "$%02X                      ", param.raw_operand);
+                    break;
+            }
+            break;
+        case ZPX:
+        case ZPY:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%02X,%c   -> $%02X   -> $%02X  ",
+                            param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.adj_operand, param.value);
+                    break;
+                default:
+                    sprintf(str_param, "$%02X,%c   -> $%02X           ",
+                            param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.value);
+                    break;
+            }
+            break;
+        case ABS:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%04X   -> $%02X           ", param.raw_operand, param.value);
+                    break;
+                default:
+                    sprintf(str_param, "$%04X                    ", param.raw_operand);
+                    break;
+            }
+            break;
+        case ABX:
+        case ABY:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%04X,%c -> $%04X -> $%02X  ",
+                            param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.adj_operand, param.value);
+                    break;
+                default:
+                    sprintf(str_param, "$%04X,%c -> $%02X          ",
+                            param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.value);
+                    break;
+            }
+            break;
+        case REL:
+            sprintf(str_param, "$%02X     -> $%04X         ",
+                    param.raw_operand, g_cpu_regs.pc + ((int8_t) param.raw_operand));
+            break;
+        case IND:
+            sprintf(str_param, "($%04X) -> $%04X         ", param.raw_operand, param.value);
+            break;
+        case IZX:
+            sprintf(str_param, "($%02X,X) -> $%04X -> $%04X", param.raw_operand, param.adj_operand, param.value);
+            break;
+        case IZY:
+            sprintf(str_param, "($%02X),Y -> $%04X -> $%04X", param.raw_operand, param.adj_operand, param.value);
+            break;
+        case IMP:
+            sprintf(str_param, "                         ");
+            break;
+    }
+
+    printf("%04X  %s  %s %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d)\n",
             g_cpu_regs.pc - get_instr_len(instr),
-            opcode,
+            str_machine_code,
             mnemonic_to_str(instr->mnemonic),
-            addr_mode_to_str(instr->addr_mode),
-            param.raw_operand,
-            param.adj_operand,
+            str_param,
             g_cpu_regs.acc,
             g_cpu_regs.x,
             g_cpu_regs.y,
@@ -831,7 +925,10 @@ void cycle_cpu(void) {
     } else {
         if (g_nmi_line) {
             issue_interrupt(&INT_NMI);
-            g_nmi_line = false;
+            cpu_clear_nmi_line();
+        } else if (g_irq_line) {
+            issue_interrupt(&INT_IRQ);
+            cpu_clear_irq_line();
         } else {
             _exec_next_instr();
         }

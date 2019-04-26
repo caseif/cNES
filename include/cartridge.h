@@ -41,8 +41,9 @@ typedef struct cartridge {
     unsigned char *chr_rom;
     size_t prg_size; // in bytes
     size_t chr_size; // in bytes
+    size_t prg_ram_size; // in bytes
     MirroringMode mirror_mode;
-    bool has_prg_ram;
+    bool has_nv_ram;
     bool ignore_mirror_ctrl;
     Mapper *mapper;
 } Cartridge;

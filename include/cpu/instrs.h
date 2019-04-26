@@ -51,7 +51,7 @@ typedef struct {
 } Instruction;
 
 typedef struct {
-    uint16_t value;
+    uint8_t value;
     uint16_t raw_operand;
     uint16_t adj_operand;
 } InstructionParameter;

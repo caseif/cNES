@@ -35,10 +35,11 @@
 #define NES_MAGIC 0x4E45531A
 #define PRG_CHUNK_SIZE ((size_t) 0x4000)
 #define CHR_CHUNK_SIZE ((size_t) 0x2000)
+#define PRG_RAM_CHUNK_SIZE ((size_t) 0x2000)
 
 typedef struct {
     MirroringMode mirror_mode:1 PACKED;
-    bool has_prg_ram:1 PACKED;
+    bool has_nv_ram:1 PACKED;
     bool has_trainer:1 PACKED;
     bool ignore_mirror_ctrl:1 PACKED;
     unsigned int mapper_low:4 PACKED;
@@ -52,10 +53,10 @@ typedef struct {
 } Flag7;
 
 Cartridge *load_rom(FILE *file) {
-    unsigned char buffer[8];
+    unsigned char buffer[16];
 
-    // read the first 8 bytes
-    fread(buffer, 8, 1, file);
+    // read the first 16 bytes
+    fread(buffer, 16, 1, file);
 
     // check the magic (the file format is Little Endian)
     uint32_t magic = endian_swap(*((uint32_t*) buffer));
@@ -75,10 +76,10 @@ Cartridge *load_rom(FILE *file) {
     Flag7 flag7 = (Flag7) {};
     memcpy(&flag7, &(buffer[7]), 1);
 
-    /*if (flag7.nes2) {
-        printf("NES 2.0 format is unsupported.\n");
+    if (flag7.nes2 == 2) {
+        printf("NES 2.0 format is not supported at this time.\n");
         return NULL;
-    }*/
+    }
 
     uint8_t mapper_id = (flag7.mapper_high << 4) | flag6.mapper_low;
     Mapper *mapper = (Mapper*) malloc(sizeof(Mapper));
@@ -98,8 +99,10 @@ Cartridge *load_rom(FILE *file) {
             return NULL;
     }
 
-    // skip next 8 bytes (we don't care about them for the moment)
-    fseek(file, 8, SEEK_CUR);
+    size_t prg_ram_size = buffer[8] * PRG_RAM_CHUNK_SIZE;
+    if (prg_ram_size == 0) {
+        prg_ram_size = PRG_RAM_CHUNK_SIZE; // for compatibility
+    }
 
     // skip the trainer if present
     if (flag6.has_trainer) {
@@ -141,7 +144,7 @@ Cartridge *load_rom(FILE *file) {
     cart->prg_size = prg_size * PRG_CHUNK_SIZE;
     cart->chr_size = chr_size * CHR_CHUNK_SIZE;
     cart->mirror_mode = flag6.mirror_mode;
-    cart->has_prg_ram = flag6.has_prg_ram;
+    cart->has_nv_ram = flag6.has_nv_ram;
     cart->ignore_mirror_ctrl = flag6.ignore_mirror_ctrl;
 
     return cart;

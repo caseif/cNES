@@ -31,12 +31,14 @@
 
 typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
 typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
+typedef void (*MapperTickFunction)(void);
 
 typedef struct {
     MemoryReadFunction ram_read_func;
     MemoryWriteFunction ram_write_func;
     MemoryReadFunction vram_read_func;
     MemoryWriteFunction vram_write_func;
+    MapperTickFunction tick_func;
 } Mapper;
 
 void mapper_init_nrom(Mapper *mapper);

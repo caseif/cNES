@@ -110,4 +110,5 @@ void mapper_init_nrom(Mapper *mapper) {
     mapper->ram_write_func  = *_nrom_ram_write;
     mapper->vram_read_func  = *_nrom_vram_read;
     mapper->vram_write_func = *_nrom_vram_write;
+    mapper->tick_func       = NULL;
 }
