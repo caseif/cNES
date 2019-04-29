@@ -889,7 +889,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
         case RM_NT0:
         case RM_NT1:
         case RM_NT2:
-        case RM_NT3:
+        case RM_NT3: {
             use_nt = true;
             uint8_t nt_index = g_render_mode - RM_NT0;
             uint16_t nt_base = NAME_TABLE_BASE_ADDR | (nt_index * NAME_TABLE_INTERVAL);
@@ -902,6 +902,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                 palette_num >>= 2;
             }
             palette_num &= 0b11;
+        }
         case RM_PT: {
             if (!use_nt) {
                 pt_tile = (y / 8) * 16 + (x % 128) / 8;
