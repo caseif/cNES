@@ -303,7 +303,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             assert(false);
     }
 
-    g_ppu_status.last_write = val & 0x10;
+    g_ppu_status.last_write = val & 0x1F;
 }
 
 uint16_t _translate_name_table_address(uint16_t addr) {
@@ -600,12 +600,12 @@ void _do_general_cycle_routine(void) {
         // set vblank flag
         case VBL_SCANLINE: {
             if (g_scanline_tick == VBL_SCANLINE_TICK) {
+                g_ppu_status.vblank = 1;
+
                 if (nmi_suppression) {
                     nmi_suppression = false;
                     break;
                 }
-
-                g_ppu_status.vblank = 1;
 
                 if (g_ppu_control.gen_nmis) {
                     nmi_countdown = NMI_DELAY;

@@ -62,8 +62,8 @@ uint16_t g_burn_cycles = 0;
 
 unsigned int g_total_cycles = 7;
 
-static bool g_nmi_line;
-static bool g_irq_line;
+static bool g_nmi_line = false;
+static bool g_irq_line = false;
 
 void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
@@ -325,10 +325,10 @@ void cpu_clear_irq_line(void) {
     g_irq_line = false;
 }
 
-void issue_interrupt(const InterruptType *type) {
+bool issue_interrupt(const InterruptType *type) {
     // check if the interrupt should be masked
     if (type->maskable && g_cpu_regs.status.interrupt_disable) {
-        return;
+        return false;
     }
 
     // set B flag
@@ -364,6 +364,8 @@ void issue_interrupt(const InterruptType *type) {
     g_cpu_regs.pc = vector;
 
     g_burn_cycles += 7;
+
+    return true;
 }
 
 void _exec_instr(const Instruction *instr, InstructionParameter param) {
@@ -830,16 +832,16 @@ void _exec_next_instr(void) {
     InstructionType instr_type = get_instr_type(instr->mnemonic);
     switch (instr->addr_mode) {
         case IMM:
-            sprintf(str_param, "#$%02X                     ", param.raw_operand);
+            sprintf(str_param, "#$%02X                   ", param.raw_operand);
             break;
         case ZRP:
             switch (instr_type) {
                 case INS_R:
                 case INS_RW:
-                    sprintf(str_param, "$%02X     -> $%02X           ", param.raw_operand, param.value);
+                    sprintf(str_param, "$%02X     -> $%02X         ", param.raw_operand, param.value);
                     break;
                 default:
-                    sprintf(str_param, "$%02X                      ", param.raw_operand);
+                    sprintf(str_param, "$%02X                    ", param.raw_operand);
                     break;
             }
             break;
@@ -848,11 +850,11 @@ void _exec_next_instr(void) {
             switch (instr_type) {
                 case INS_R:
                 case INS_RW:
-                    sprintf(str_param, "$%02X,%c   -> $%02X   -> $%02X  ",
+                    sprintf(str_param, "$%02X,%c   -> $%02X   -> $%02X",
                             param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.adj_operand, param.value);
                     break;
                 default:
-                    sprintf(str_param, "$%02X,%c   -> $%02X           ",
+                    sprintf(str_param, "$%02X,%c   -> $%02X         ",
                             param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.value);
                     break;
             }
@@ -861,10 +863,10 @@ void _exec_next_instr(void) {
             switch (instr_type) {
                 case INS_R:
                 case INS_RW:
-                    sprintf(str_param, "$%04X   -> $%02X           ", param.raw_operand, param.value);
+                    sprintf(str_param, "$%04X   -> $%02X         ", param.raw_operand, param.value);
                     break;
                 default:
-                    sprintf(str_param, "$%04X                    ", param.raw_operand);
+                    sprintf(str_param, "$%04X                  ", param.raw_operand);
                     break;
             }
             break;
@@ -873,34 +875,34 @@ void _exec_next_instr(void) {
             switch (instr_type) {
                 case INS_R:
                 case INS_RW:
-                    sprintf(str_param, "$%04X,%c -> $%04X -> $%02X  ",
+                    sprintf(str_param, "$%04X,%c -> $%04X -> $%02X",
                             param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.adj_operand, param.value);
                     break;
                 default:
-                    sprintf(str_param, "$%04X,%c -> $%02X          ",
+                    sprintf(str_param, "$%04X,%c -> $%02X         ",
                             param.raw_operand, instr->addr_mode == ZPX ? 'X' : 'Y', param.value);
                     break;
             }
             break;
         case REL:
-            sprintf(str_param, "$%02X     -> $%04X         ",
+            sprintf(str_param, "#$%02X    -> $%04X       ",
                     param.raw_operand, g_cpu_regs.pc + ((int8_t) param.raw_operand));
             break;
         case IND:
-            sprintf(str_param, "($%04X) -> $%04X         ", param.raw_operand, param.value);
+            sprintf(str_param, "($%04X) -> $%04X       ", param.raw_operand, param.value);
             break;
         case IZX:
-            sprintf(str_param, "($%02X,X) -> $%04X -> $%04X", param.raw_operand, param.adj_operand, param.value);
+            sprintf(str_param, "($%02X,X) -> $%04X -> $%02X", param.raw_operand, param.adj_operand, param.value);
             break;
         case IZY:
-            sprintf(str_param, "($%02X),Y -> $%04X -> $%04X", param.raw_operand, param.adj_operand, param.value);
+            sprintf(str_param, "($%02X),Y -> $%04X -> $%02X", param.raw_operand, param.adj_operand, param.value);
             break;
         case IMP:
-            sprintf(str_param, "                         ");
+            sprintf(str_param, "                       ");
             break;
     }
 
-    printf("%04X  %s  %s %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d)\n",
+    printf("%04X  %s  %s %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d,ppu=%03d,%03d)\n",
             g_cpu_regs.pc - get_instr_len(instr),
             str_machine_code,
             mnemonic_to_str(instr->mnemonic),
@@ -910,7 +912,9 @@ void _exec_next_instr(void) {
             g_cpu_regs.y,
             g_cpu_regs.sp,
             status,
-            g_total_cycles);
+            g_total_cycles,
+            ppu_get_scanline(),
+            ppu_get_scanline_tick());
     #endif
 
     // we increment, since decoding the instruction can modify the value
@@ -923,13 +927,16 @@ void cycle_cpu(void) {
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
     } else {
+        bool non_masked_int_occurred = false;
         if (g_nmi_line) {
-            issue_interrupt(&INT_NMI);
+            non_masked_int_occurred = issue_interrupt(&INT_NMI);
             cpu_clear_nmi_line();
         } else if (g_irq_line) {
-            issue_interrupt(&INT_IRQ);
+            non_masked_int_occurred = issue_interrupt(&INT_IRQ);
             cpu_clear_irq_line();
-        } else {
+        }
+
+        if (!non_masked_int_occurred) {
             _exec_next_instr();
         }
     }
