@@ -21,13 +21,14 @@ OBJEXT = o
 INCLUDES = ./include
 TEST_INCLUDES = ./test/include
 LIBS = c pthread SDL2
+CFLAGS := -g -Wall -std=c11
 
 INCFLAGS := $(foreach d, $(INCLUDES), -I$d)
 TEST_INCFLAGS := $(foreach d, $(TEST_INCLUDES), -I$d)
 LIBFLAGS := $(foreach d, $(LIBS), -l$d)
-CFLAGS   := -g $(INCFLAGS) -Wall -std=c11
+CFLAGS += $(INCFLAGS)
 TEST_CFLAGS := $(TEST_INCFLAGS) $(CFLAGS)
-LDFLAGS  := $(LIBFLAGS)
+LDFLAGS := $(LIBFLAGS)
 
 SRCFILES = $(call rwildcard, $(SRCDIR), *.$(SRCEXT))
 HFILES = $(call rwildcard, $(INCDIR), *.$(HEXT))

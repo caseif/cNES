@@ -57,7 +57,7 @@ static inline void add_to_linked_list(LinkedList *list, void *value) {
     while (list->next != NULL) {
         list = list->next;
     }
-    list->next = (LinkedList*) malloc(sizeof(LinkedList));
+    list->next = (LinkedList*) calloc(sizeof(LinkedList), 1);
     list->next->value = value;
 }
 

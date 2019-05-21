@@ -33,7 +33,7 @@
 
 static SDL_Window *g_window;
 
-static LinkedList g_callbacks;
+static LinkedList g_callbacks = {0};
 
 void _close_listener(SDL_Event *event) {
     switch (event->type) {
