@@ -41,6 +41,7 @@ void _close_listener(SDL_Event *event) {
             if (event->window.event != SDL_WINDOWEVENT_CLOSE) {
                 break;
             }
+            // intentional fall-through
         case SDL_QUIT:
             kill_execution();
             close_window();

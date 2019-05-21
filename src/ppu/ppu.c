@@ -752,6 +752,8 @@ void _do_sprite_evaluation(void) {
                 switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
                         g_ppu_internal_regs.sprite_y_latch = g_secondary_oam_ram[index].y;
+
+                        break;
                     }
                     case 1: {
                         g_ppu_internal_regs.sprite_tile_index_latch = g_secondary_oam_ram[index].tile_num;
@@ -902,6 +904,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                 palette_num >>= 2;
             }
             palette_num &= 0b11;
+            // intentional fall-through
         }
         case RM_PT: {
             if (!use_nt) {
