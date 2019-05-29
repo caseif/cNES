@@ -477,8 +477,6 @@ void _do_general_cycle_routine(void) {
                     g_ppu_internal_regs.v &= ~0x41F; // clear horizontal bits
                     g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x41F; // copy horizontal bits to v from t
                 }
-
-                //TODO: perform sprite tile fetching
             } else {
                 unsigned int fetch_pixel_x;
                 unsigned int fetch_pixel_y;
@@ -543,7 +541,7 @@ void _do_general_cycle_routine(void) {
                         }
 
                         // check if it's in the right half of the table cell
-                        if (((fetch_pixel_x + g_ppu_internal_regs.x) % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
+                        if ((fetch_pixel_x % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
                             attr_table_byte >>= 2;
                         }
 

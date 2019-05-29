@@ -114,8 +114,8 @@ typedef struct {
 
     uint16_t pattern_shift_l;
     uint16_t pattern_shift_h;
-    uint16_t palette_shift_l;
-    uint16_t palette_shift_h;
+    uint8_t palette_shift_l;
+    uint8_t palette_shift_h;
 } PpuInternalRegisters;
 
 typedef enum {
