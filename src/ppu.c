@@ -146,7 +146,7 @@ void ppu_set_mirroring_mode(MirroringMode mirror_mode) {
     g_mirror_mode = mirror_mode;
 }
 
-uint8_t ppu_get_scanline(void) {
+uint16_t ppu_get_scanline(void) {
     return g_scanline;
 }
 
@@ -612,6 +612,10 @@ void _do_general_cycle_routine(void) {
 
             break;
         }
+    }
+
+    if (g_scanline == VBL_SCANLINE - 1 && g_scanline_tick >= CYCLES_PER_SCANLINE - 3) {
+        g_ppu_status.vblank = 1;
     }
 
     if (nmi_countdown-- == 0) {

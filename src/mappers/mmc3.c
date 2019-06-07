@@ -279,6 +279,9 @@ static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 static void _mmc3_tick(void) {
+    #if MMC3_DEBUG_LOGGING
+    printf("mmc3 counter: %d\n", g_irq_counter);
+    #endif
     uint16_t target_tick = ppu_get_swap_pattern_tables() ? 324 : 260;
     if (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2) {
         if (g_irq_counter == 0) {

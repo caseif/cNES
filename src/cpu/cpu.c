@@ -363,7 +363,9 @@ bool issue_interrupt(const InterruptType *type) {
     // set the PC
     g_cpu_regs.pc = vector;
 
-    g_burn_cycles += 7;
+    if (type == &INT_NMI) {
+        g_burn_cycles += 4;
+    }
 
     return true;
 }
@@ -889,7 +891,7 @@ void _exec_next_instr(void) {
                     param.raw_operand, g_cpu_regs.pc + ((int8_t) param.raw_operand));
             break;
         case IND:
-            sprintf(str_param, "($%04X) -> $%04X       ", param.raw_operand, param.value);
+            sprintf(str_param, "($%04X) -> $%04X       ", param.raw_operand, param.adj_operand);
             break;
         case IZX:
             sprintf(str_param, "($%02X,X) -> $%04X -> $%02X", param.raw_operand, param.adj_operand, param.value);
@@ -927,19 +929,21 @@ void cycle_cpu(void) {
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
     } else {
-        bool non_masked_int_occurred = false;
         if (g_nmi_line) {
-            non_masked_int_occurred = issue_interrupt(&INT_NMI);
+            issue_interrupt(&INT_NMI);
             cpu_clear_nmi_line();
+            cycle_cpu();
+            return;
         } else if (g_irq_line) {
-            non_masked_int_occurred = issue_interrupt(&INT_IRQ);
+            issue_interrupt(&INT_IRQ);
             cpu_clear_irq_line();
-        }
-
-        if (!non_masked_int_occurred) {
+            cycle_cpu();
+            return;
+        } else {
             _exec_next_instr();
         }
     }
+
     g_total_cycles++;
 }
 
