@@ -488,22 +488,12 @@ void _do_general_cycle_routine(void) {
                         // copy the palette data from the secondary latch to the primary
                         g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
 
-                        // special case since the registers need to be preloaded before any shifting happens
-                        if (g_scanline_tick == 329) {
-                            g_ppu_internal_regs.pattern_shift_l = g_ppu_internal_regs.pattern_bitmap_l_latch;
-                            g_ppu_internal_regs.pattern_shift_h = g_ppu_internal_regs.pattern_bitmap_h_latch;
-
-                            // load the shift register directly
-                            g_ppu_internal_regs.palette_shift_l = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch & 1);
-                            g_ppu_internal_regs.palette_shift_h = 0xFF * (g_ppu_internal_regs.attr_table_entry_latch >> 1);
-                        } else {
-                            // clear upper bits
-                            g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
-                            g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
-                            // set upper bits
-                            g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
-                            g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
-                        }
+                        // clear upper bits
+                        g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
+                        g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
+                        // set upper bits
+                        g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
+                        g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
 
                         break;
                     }
@@ -1019,15 +1009,6 @@ void cycle_ppu(void) {
 
         render_pixel(draw_pixel_x, draw_pixel_y, rgb);
 
-        // shift the internal registers
-        g_ppu_internal_regs.pattern_shift_h >>= 1;
-        g_ppu_internal_regs.pattern_shift_l >>= 1;
-        g_ppu_internal_regs.palette_shift_h >>= 1;
-        g_ppu_internal_regs.palette_shift_l >>= 1;
-        // feed the attribute registers from the latch(es)
-        g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
-        g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
-
         for (int i = 0; i < 8; i++) {
             if (g_ppu_internal_regs.sprite_x_counters[i]) {
                 g_ppu_internal_regs.sprite_x_counters[i]--;
@@ -1039,6 +1020,19 @@ void cycle_ppu(void) {
                 }
             }
         }
+    }
+
+    if (g_scanline < RESOLUTION_V
+            && ((g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H)
+                    || (g_scanline_tick >= 329 && g_scanline_tick <= 336))) {
+        // shift the internal registers
+        g_ppu_internal_regs.pattern_shift_h >>= 1;
+        g_ppu_internal_regs.pattern_shift_l >>= 1;
+        g_ppu_internal_regs.palette_shift_h >>= 1;
+        g_ppu_internal_regs.palette_shift_l >>= 1;
+        // feed the attribute registers from the latch(es)
+        g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
+        g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
     }
 
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {
