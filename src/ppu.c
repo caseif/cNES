@@ -183,22 +183,22 @@ uint8_t ppu_read_mmio(uint8_t index) {
             return res;
         }
         case 7: {
-            if (g_ppu_internal_regs.v < 0x3F00) {
+            if (g_ppu_internal_regs.v.addr < 0x3F00) {
                 // most VRAM goes through a read buffer
                 uint8_t res = g_ppu_internal_regs.read_buf;
 
-                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v);
+                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr);
 
-                g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
+                g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
                 return res;
             } else {
                 // palette reading bypasses buffer, but still updates it in a weird way
 
                 // address is offset since the buffer is updated with the mirrored NT data "under" the palette data
-                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v - 0x1000);
+                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr - 0x1000);
 
-                return system_vram_read(g_ppu_internal_regs.v);
+                return system_vram_read(g_ppu_internal_regs.v.addr);
             }
 
         }
@@ -217,8 +217,8 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             bool old_gen_nmis = g_ppu_control.gen_nmis;
 
             memcpy(&g_ppu_control, &val, 1);
-            g_ppu_internal_regs.t &= ~(0b11 << 10); // clear bits 10-11
-            g_ppu_internal_regs.t |= (val & 0b11) << 10; // set bits 10-11 to current nametable
+            g_ppu_internal_regs.t.addr &= ~(0b11 << 10); // clear bits 10-11
+            g_ppu_internal_regs.t.addr |= (val & 0b11) << 10; // set bits 10-11 to current nametable
 
             if (!old_gen_nmis && g_ppu_control.gen_nmis && g_ppu_status.vblank) {
                 nmi_countdown = NMI_DELAY;
@@ -242,15 +242,15 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             // set either x- or y-scroll, depending on whether this is the first or second write
             if (g_ppu_internal_regs.w) {
                 // setting y-scroll
-                g_ppu_internal_regs.t &= ~(0b11111 << 5); // clear bits 5-9
-                g_ppu_internal_regs.t |= (val & 0b11111000) << 2; // set bits 5-9
+                g_ppu_internal_regs.t.addr &= ~(0b11111 << 5); // clear bits 5-9
+                g_ppu_internal_regs.t.addr |= (val & 0b11111000) << 2; // set bits 5-9
 
-                g_ppu_internal_regs.t &= ~(0b111 << 12);  // clear bits 12-14
-                g_ppu_internal_regs.t |= (val & 0b111) << 12; // set bits 12-14
+                g_ppu_internal_regs.t.addr &= ~(0b111 << 12);  // clear bits 12-14
+                g_ppu_internal_regs.t.addr |= (val & 0b111) << 12; // set bits 12-14
             } else {
                 // setting x-scroll
-                g_ppu_internal_regs.t &= ~(0b11111); // clear bits 0-4
-                g_ppu_internal_regs.t |= val >> 3; // set bits 0-4
+                g_ppu_internal_regs.t.addr &= ~(0b11111); // clear bits 0-4
+                g_ppu_internal_regs.t.addr |= val >> 3; // set bits 0-4
                 
                 g_ppu_internal_regs.x = val & 0x7; // copy fine x to x register
             }
@@ -267,19 +267,19 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
 
             if (g_ppu_internal_regs.w) {
                 // clear lower bits
-                g_ppu_internal_regs.t &= ~0x00FF;
+                g_ppu_internal_regs.t.addr &= ~0x00FF;
                 // set lower bits
-                g_ppu_internal_regs.t |= (val & 0xFF);
+                g_ppu_internal_regs.t.addr |= (val & 0xFF);
 
                 // flush t to v
-                g_ppu_internal_regs.v = g_ppu_internal_regs.t;
+                g_ppu_internal_regs.v.addr = g_ppu_internal_regs.t.addr;
             } else {
                 // clear upper bits
-                g_ppu_internal_regs.t &= ~0x7F00;
+                g_ppu_internal_regs.t.addr &= ~0x7F00;
                 // set upper bits
-                g_ppu_internal_regs.t |= (val & 0b111111) << 8;
+                g_ppu_internal_regs.t.addr |= (val & 0b111111) << 8;
                 // set MSB to 0
-                g_ppu_internal_regs.t &= ~0x4000;
+                g_ppu_internal_regs.t.addr &= ~0x4000;
             }
 
             // flip w flag
@@ -290,12 +290,12 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             // write to the stored address
 
             #if PRINT_VRAM_WRITES
-            printf("PPU write: $%04x, %02x\n", g_ppu_internal_regs.v, val);
+            printf("PPU write: $%04x, %02x\n", g_ppu_internal_regs.v.addr, val);
             #endif
 
-            system_vram_write(g_ppu_internal_regs.v, val);
+            system_vram_write(g_ppu_internal_regs.v.addr, val);
 
-            g_ppu_internal_regs.v += g_ppu_control.vertical_increment ? 32 : 1;
+            g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
             break;
         }
@@ -403,7 +403,7 @@ void ppu_start_oam_dma(uint8_t page) {
 void _update_v_vertical(void) {
     // update vert(v)
 
-    unsigned int v = g_ppu_internal_regs.v;
+    unsigned int v = g_ppu_internal_regs.v.addr;
 
     // if fine y = 7
     if ((v & 0x7000) == 0x7000) {
@@ -427,12 +427,12 @@ void _update_v_vertical(void) {
         v += 0x1000;
     }
 
-    g_ppu_internal_regs.v = v;
+    g_ppu_internal_regs.v.addr = v;
 }
 
 // this code was shamelessly lifted from https://wiki.nesdev.com/w/index.php/PPU_scrolling
 void _update_v_horizontal(void) {
-    unsigned int v = g_ppu_internal_regs.v;
+    unsigned int v = g_ppu_internal_regs.v.addr;
 
     if ((v & 0x1F) == 0x1F) {
         // if x = 31 (last tile of nametable), skip to next name table
@@ -444,7 +444,7 @@ void _update_v_horizontal(void) {
     }
 
     // write the updated value back to the register
-    g_ppu_internal_regs.v = v;
+    g_ppu_internal_regs.v.addr = v;
 }
 
 void _do_general_cycle_routine(void) {
@@ -460,8 +460,8 @@ void _do_general_cycle_routine(void) {
 
             // vert(v) = vert(t)
             if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && _is_rendering_enabled()) {
-                g_ppu_internal_regs.v &= ~0x7BE0; // clear vertical bits
-                g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x7BE0; // copy vertical bits to v from t
+                g_ppu_internal_regs.v.addr &= ~0x7BE0; // clear vertical bits
+                g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x7BE0; // copy vertical bits to v from t
             }
 
             // intentional fall-through
@@ -474,31 +474,22 @@ void _do_general_cycle_routine(void) {
             } else if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick <= 320) {
                 // hori(v) = hori(t)
                 if (g_scanline_tick == 257 && _is_rendering_enabled()) {
-                    g_ppu_internal_regs.v &= ~0x41F; // clear horizontal bits
-                    g_ppu_internal_regs.v |= g_ppu_internal_regs.t & 0x41F; // copy horizontal bits to v from t
+                    g_ppu_internal_regs.v.addr &= ~0x41F; // clear horizontal bits
+                    g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x41F; // copy horizontal bits to v from t
                 }
             } else {
-                unsigned int fetch_pixel_x;
-                unsigned int fetch_pixel_y;
-
-                if (g_scanline_tick >= 321) { // start fetching for the next scanline
-                    fetch_pixel_x = g_scanline_tick - 321; // fetching starts at cycle 321
-                    fetch_pixel_y = g_scanline == PRE_RENDER_LINE ? 0 : g_scanline + 1; // we're on the next line
-                } else if ((g_scanline_tick >= 1 && g_scanline_tick <= LAST_VISIBLE_CYCLE)) {
-                    fetch_pixel_x = g_scanline_tick + 15; // we fetch two tiles ahead
-                    fetch_pixel_y = g_scanline;
-                } else {
+                if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick < 321) {
                     // these cycles are for garbage NT fetches
                     break;
                 }
 
-                switch (fetch_pixel_x % 8) {
+                switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
                         // copy the palette data from the secondary latch to the primary
                         g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
 
                         // special case since the registers need to be preloaded before any shifting happens
-                        if (fetch_pixel_x == 8) {
+                        if (g_scanline_tick == 329) {
                             g_ppu_internal_regs.pattern_shift_l = g_ppu_internal_regs.pattern_bitmap_l_latch;
                             g_ppu_internal_regs.pattern_shift_h = g_ppu_internal_regs.pattern_bitmap_h_latch;
 
@@ -519,7 +510,7 @@ void _do_general_cycle_routine(void) {
                     // fetch name table entry
                     case 1: {
                         // address = name table base + (v except fine y)
-                        uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v & 0x0FFF);
+                        uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
 
                         //printf("(%03d, %03d) @ (%03d, %03d) -> %04x\n", fetch_pixel_x, fetch_pixel_y, g_scanline_tick, g_scanline, name_table_addr);
 
@@ -529,19 +520,19 @@ void _do_general_cycle_routine(void) {
                     }
                     case 3: {
                         // address = attr table base + (name table offset) + (shifted v)
-                        unsigned int v = g_ppu_internal_regs.v;
+                        unsigned int v = g_ppu_internal_regs.v.addr;
 
                         uint16_t attr_table_addr = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
                         uint8_t attr_table_byte = system_vram_read(attr_table_addr);
 
                         // check if it's in the bottom half of the table cell
-                        if ((fetch_pixel_y % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
+                        if (g_ppu_internal_regs.v.y_coarse & 0b10) {
                             attr_table_byte >>= 4;
                         }
 
                         // check if it's in the right half of the table cell
-                        if ((fetch_pixel_x % ATTR_TABLE_GRANULARITY) >= ATTR_TABLE_GRANULARITY / 2) {
+                        if (g_ppu_internal_regs.v.x_coarse & 0b10) {
                             attr_table_byte >>= 2;
                         }
 
@@ -553,7 +544,7 @@ void _do_general_cycle_routine(void) {
                         // multiply by 16 since each plane is 8 bytes, and there are 2 planes per tile
                         // then we just add the mod of the current line to get the sub-tile offset
                         unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
-                                + (fetch_pixel_y % 8);
+                                + g_ppu_internal_regs.v.y_fine;
 
                         uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
@@ -565,7 +556,7 @@ void _do_general_cycle_routine(void) {
                     case 7: {
                         // basically the same as above, but we add 8 to get the second plane
                         unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
-                                + (fetch_pixel_y % 8) + 8;
+                                + g_ppu_internal_regs.v.y_fine + 8;
 
                         uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;

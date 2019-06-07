@@ -79,9 +79,19 @@ typedef struct {
     uint8_t x;
 } Sprite;
 
+typedef union {
+    struct {
+        unsigned int x_coarse:5;
+        unsigned int y_coarse:5;
+        unsigned int nt:2;
+        unsigned int y_fine:3;
+    };
+    unsigned int addr:15;
+} VramAddr;
+
 typedef struct {
-    unsigned int v:15;  // current VRAM address
-    unsigned int t:15;  // temporary VRAM address
+    VramAddr v;  // current VRAM address
+    VramAddr t;  // temporary VRAM address
     unsigned int x:8;   // fine x-scroll
     unsigned int w:1;   // write flag (for twice-writable registers)
 
