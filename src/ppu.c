@@ -486,6 +486,9 @@ void _do_general_cycle_routine(void) {
                 switch ((g_scanline_tick - 1) % 8) {
                     case 0: {
                         // copy the palette data from the secondary latch to the primary
+                        if (g_scanline == 150) {
+                            printf("%03d: load latch <- %02d\n", g_scanline_tick, g_ppu_internal_regs.attr_table_entry_latch_secondary);
+                        }
                         g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
 
                         // clear upper bits
@@ -1023,16 +1026,39 @@ void cycle_ppu(void) {
     }
 
     if (g_scanline < RESOLUTION_V
-            && ((g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H)
-                    || (g_scanline_tick >= 329 && g_scanline_tick <= 336))) {
+            && ((g_scanline_tick >= 1 && g_scanline_tick <= RESOLUTION_H)
+                    || (g_scanline_tick >= 321 && g_scanline_tick <= 336))) {
         // shift the internal registers
         g_ppu_internal_regs.pattern_shift_h >>= 1;
         g_ppu_internal_regs.pattern_shift_l >>= 1;
+
         g_ppu_internal_regs.palette_shift_h >>= 1;
         g_ppu_internal_regs.palette_shift_l >>= 1;
         // feed the attribute registers from the latch(es)
         g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
         g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
+
+        if (g_scanline == 150 && (g_scanline_tick > 256 || g_scanline_tick <= 16)) {
+            printf("tick %03d\n", g_scanline_tick);
+            printf("%01d%01d%01d%01d%01d%01d%01d%01d\n",
+                    (g_ppu_internal_regs.palette_shift_h >> 7) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 6) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 5) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 4) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 3) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 2) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 1) & 1,
+                    (g_ppu_internal_regs.palette_shift_h >> 0) & 1);
+            printf("%01d%01d%01d%01d%01d%01d%01d%01d\n",
+                    (g_ppu_internal_regs.palette_shift_l >> 7) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 6) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 5) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 4) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 3) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 2) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 1) & 1,
+                    (g_ppu_internal_regs.palette_shift_l >> 0) & 1);
+        }
     }
 
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {
