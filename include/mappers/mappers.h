@@ -43,4 +43,6 @@ typedef struct {
 
 void mapper_init_nrom(Mapper *mapper);
 
+void mapper_init_mmc1(Mapper *mapper);
+
 void mapper_init_mmc3(Mapper *mapper);

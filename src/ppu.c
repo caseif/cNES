@@ -309,6 +309,12 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
 uint16_t _translate_name_table_address(uint16_t addr) {
     assert(addr < 0x1000);
 
+    if (g_mirror_mode == MIRROR_SINGLE_LOWER) {
+        return addr % 0x400;
+    } else if (g_mirror_mode == MIRROR_SINGLE_UPPER) {
+        return (addr % 0x400) + 0x400;
+    }
+
     switch (addr) {
         // name table 0
         case 0x000 ... 0x3FF: {
@@ -317,28 +323,40 @@ uint16_t _translate_name_table_address(uint16_t addr) {
         }
         // name table 1
         case 0x400 ... 0x7FF: {
-            if (g_mirror_mode == MIRROR_VERTICAL) {
+            if (g_mirror_mode == MIRROR_NONE || g_mirror_mode == MIRROR_VERTICAL) {
                 // no need for translation
                 return addr;
-            } else {
+            } else if (g_mirror_mode == MIRROR_HORIZONTAL) {
                 // look up the data in name table 0 since name table 1 is a mirror
                 return addr - 0x400;
+            } else {
+                printf("Got bad mirroring mode %d\n", g_mirror_mode);
+                exit(1);
             }
         }
         // name table 2
         case 0x800 ... 0xBFF: {
-            if (g_mirror_mode == MIRROR_HORIZONTAL) {
+            if (g_mirror_mode == MIRROR_NONE) {
+                return addr;
+            } else if (g_mirror_mode == MIRROR_HORIZONTAL) {
                 // use the second half of the memory
                 return addr - 0x400;
-            } else {
+            } else if (g_mirror_mode == MIRROR_VERTICAL) {
                 // use name table 0 since name table 2 is a mirror
                 return addr - 0x800;
+            } else {
+                printf("Got bad mirroring mode %d\n", g_mirror_mode);
+                exit(1);
             }
         }
         // name table 3
         case 0xC00 ... 0xFFF: {
-            // it's always in the second half
-            return addr - 0x800;
+            if (g_mirror_mode == MIRROR_NONE) {
+                return addr;
+            } else {
+                // it's always in the second half
+                return addr - 0x800;
+            }
         }
         default: {
             exit(-1); // shouldn't happen

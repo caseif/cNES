@@ -89,6 +89,10 @@ Cartridge *load_rom(FILE *file) {
             printf("Found mapper %d (NROM)\n", mapper_id);
             mapper_init_nrom(mapper);
             break;
+        case 1:
+            printf("Found mapper %d (MMC1)\n", mapper_id);
+            mapper_init_mmc1(mapper);
+            break;
         case 4:
             printf("Found mapper %d (MMC3)\n", mapper_id);
             mapper_init_mmc3(mapper);
