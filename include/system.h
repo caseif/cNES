@@ -27,6 +27,10 @@
 
 #include "cartridge.h"
 
+#define PRG_RAM_SIZE 0x2000
+
+unsigned char g_prg_ram[PRG_RAM_SIZE];
+
 void initialize_system(Cartridge *cart);
 
 uint8_t system_ram_read(uint16_t addr);

@@ -24,6 +24,7 @@
  */
 
 #include "cartridge.h"
+#include "fs.h"
 #include "renderer.h"
 #include "system.h"
 #include "util.h"
@@ -36,6 +37,8 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #define FRAMES_PER_SECOND 60.0988
@@ -43,6 +46,8 @@
 #define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
 
 #define SLEEP_INTERVAL 10 // milliseconds
+
+#define SRAM_FILE_NAME "sram.bin"
 
 bool halted = false;
 bool stepping = false;
@@ -58,8 +63,21 @@ static void _init_controllers() {
     sc_attach_driver(sc_poll_input);
 }
 
+static void _write_prg_ram(void) {
+    printf("Saving SRAM to disk\n");
+    write_game_data(g_cart->title, SRAM_FILE_NAME, g_prg_ram, sizeof(g_prg_ram));
+}
+
 void initialize_system(Cartridge *cart) {
     g_cart = cart;
+
+    if (g_cart->has_nv_ram) {
+        unsigned char prg_ram_tmp[sizeof(g_prg_ram)];
+        if (read_game_data(cart->title, SRAM_FILE_NAME, prg_ram_tmp, sizeof(prg_ram_tmp), true)) {
+            printf("Loading SRAM from disk\n");
+            memcpy(g_prg_ram, prg_ram_tmp, sizeof(prg_ram_tmp));
+        }
+    }
 
     initialize_cpu();
     initialize_ppu();
@@ -192,5 +210,8 @@ bool is_execution_halted(void) {
 }
 
 void kill_execution(void) {
+    if (g_cart->has_nv_ram) {
+        _write_prg_ram();
+    }
     dead = true;
 }

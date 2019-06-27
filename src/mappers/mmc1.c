@@ -35,13 +35,11 @@
 
 #define MMC3_DEBUG_LOGGING 0
 
-#define PRG_RAM_SIZE 0x2000
 #define CHR_RAM_SIZE 0x2000
 
 #define CHR_BANK_GRANULARITY 0x1000
 #define PRG_BANK_GRANULARITY 0x4000
 
-static unsigned char g_prg_ram[PRG_RAM_SIZE];
 static unsigned char g_chr_ram[CHR_RAM_SIZE];
 
 static uint8_t g_write_count = 0;
@@ -161,7 +159,6 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
                 g_mmc1_control.prg_bank_mode = (g_write_val >> 2) & 0x03;
                 g_mmc1_control.chr_bank_mode = (g_write_val >> 4) & 0x01;
 
-                printf("mirror mode: %d\n", g_mmc1_control.mirroring);
                 switch (g_mmc1_control.mirroring) {
                     case 0:
                         ppu_set_mirroring_mode(MIRROR_SINGLE_LOWER);

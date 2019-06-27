@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define NES_MAGIC 0x4E45531A
 #define PRG_CHUNK_SIZE ((size_t) 0x4000)
@@ -38,7 +39,7 @@
 #define PRG_RAM_CHUNK_SIZE ((size_t) 0x2000)
 
 typedef struct {
-    MirroringMode mirror_mode:1 PACKED;
+    unsigned int mirror_mode:1 PACKED;
     bool has_nv_ram:1 PACKED;
     bool has_trainer:1 PACKED;
     bool ignore_mirror_ctrl:1 PACKED;
@@ -52,7 +53,7 @@ typedef struct {
     unsigned int mapper_high:4 PACKED;
 } Flag7;
 
-Cartridge *load_rom(FILE *file) {
+Cartridge *load_rom(FILE *file, char *file_name) {
     unsigned char buffer[16];
 
     // read the first 16 bytes
@@ -142,6 +143,7 @@ Cartridge *load_rom(FILE *file) {
 
     Cartridge *cart = (Cartridge*) malloc(sizeof(Cartridge));
 
+    cart->title = file_name;
     cart->mapper = mapper;
     cart->prg_rom = prg_data;
     cart->chr_rom = chr_data;

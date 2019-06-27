@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include "cartridge.h"
+#include <stdlib.h>
 
-#include <stdio.h>
+bool read_game_data(char *game_title, char *file_name, void *buf, size_t buf_len, bool quiet);
 
-Cartridge *load_rom(FILE *file, char *file_name);
+bool write_game_data(char *game_title, char *file_name, void *buf, size_t buf_len);

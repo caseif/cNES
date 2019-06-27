@@ -69,7 +69,23 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    Cartridge *cart = load_rom(rom_file);
+    char *base_name = strrchr(rom_file_name, '/');
+    if (base_name == NULL) {
+        base_name = rom_file_name;
+    } else {
+        base_name += 1;
+    }
+
+    char *dot_ptr = strrchr(base_name, '.');
+    size_t base_name_len = strlen(base_name);
+    if (dot_ptr != NULL) {
+        base_name_len = dot_ptr - base_name;
+    }
+    char *base_name_fin = malloc(base_name_len + 1);
+    memcpy(base_name_fin, base_name, base_name_len);
+    base_name_fin[base_name_len] = '\0';
+
+    Cartridge *cart = load_rom(rom_file, base_name_fin);
 
     if (!cart) {
         printf("Failed to load ROM.\n");

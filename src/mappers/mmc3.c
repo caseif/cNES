@@ -35,12 +35,8 @@
 
 #define MMC3_DEBUG_LOGGING 0
 
-#define PRG_RAM_SIZE 0x2000
-
 #define CHR_BANK_GRANULARITY 0x400
 #define PRG_BANK_GRANULARITY 0x2000
-
-static unsigned char g_prg_ram[PRG_RAM_SIZE];
 
 // false -> $C000-DFFF fixed, $8000-9FFF swappable
 // true  -> $8000-9FFF fixed, $C000-DFFF swappable
