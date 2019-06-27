@@ -141,7 +141,9 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
         system_lower_memory_write(addr, val);
         return;
     } else if (addr < 0x8000) {
-        g_prg_ram[addr % 0x2000] = val;
+        if (g_enable_prg_ram) {
+            g_prg_ram[addr % 0x2000] = val;
+        }
         return;
     }
 
@@ -185,7 +187,7 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             case 0xE000:
                 // technically the high bit is ignored, but it doesn't matter here
                 g_prg_bank = g_write_val & 0x1F;
-                g_enable_prg_ram = (g_write_val & 0x1F) >> 4;
+                g_enable_prg_ram = !((g_write_val & 0x1F) >> 4);
                 break;
         }
 
