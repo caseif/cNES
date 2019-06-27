@@ -623,7 +623,7 @@ void _do_general_cycle_routine(void) {
 }
 
 void _do_sprite_evaluation(void) {
-    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) || g_scanline == PRE_RENDER_LINE) {
+    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE)) {
         switch (g_scanline_tick) {
             // idle tick
             case 0:
@@ -655,7 +655,7 @@ void _do_sprite_evaluation(void) {
 
                             // check if the sprite is on the next scanline
                             // we compare to the current line since sprites are rendered a line late
-                            if (g_scanline - val <= (g_ppu_control.tall_sprites ? 15 : 7) && val <= g_scanline) {
+                            if (val <= g_scanline && g_scanline - val <= (g_ppu_control.tall_sprites ? 15 : 7)) {
                                 // increment m if it is
                                 g_ppu_internal_regs.m++;
 
