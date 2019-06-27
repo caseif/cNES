@@ -39,7 +39,7 @@
 #define STD_BTN_LEFT   6
 #define STD_BTN_RIGHT  7
 
-void sc_attach_driver(PollingCallback callback);
+void sc_attach_driver(NullaryCallback init, NullaryCallback callback);
 
 Controller *create_standard_controller(void);
 

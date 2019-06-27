@@ -30,7 +30,7 @@
 typedef uint8_t (*ControllerPollFunction)(void*);
 typedef void (*ControllerPushFunction)(void*, uint8_t);
 
-typedef void (*PollingCallback)(void);
+typedef void (*NullaryCallback)(void);
 
 typedef struct {
     ControllerPollFunction poller;

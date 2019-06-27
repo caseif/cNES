@@ -25,4 +25,6 @@
 
 #pragma once
 
+void sc_init(void);
+
 void sc_poll_input(void);

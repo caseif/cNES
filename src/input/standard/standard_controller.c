@@ -36,9 +36,10 @@ typedef struct {
     unsigned int bit;
 } ScState;
 
-static PollingCallback g_poll_callback;
+static NullaryCallback g_poll_callback;
 
-void sc_attach_driver(PollingCallback callback) {
+void sc_attach_driver(NullaryCallback init, NullaryCallback callback) {
+    init();
     g_poll_callback = callback;
 }
 

@@ -60,7 +60,7 @@ static void _init_controllers() {
 
     controller_connect(0, create_standard_controller());
 
-    sc_attach_driver(sc_poll_input);
+    sc_attach_driver(sc_init, sc_poll_input);
 }
 
 static void _write_prg_ram(void) {
