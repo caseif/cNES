@@ -47,13 +47,10 @@ static unsigned char g_chr_ram[CHR_RAM_SIZE];
 static uint8_t g_write_count = 0;
 static uint8_t g_write_val = 0;
 
-static union {
-    struct {
-        unsigned int mirroring:2;
-        unsigned int prg_bank_mode:2;
+static struct {
         unsigned int chr_bank_mode:1;
-    };
-    uint8_t serial;
+        unsigned int prg_bank_mode:2;
+        unsigned int mirroring:2;
 } g_mmc1_control;
 static unsigned char g_chr_bank_0;
 static unsigned char g_chr_bank_1;
@@ -160,8 +157,11 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     if (g_write_count == 5) {
         switch (addr & 0xE000) {
             case 0x8000:
-                g_mmc1_control.serial = g_write_val & 0x1F;
+                g_mmc1_control.mirroring = g_write_val & 0x03;
+                g_mmc1_control.prg_bank_mode = (g_write_val >> 2) & 0x03;
+                g_mmc1_control.chr_bank_mode = (g_write_val >> 4) & 0x01;
 
+                printf("mirror mode: %d\n", g_mmc1_control.mirroring);
                 switch (g_mmc1_control.mirroring) {
                     case 0:
                         ppu_set_mirroring_mode(MIRROR_SINGLE_LOWER);
@@ -251,5 +251,5 @@ void mapper_init_mmc1(Mapper *mapper) {
 
     g_mmc1_control.prg_bank_mode = 3;
 
-    ppu_set_mirroring_mode(MIRROR_NONE);
+    ppu_set_mirroring_mode(MIRROR_SINGLE_LOWER);
 }

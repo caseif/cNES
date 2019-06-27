@@ -323,7 +323,7 @@ uint16_t _translate_name_table_address(uint16_t addr) {
         }
         // name table 1
         case 0x400 ... 0x7FF: {
-            if (g_mirror_mode == MIRROR_NONE || g_mirror_mode == MIRROR_VERTICAL) {
+            if (g_mirror_mode == MIRROR_VERTICAL) {
                 // no need for translation
                 return addr;
             } else if (g_mirror_mode == MIRROR_HORIZONTAL) {
@@ -336,9 +336,7 @@ uint16_t _translate_name_table_address(uint16_t addr) {
         }
         // name table 2
         case 0x800 ... 0xBFF: {
-            if (g_mirror_mode == MIRROR_NONE) {
-                return addr;
-            } else if (g_mirror_mode == MIRROR_HORIZONTAL) {
+            if (g_mirror_mode == MIRROR_HORIZONTAL) {
                 // use the second half of the memory
                 return addr - 0x400;
             } else if (g_mirror_mode == MIRROR_VERTICAL) {
@@ -351,14 +349,11 @@ uint16_t _translate_name_table_address(uint16_t addr) {
         }
         // name table 3
         case 0xC00 ... 0xFFF: {
-            if (g_mirror_mode == MIRROR_NONE) {
-                return addr;
-            } else {
-                // it's always in the second half
-                return addr - 0x800;
-            }
+            // it's always in the second half
+            return addr - 0x800;
         }
         default: {
+            printf("Bad nametable address $%04X\n", addr);
             exit(-1); // shouldn't happen
         }
     }

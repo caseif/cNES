@@ -34,7 +34,7 @@ struct cartridge;
 
 #include "mappers/mappers.h"
 
-typedef enum MirroringMode {MIRROR_NONE, MIRROR_HORIZONTAL, MIRROR_VERTICAL,
+typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL,
                             MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER} MirroringMode;
 
 typedef struct cartridge {
