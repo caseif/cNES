@@ -30,7 +30,7 @@
 #include "mappers/mappers.h"
 #include "ppu/ppu.h"
 
-static uint8_t _nrom_ram_read(Cartridge *cart, uint16_t addr) {
+uint8_t nrom_ram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         case 0x0000 ... 0x7FFF:
             return system_lower_memory_read(addr);
@@ -49,7 +49,7 @@ static uint8_t _nrom_ram_read(Cartridge *cart, uint16_t addr) {
     }
 }
 
-static void _nrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+void nrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     if (addr < 0x8000) {
         system_lower_memory_write(addr, val);
     }
@@ -58,7 +58,7 @@ static void _nrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     return;
 }
 
-static uint8_t _nrom_vram_read(Cartridge *cart, uint16_t addr) {
+uint8_t nrom_vram_read(Cartridge *cart, uint16_t addr) {
     addr %= 0x4000;
 
     switch (addr) {
@@ -80,13 +80,12 @@ static uint8_t _nrom_vram_read(Cartridge *cart, uint16_t addr) {
     }
 }
 
-static void _nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+void nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     addr %= 0x4000;
 
     switch (addr) {
         // pattern tables
         case 0x0000 ... 0x1FFF: {
-            //TODO: unsupported altogether for now
             break;
         }
         // name tables
@@ -106,9 +105,9 @@ static void _nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }   
 
 void mapper_init_nrom(Mapper *mapper) {
-    mapper->ram_read_func   = *_nrom_ram_read;
-    mapper->ram_write_func  = *_nrom_ram_write;
-    mapper->vram_read_func  = *_nrom_vram_read;
-    mapper->vram_write_func = *_nrom_vram_write;
+    mapper->ram_read_func   = *nrom_ram_read;
+    mapper->ram_write_func  = *nrom_ram_write;
+    mapper->vram_read_func  = *nrom_vram_read;
+    mapper->vram_write_func = *nrom_vram_write;
     mapper->tick_func       = NULL;
 }

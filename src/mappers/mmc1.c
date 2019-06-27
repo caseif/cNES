@@ -33,8 +33,6 @@
 #include <assert.h>
 #include <stdio.h>
 
-#define MMC3_DEBUG_LOGGING 0
-
 #define CHR_RAM_SIZE 0x2000
 
 #define CHR_BANK_GRANULARITY 0x1000

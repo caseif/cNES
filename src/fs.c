@@ -113,7 +113,7 @@ static FILE *_open_game_file(char *game_title, char *file_name) {
     sprintf(file_path, "%s/%s", game_path, file_name);
     free(game_path);
 
-    FILE *save_file = fopen(file_path, "rw+");
+    FILE *save_file = fopen(file_path, "w+");
     free(file_path);
 
     return save_file;

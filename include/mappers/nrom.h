@@ -29,22 +29,10 @@
 
 #include <stdint.h>
 
-typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
-typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
-typedef void (*MapperTickFunction)(void);
+uint8_t nrom_ram_read(Cartridge *cart, uint16_t addr);
 
-typedef struct {
-    MemoryReadFunction ram_read_func;
-    MemoryWriteFunction ram_write_func;
-    MemoryReadFunction vram_read_func;
-    MemoryWriteFunction vram_write_func;
-    MapperTickFunction tick_func;
-} Mapper;
+void nrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val);
 
-void mapper_init_nrom(Mapper *mapper);
+uint8_t nrom_vram_read(Cartridge *cart, uint16_t addr);
 
-void mapper_init_mmc1(Mapper *mapper);
-
-void mapper_init_unrom(Mapper *mapper);
-
-void mapper_init_mmc3(Mapper *mapper);
+void nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val);
