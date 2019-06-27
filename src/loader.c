@@ -157,5 +157,9 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     cart->has_nv_ram = flag6.has_nv_ram;
     cart->ignore_mirror_ctrl = flag6.ignore_mirror_ctrl;
 
+    if (mapper->init_func != NULL) {
+        mapper->init_func(cart);
+    }
+
     return cart;
 }

@@ -31,11 +31,19 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #define PRG_BANK_GRANULARITY 0x4000
 
+#define CHR_RAM_SIZE 0x2000
 
 static unsigned char g_prg_bank;
+
+static unsigned char chr_ram[CHR_RAM_SIZE];
+
+static void _unrom_init(Cartridge *cart) {
+    memcpy(chr_ram, cart->chr_rom, cart->chr_size < CHR_RAM_SIZE ? cart->chr_size : CHR_RAM_SIZE);
+}
 
 static uint32_t _unrom_get_prg_offset(Cartridge *cart, uint16_t addr) {
     assert(addr >= 0x8000);
@@ -78,10 +86,27 @@ static void _unrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     }
 }
 
+static uint8_t _unrom_vram_read(Cartridge *cart, uint16_t addr) {
+    if (addr < 0x2000) {
+        return chr_ram[addr];
+    } else {
+        return nrom_vram_read(cart, addr);
+    }
+}
+
+static void _unrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    if (addr < 0x2000) {
+        chr_ram[addr] = val;
+    } else {
+        nrom_vram_write(cart, addr, val);
+    }
+}
+
 void mapper_init_unrom(Mapper *mapper) {
+    mapper->init_func       = *_unrom_init;
     mapper->ram_read_func   = *_unrom_ram_read;
     mapper->ram_write_func  = *_unrom_ram_write;
-    mapper->vram_read_func  = *nrom_vram_read;
-    mapper->vram_write_func = *nrom_vram_write;
+    mapper->vram_read_func  = *_unrom_vram_read;
+    mapper->vram_write_func = *_unrom_vram_write;
     mapper->tick_func       = NULL;
 }

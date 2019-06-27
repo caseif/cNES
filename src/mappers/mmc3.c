@@ -293,6 +293,7 @@ static void _mmc3_tick(void) {
 }
 
 void mapper_init_mmc3(Mapper *mapper) {
+    mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc3_ram_read;
     mapper->ram_write_func  = *_mmc3_ram_write;
     mapper->vram_read_func  = *_mmc3_vram_read;

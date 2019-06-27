@@ -29,11 +29,13 @@
 
 #include <stdint.h>
 
+typedef void (*MapperInitFunction)(struct cartridge *cart);
 typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
 typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
 typedef void (*MapperTickFunction)(void);
 
 typedef struct {
+    MapperInitFunction init_func;
     MemoryReadFunction ram_read_func;
     MemoryWriteFunction ram_write_func;
     MemoryReadFunction vram_read_func;

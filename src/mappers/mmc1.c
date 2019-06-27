@@ -238,6 +238,7 @@ static void _mmc1_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 void mapper_init_mmc1(Mapper *mapper) {
+    mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc1_ram_read;
     mapper->ram_write_func  = *_mmc1_ram_write;
     mapper->vram_read_func  = *_mmc1_vram_read;
