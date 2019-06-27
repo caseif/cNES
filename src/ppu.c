@@ -426,7 +426,7 @@ void _update_v_vertical(void) {
         // check if we're at the end of the name table
         if (y == 29) {
             y = 0; // clear coarse y
-            v ^= 0x8000; // flip vertical name table bit
+            v ^= 0x0800; // flip vertical name table bit
         } else if (y == 31) {
             y = 0; // just clear coarse y
             //TODO: not sure why we don't switch the name table here
