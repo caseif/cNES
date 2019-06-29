@@ -85,7 +85,7 @@ static char *get_save_dir(void) {
     return full_dir;
 }
 
-static FILE *_open_game_file(char *game_title, char *file_name) {
+static FILE *_open_game_file(char *game_title, char *file_name, char *flags) {
     char *save_dir = get_save_dir();
 
     if (!save_dir) {
@@ -113,14 +113,14 @@ static FILE *_open_game_file(char *game_title, char *file_name) {
     sprintf(file_path, "%s/%s", game_path, file_name);
     free(game_path);
 
-    FILE *save_file = fopen(file_path, "w+");
+    FILE *save_file = fopen(file_path, flags);
     free(file_path);
 
     return save_file;
 }
 
 bool read_game_data(char *game_title, char *file_name, void *buf, size_t buf_len, bool quiet) {
-    FILE *in_file = _open_game_file(game_title, file_name);
+    FILE *in_file = _open_game_file(game_title, file_name, "r");
 
     if (!in_file || !fread(buf, buf_len, 1, in_file)) {
         if (quiet) {
@@ -135,7 +135,7 @@ bool read_game_data(char *game_title, char *file_name, void *buf, size_t buf_len
 }
 
 bool write_game_data(char *game_title, char *file_name, void *buf, size_t buf_len) {
-    FILE *out_file = _open_game_file(game_title, file_name);
+    FILE *out_file = _open_game_file(game_title, file_name, "w+");
 
     if (!out_file || !fwrite(buf, buf_len, 1, out_file)) {
         printf("Failed to write to file %s\n", file_name);
