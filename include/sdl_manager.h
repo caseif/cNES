@@ -25,7 +25,7 @@
 
 #include <SDL2/SDL.h>
 
-#define WINDOW_SCALE 2
+#define WINDOW_SCALE 4
 
 typedef void (*EventCallback)(SDL_Event*);
 
