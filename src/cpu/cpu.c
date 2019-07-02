@@ -45,6 +45,9 @@
 #define PRINT_INSTRS 0
 #define PRINT_MEMORY_ACCESS 0
 
+#define ASSERT_CYCLE(l, h)  assert(g_instr_cycle >= l); \
+                            assert(g_instr_cycle <= h)
+
 const InterruptType INT_NMI   = (InterruptType) {0xFFFA, false, true, false, false};
 const InterruptType INT_RESET = (InterruptType) {0xFFFC, false, true,  false, false};
 const InterruptType INT_IRQ   = (InterruptType) {0xFFFE, true,  true,  false, true};
@@ -64,6 +67,12 @@ unsigned int g_total_cycles = 7;
 
 static bool g_nmi_line = false;
 static bool g_irq_line = false;
+
+// state for implementing cycle-accuracy
+static uint8_t g_instr_cycle; // this is 1-indexed to match blargg's doc
+static Instruction *g_cur_instr;
+static uint16_t g_cur_operand;
+static uint8_t g_generic_latch;
 
 void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
@@ -925,6 +934,189 @@ void _exec_next_instr(void) {
     _exec_instr(instr, param);
 }
 
+static void _handle_brk(void) {
+    ASSERT_CYCLE(3, 7);
+
+    switch (g_instr_cycle) {
+        case 3:
+            // push PC high, decrement S
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
+            g_cpu_regs.sp--;
+            break;
+        case 4:
+            // push PC low, decrement S
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
+            g_cpu_regs.sp--;
+            break;
+        case 5:
+            // push P, decrement S, set B
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial);
+            g_cpu_regs.sp--;
+            g_cpu_regs.status.break_command = 1;
+            break;
+        case 6:
+            // clear PC high and set to vector value
+            g_cpu_regs.pc &= ~0xFF;
+            g_cpu_regs.pc |= system_ram_read(0xFFFE);
+            break;
+        case 7:
+            // clear PC high and set to vector value
+            g_cpu_regs.pc &= ~0xFF00;
+            g_cpu_regs.pc |= system_ram_read(0xFFFF) << 8;
+            g_instr_cycle = 0; // reset for next instruction
+            break;
+    }
+}
+
+static void _handle_rti(void) {
+    ASSERT_CYCLE(3, 6);
+    
+    switch (g_instr_cycle) {
+        case 3:
+            // increment S
+            g_cpu_regs.sp++;
+            break;
+        case 4:
+            // pull P, increment S
+            g_cpu_regs.status.serial = system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            g_cpu_regs.sp++;
+            break;
+        case 5:
+            // clear PC low and set to stack value, increment S
+            g_cpu_regs.pc &= ~0xFF;
+            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            g_cpu_regs.sp++;
+            break;
+        case 6:
+            // clear PC high and set to stack value
+            g_cpu_regs.pc &= ~0xFF00;
+            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+            break;
+    }
+}
+
+static void _handle_rts(void) {
+    ASSERT_CYCLE(3, 6);
+    
+    switch (g_instr_cycle) {
+        case 3:
+            // increment S
+            g_cpu_regs.sp++;
+            break;
+        case 4:
+            // clear PC low and set to stack value, increment S
+            g_cpu_regs.pc &= ~0xFF;
+            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            g_cpu_regs.sp++;
+            break;
+        case 5:
+            // clear PC high and set to stack value
+            g_cpu_regs.pc &= ~0xFF00;
+            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+            break;
+        case 6:
+            // increment PC
+            g_cpu_regs.pc++;
+    }
+}
+
+static void _handle_stack_push(void) {
+    ASSERT_CYCLE(3, 3);
+
+    // push register, decrement S
+    system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp,
+            g_cur_instr == PLA ? g_cpu_regs.acc : g_cpu_regs.status.serial);
+    g_cpu_regs.sp--;
+}
+
+static void _handle_stack_pull(void) {
+    ASSERT_CYCLE(3, 4);
+
+    switch (g_instr_cycle) {
+        case 3:
+            // increment S
+            g_cpu_regs.sp++;
+        case 4:
+            // pull register
+            uint8_t val = system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            if (g_cur_instr == PLA) {
+                g_cpu_regs.acc = val;
+            } else {
+                g_cpu_regs.status.serial = val;
+            }
+            break;
+    }
+}
+
+static void _handle_jsr(void) {
+    ASSERT_CYCLE(3, 6);
+
+    switch (g_instr_cycle) {
+        case 3:
+            // unsure of what happens here
+            break;
+        case 4:
+            // push PC high, decrement S
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
+            g_cpu_regs.sp--;
+            break;
+        case 5:
+            // push PC low, decrement S
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
+            g_cpu_regs.sp--;
+            break;
+        case 6:
+            // copy low byte to PC, fetch high byte to PC (but don't increment PC)
+            g_cpu_regs.pc = g_cur_operand & 0xFF;
+            g_cpu_regs.pc |= system_ram_read(g_cpu_regs.pc) << 8;
+            break;
+    }
+}
+
+static bool _handle_stack_instr(void) {
+    switch (g_cur_instr->mnemonic) {
+        case BRK:
+            _handle_brk();
+            return true;
+        case RTI:
+            _handle_rti();
+            return true;
+        case RTS:
+            _handle_rts();
+            return true;
+        case PHA:
+        case PHP:
+            _handle_push();
+            return true;
+        case PLA:
+        case PLP:
+            _handle_pull();
+            return true;
+        case JSR:
+            _handle_jsr();
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void _do_instr_cycle(void) {
+    if (g_instr_cycle == 1) {
+        g_cur_instr = decode_instr(_next_prg_byte()); // fetch and decode opcode
+        g_cur_operand = 0; // reset current operand
+        return;
+    } else if (g_instr_cycle == 2 && get_instr_len(g_cur_instr) >= 2) {
+        g_cur_operand |= _next_prg_byte(); // fetch low byte of operand
+        return;
+    } else if (g_instr_cycle == 3 && get_instr_len(g_cur_instr) >= 3
+            && g_cur_instr->mnemonic != JSR) {
+        g_cur_operand |= (_next_prg_byte() << 8); // fetch high byte of operand
+        return;
+    } else if (_handle_stack_instr()) {
+        return;
+    }
+}
+
 void cycle_cpu(void) {
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
@@ -940,7 +1132,8 @@ void cycle_cpu(void) {
             cycle_cpu();
             return;
         } else {
-            _exec_next_instr();
+            _do_instr_cycle();
+            g_instr_cycle++;
         }
     }
 

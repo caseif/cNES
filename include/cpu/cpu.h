@@ -31,15 +31,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct {
-    unsigned char carry:1 PACKED;
-    unsigned char zero:1 PACKED;
-    unsigned char interrupt_disable:1 PACKED;
-    unsigned char decimal:1 PACKED;
-    unsigned char break_command:1 PACKED;
-    unsigned char unused:1 PACKED;
-    unsigned char overflow:1 PACKED;
-    unsigned char negative:1 PACKED;
+typedef union {
+    struct {
+        unsigned char carry:1 PACKED;
+        unsigned char zero:1 PACKED;
+        unsigned char interrupt_disable:1 PACKED;
+        unsigned char decimal:1 PACKED;
+        unsigned char break_command:1 PACKED;
+        unsigned char unused:1 PACKED;
+        unsigned char overflow:1 PACKED;
+        unsigned char negative:1 PACKED;
+    };
+    unsigned char serial:8;
 } StatusRegister;
 
 typedef struct {
