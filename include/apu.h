@@ -114,4 +114,8 @@ typedef union {
     uint8_t serial;
 } ApuFrameCounterRegister;
 
-void apu_set_register(uint8_t reg, uint8_t val);
+void apu_tick(void);
+
+void apu_register_read(uint8_t reg);
+
+void apu_register_write(uint8_t reg, uint8_t val);
