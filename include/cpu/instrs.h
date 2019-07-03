@@ -66,7 +66,7 @@ const InstructionType get_instr_type(const Mnemonic mnemonic);
 
 uint8_t get_instr_len(const Instruction *instr);
 
-const Instruction *decode_instr(unsigned char opcode);
+Instruction *decode_instr(unsigned char opcode);
 
 bool does_cross_page_boundary(uint8_t a, int16_t offset);
 

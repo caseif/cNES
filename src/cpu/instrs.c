@@ -182,8 +182,9 @@ uint8_t get_instr_len(const Instruction *instr) {
     }
 }
 
-const Instruction *decode_instr(unsigned char opcode) {
-    return &g_instr_list[opcode];
+Instruction *decode_instr(unsigned char opcode) {
+    printf("%s\n", g_mnemonic_strs[opcode]);
+    return (Instruction*) &g_instr_list[opcode];
 }
 
 bool can_incur_page_boundary_penalty(const uint8_t opcode) {
