@@ -62,7 +62,7 @@ uint16_t base_pc;
 
 uint16_t g_burn_cycles = 0;
 
-unsigned int g_total_cycles = 7;
+unsigned int g_total_cycles = 0;
 
 static bool g_nmi_line = false;
 static bool g_irq_line = false;
@@ -86,8 +86,9 @@ void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
 
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
-    g_cpu_regs.sp = 0xFF;
     memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
+
+    g_queued_interrupt = &INT_RESET;
 }
 
 void cpu_init_pc(uint16_t addr) {

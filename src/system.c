@@ -85,7 +85,6 @@ void initialize_system(Cartridge *cart) {
     initialize_cpu();
     initialize_ppu();
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
-    cpu_init_pc(system_ram_read(0xFFFC) | (system_ram_read(0xFFFD) << 8));
 
     _init_controllers();
 }
