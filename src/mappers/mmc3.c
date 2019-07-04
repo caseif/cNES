@@ -58,7 +58,7 @@ static uint8_t g_prg_2 = 1;
 
 static uint8_t g_irq_counter;
 static uint8_t g_irq_latch;
-static bool g_irq_enabled = true;
+static bool g_irq_enabled = false;
 
 static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
     assert(addr >= 0x8000);
