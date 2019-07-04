@@ -31,6 +31,12 @@
 #define RESOLUTION_H 256
 #define RESOLUTION_V 240
 
+#define PRE_RENDER_LINE 261
+#define FIRST_VISIBLE_LINE 0
+#define LAST_VISIBLE_LINE 239
+#define FIRST_VISIBLE_CYCLE 0
+#define LAST_VISIBLE_CYCLE 256
+
 typedef struct {
     unsigned char name_table:2 PACKED;
     unsigned char vertical_increment:1 PACKED;
@@ -138,6 +144,8 @@ typedef enum {
 void initialize_ppu();
 
 void ppu_set_mirroring_mode(MirroringMode mirror_mode);
+
+bool ppu_is_rendering_enabled(void);
 
 uint16_t ppu_get_scanline(void);
 

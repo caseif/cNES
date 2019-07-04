@@ -38,12 +38,6 @@
 #define SCANLINE_COUNT 262
 #define CYCLES_PER_SCANLINE 341
 
-#define PRE_RENDER_LINE 261
-#define FIRST_VISIBLE_LINE 0
-#define LAST_VISIBLE_LINE 239
-#define FIRST_VISIBLE_CYCLE 0
-#define LAST_VISIBLE_CYCLE 256
-
 #define VBL_SCANLINE 241
 #define VBL_SCANLINE_TICK 1
 
@@ -122,7 +116,7 @@ static bool nmi_suppression = false;
 
 static RenderMode g_render_mode;
 
-static inline bool _is_rendering_enabled(void) {
+bool ppu_is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
 }
 
@@ -468,7 +462,7 @@ void _do_general_cycle_routine(void) {
             }
 
             // vert(v) = vert(t)
-            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && _is_rendering_enabled()) {
+            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && ppu_is_rendering_enabled()) {
                 g_ppu_internal_regs.v.addr &= ~0x7BE0; // clear vertical bits
                 g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x7BE0; // copy vertical bits to v from t
             }
@@ -482,7 +476,7 @@ void _do_general_cycle_routine(void) {
                 break;
             } else if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick <= 320) {
                 // hori(v) = hori(t)
-                if (g_scanline_tick == 257 && _is_rendering_enabled()) {
+                if (g_scanline_tick == 257 && ppu_is_rendering_enabled()) {
                     g_ppu_internal_regs.v.addr &= ~0x41F; // clear horizontal bits
                     g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x41F; // copy horizontal bits to v from t
                 }
@@ -563,7 +557,7 @@ void _do_general_cycle_routine(void) {
                         g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(system_vram_read(pattern_addr));
 
                         // only update v if rendering is enabled
-                        if (_is_rendering_enabled()) {
+                        if (ppu_is_rendering_enabled()) {
                             // only update vertical v at the end of the visible part of the scanline
                             if (g_scanline_tick == LAST_VISIBLE_CYCLE) {
                                 _update_v_vertical();

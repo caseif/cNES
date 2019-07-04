@@ -58,6 +58,7 @@ static uint8_t g_prg_2 = 1;
 
 static uint8_t g_irq_counter;
 static uint8_t g_irq_latch;
+static bool g_irq_reload;
 static bool g_irq_enabled = false;
 
 static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
@@ -86,7 +87,8 @@ static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
             bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 1; // fixed, used last bank
             break;
     }
-    return ((bank * PRG_BANK_GRANULARITY) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size;
+    uint32_t offset = ((bank * PRG_BANK_GRANULARITY) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size;
+    return offset;
 }
 
 static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
@@ -219,7 +221,7 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             g_irq_latch = val;
             return;
         case 0xC001:
-            g_irq_counter = 0;
+            g_irq_reload = true;
             return;
         case 0xE000:
             if (g_irq_enabled) {
@@ -276,18 +278,24 @@ static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 
 static void _mmc3_tick(void) {
     #if MMC3_DEBUG_LOGGING
-    printf("mmc3 counter: %d\n", g_irq_counter);
+    printf("MMC3 counter: %d\n", g_irq_counter);
     #endif
     uint16_t target_tick = ppu_get_swap_pattern_tables() ? 324 : 260;
-    if (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2) {
-        if (g_irq_counter == 0) {
+    if (ppu_is_rendering_enabled() 
+            && ((ppu_get_scanline() == PRE_RENDER_LINE)
+                    || (ppu_get_scanline() >= FIRST_VISIBLE_LINE && ppu_get_scanline() <= LAST_VISIBLE_LINE))
+            && (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2)) {
+        if (g_irq_counter == 0 || g_irq_reload) {
             g_irq_counter = g_irq_latch;
+            g_irq_reload = false;
+
+            if (g_irq_counter == 0) {
+                if (g_irq_enabled) {
+                    cpu_raise_irq_line();
+                }
+            }
         } else {
             g_irq_counter--;
-        }
-
-        if (g_irq_counter == 0 && g_irq_enabled) {
-            cpu_raise_irq_line();
         }
     }
 }
