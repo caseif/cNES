@@ -69,11 +69,18 @@ static bool g_irq_line = false;
 
 // state for implementing cycle-accuracy
 uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
+
 Instruction *g_cur_instr; // the instruction currently being executed
 static uint8_t g_last_opcode; // the last opcode decoded
+
 static uint16_t g_cur_operand; // the operand directly read from PRG
 static uint16_t g_eff_operand; // the effective operand (after being offset)
+
 static uint8_t g_latched_val; // typically the value to be read from or written to memory
+
+static const InterruptType *g_cur_interrupt; // the interrupt type currently being executed
+static const InterruptType *g_queued_interrupt; // the interrupt type currently queued
+static bool g_nmi_hijack; // set when an NMI "hijacks" a software interrupt
 
 void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
@@ -556,40 +563,92 @@ static void _reset_instr_state(void) {
     g_instr_cycle = 1; // skip opcode fetching
 }
 
-static void _handle_brk(void) {
-    ASSERT_CYCLE(2, 7);
+static void _poll_interrupts() {
+    if (g_nmi_line) {
+        g_queued_interrupt = &INT_NMI;
+    } else if (g_irq_line) {
+        g_queued_interrupt = &INT_IRQ;
+    }
+}
+
+static void _execute_interrupt() {
+    ASSERT_CYCLE(1, 7);
 
     switch (g_instr_cycle) {
+        case 1:
+            _next_prg_byte(); // garbage read
+            g_last_opcode = 0; // BRK
+
+            if (g_cur_interrupt == &INT_NMI) {
+                cpu_clear_nmi_line();
+            } else if (g_cur_interrupt == &INT_IRQ) {
+                cpu_clear_irq_line();
+            } else if (g_cur_interrupt == &INT_BRK && g_nmi_line) {
+                g_nmi_hijack = true;
+            }
+
+            break;
         case 2:
             _next_prg_byte(); // garbage read
-            g_cpu_regs.pc++; // increment PC anyway
+            if (g_cur_interrupt == &INT_BRK) {
+                g_cpu_regs.pc++; // increment PC anyway for software interrupts
+            }
+
+            if (g_cur_interrupt == &INT_BRK && g_nmi_line) {
+                g_nmi_hijack = true;
+            }
+
             break;
         case 3:
-            // push PC high, decrement S
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
-            g_cpu_regs.sp--;
+            if (g_cur_interrupt->push_pc) {
+                // push PC high, decrement S
+                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
+                g_cpu_regs.sp--;
+            }
+
+            if (g_cur_interrupt == &INT_BRK && g_nmi_line) {
+                g_nmi_hijack = true;
+            }
+
             break;
         case 4:
-            // push PC low, decrement S
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
-            g_cpu_regs.sp--;
+            if (g_cur_interrupt->push_pc) {
+                // push PC low, decrement S
+                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
+                g_cpu_regs.sp--;
+            }
+
+            if (g_cur_interrupt == &INT_BRK && g_nmi_line) {
+                g_nmi_hijack = true;
+            }
+
             break;
         case 5:
-            // push P, decrement S, set B
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial | 0x30);
-            g_cpu_regs.sp--;
-            g_cpu_regs.status.break_command = 1;
+            if (g_nmi_hijack) {
+                g_cur_interrupt = &INT_NMI;
+                g_nmi_hijack = false;
+            }
+
+            if (g_cur_interrupt->push_pc) {
+                // push P, decrement S, set/clear B
+                g_cpu_regs.status.break_command = g_cur_interrupt->set_b;
+                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial | 0x30);
+                g_cpu_regs.sp--;
+            }
             break;
         case 6:
             // clear PC high and set to vector value
-            g_cpu_regs.pc &= ~0xFF;
-            g_cpu_regs.pc |= system_ram_read(0xFFFE);
+            g_latched_val = system_ram_read(g_cur_interrupt->vector_loc);
+
+            if (g_cur_interrupt->set_i) {
+                g_cpu_regs.status.interrupt_disable = 1;
+            }
             break;
         case 7:
             // clear PC high and set to vector value
-            g_cpu_regs.pc &= ~0xFF00;
-            g_cpu_regs.pc |= system_ram_read(0xFFFF) << 8;
+            g_cpu_regs.pc = (system_ram_read(g_cur_interrupt->vector_loc + 1) << 8) | g_latched_val;
             g_instr_cycle = 0; // reset for next instruction
+            g_cur_interrupt = NULL;
             break;
     }
 }
@@ -615,6 +674,9 @@ static void _handle_rti(void) {
             g_cpu_regs.pc &= ~0xFF;
             g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
             g_cpu_regs.sp++;
+
+            _poll_interrupts();
+
             break;
         case 6:
             // clear PC high and set to stack value
@@ -647,6 +709,9 @@ static void _handle_rts(void) {
             // clear PC high and set to stack value
             g_cpu_regs.pc &= ~0xFF00;
             g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+
+            _poll_interrupts();
+
             break;
         case 6:
             // increment PC
@@ -662,6 +727,9 @@ static void _handle_stack_push(void) {
     switch (g_instr_cycle) {
         case 2:
             _next_prg_byte(); // garbage read
+
+            _poll_interrupts();
+
             break;
         case 3: {
             // push register, decrement S
@@ -691,6 +759,9 @@ static void _handle_stack_pull(void) {
         case 3:
             // increment S
             g_cpu_regs.sp++;
+
+            _poll_interrupts();
+
             break;
         case 4: {
             // pull register
@@ -728,6 +799,9 @@ static void _handle_jsr(void) {
             // push PC low, decrement S
             system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
             g_cpu_regs.sp--;
+
+            _poll_interrupts();
+
             break;
         case 6: {
             // copy low byte to PC, fetch high byte to PC (but don't increment PC)
@@ -744,9 +818,6 @@ static void _handle_jsr(void) {
 
 static bool _handle_stack_instr(void) {
     switch (g_cur_instr->mnemonic) {
-        case BRK:
-            _handle_brk();
-            return true;
         case RTI:
             _handle_rti();
             return true;
@@ -799,6 +870,9 @@ static void _handle_instr_rw(uint8_t offset) {
                 case 1:
                     system_ram_write(g_eff_operand, g_latched_val);
                     _do_instr_operation();
+
+                    _poll_interrupts();
+
                     break;
                 case 2:
                     system_ram_write(g_eff_operand, g_latched_val);
@@ -826,6 +900,10 @@ static void _handle_instr_zpi(void) {
     if (g_instr_cycle == 3) {
         g_latched_val = system_ram_read(g_cur_operand);
         g_eff_operand = (g_cur_operand + (g_cur_instr->addr_mode == ZPX ? g_cpu_regs.x : g_cpu_regs.y)) & 0xFF;
+
+        if (get_instr_type(g_cur_instr->mnemonic) != INS_RW) {
+            _poll_interrupts();
+        }
     } else {
         _handle_instr_rw(4);
     }
@@ -837,6 +915,10 @@ static void _handle_instr_abs(void) {
     if (g_instr_cycle == 3) {
         g_cur_operand |= (_next_prg_byte() << 8); // fetch high byte of operand
         g_cpu_regs.pc++; // increment PC
+
+        if (get_instr_type(g_cur_instr->mnemonic) != INS_RW) {
+            _poll_interrupts();
+        }
     } else {
         g_eff_operand = g_cur_operand;
         _handle_instr_rw(4);
@@ -853,12 +935,21 @@ static void _handle_instr_abi(void) {
                     | ((g_cur_operand + (g_cur_instr->addr_mode == ABX ? g_cpu_regs.x : g_cpu_regs.y)) & 0xFF);
             g_cpu_regs.pc++; // increment PC
 
+            // if this will be the next-last cycle, poll interrupts
+            if (get_instr_type(g_cur_instr->mnemonic) != INS_RW
+                    && !((g_cur_operand & 0xFF) + (g_cur_instr->addr_mode == ABX ? g_cpu_regs.x : g_cpu_regs.y) >= 0x100)) {
+                _poll_interrupts();
+            }
+
             break;
         case 4:
             g_latched_val = system_ram_read(g_eff_operand);
             // fix effective address
             if ((g_cur_operand & 0xFF) + (g_cur_instr->addr_mode == ABX ? g_cpu_regs.x : g_cpu_regs.y) >= 0x100) {
                 g_eff_operand += 0x100;
+                if (get_instr_type(g_cur_instr->mnemonic) != INS_RW) {
+                    _poll_interrupts();
+                }
             } else if (get_instr_type(g_cur_instr->mnemonic) == INS_R) {
                 // we're finished if the high byte was correct
                 _do_instr_operation();
@@ -886,6 +977,11 @@ static void _handle_instr_izx(void) {
             break;
         case 5:
             g_eff_operand |= system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
+
+            if (get_instr_type(g_cur_instr->mnemonic) != INS_RW) {
+                _poll_interrupts();
+            }
+
             break;
         default:
             _handle_instr_rw(6);
@@ -920,6 +1016,11 @@ static void _handle_instr_izy(void) {
             } else {
                 g_latched_val = tmp;
             }
+
+            if (get_instr_type(g_cur_instr->mnemonic) != INS_RW) {
+                _poll_interrupts();
+            }
+
             break;
         }
         default:
@@ -950,6 +1051,11 @@ static void _handle_jmp(void) {
                     break;
                 case 4:
                     g_latched_val = system_ram_read(g_cur_operand); // fetch target low
+
+                    if (get_instr_type(g_cur_instr->mnemonic) != INS_RW) {
+                        _poll_interrupts();
+                    }
+
                     break;
                 case 5:
                     g_cpu_regs.pc = 0; // clear PC (technically not accurate, but it has no practical consequence)
@@ -1045,21 +1151,41 @@ static void _handle_branch(void) {
 }
 
 static void _do_instr_cycle(void) {
-    if (g_instr_cycle == 1) {
+    if (g_cur_interrupt) {
+        _execute_interrupt();
+    } else if (g_instr_cycle == 1) {
         #if PRINT_INSTRS
         if (g_total_cycles != 7) {
             print_last_instr();
         }
         #endif
 
-        g_last_opcode = _next_prg_byte(); // store last opcode (for logging)
-        g_cur_instr = decode_instr(g_last_opcode); // fetch and decode opcode
-        g_cpu_regs.pc++; // increment PC
+        if (g_queued_interrupt) {
+            g_cur_interrupt = g_queued_interrupt;
+            g_queued_interrupt = NULL;
+            _execute_interrupt();
+        } else {
+            g_last_opcode = _next_prg_byte(); // store last opcode (for logging)
+            g_cur_instr = decode_instr(g_last_opcode); // fetch and decode opcode
+            g_cpu_regs.pc++; // increment PC
 
-        _reset_instr_state();
+            _reset_instr_state();
+
+            if (g_cur_instr->addr_mode == IMP || g_cur_instr->addr_mode == IMM) {
+                _poll_interrupts();
+            }
+        }
 
         return;
+    } else if (g_cur_instr->mnemonic == BRK) {
+        //g_cur_interrupt = &INT_BRK;
+        //_execute_interrupt();
     } else if (g_instr_cycle == 2 && g_cur_instr->addr_mode != IMP && g_cur_instr->addr_mode != IMM) {
+        if ((g_cur_instr->mnemonic == JMP && g_cur_instr->addr_mode == ABS)
+                || get_instr_type(g_cur_instr->mnemonic) == INS_BRANCH) {
+            _poll_interrupts();
+        }
+
         // this doesn't execute for implicit/immediate instructions because they have additional steps beyond fetching
         // on this cycle
         g_cur_operand |= _next_prg_byte(); // fetch low byte of operand
@@ -1144,7 +1270,7 @@ void cycle_cpu(void) {
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
     } else {
-        if (g_instr_cycle == 1) {
+        /*if (g_instr_cycle == 1) {
             if (g_nmi_line) {
                 issue_interrupt(&INT_NMI);
                 cpu_clear_nmi_line();
@@ -1156,7 +1282,7 @@ void cycle_cpu(void) {
                 cycle_cpu();
                 return;
             }
-        }
+        }*/
 
         _do_instr_cycle();
         g_instr_cycle++;
