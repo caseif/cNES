@@ -1014,7 +1014,10 @@ static void _handle_jmp(void) {
             uint8_t pch = system_ram_read(g_cpu_regs.pc);
             g_cpu_regs.pc++;
 
-            g_cpu_regs.pc = (pch << 8) | (g_cur_operand & 0xFF);
+            g_cur_operand |= pch << 8;
+
+            g_cpu_regs.pc = g_cur_operand;
+            
 
             g_instr_cycle = 0;
             
