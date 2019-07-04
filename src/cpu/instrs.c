@@ -125,10 +125,15 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         case CMP:
         case CPX:
         case CPY:
+        // unofficial
+        case NOP:
+        case LAX:
             return INS_R;
         case STA:
         case STX:
         case STY:
+        // unofficial
+        case SAX:
             return INS_W;
         case DEC:
         case INC:
@@ -136,6 +141,13 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         case LSR:
         case ROL:
         case ROR:
+        // unofficial
+        case SLO:
+        case DCP:
+        case ISC:
+        case RLA:
+        case SRE:
+        case RRA:
             return INS_RW;
         case BCC:
         case BCS:
