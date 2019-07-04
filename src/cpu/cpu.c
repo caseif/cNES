@@ -559,8 +559,8 @@ static void _execute_interrupt() {
             if (g_cur_interrupt->push_pc) {
                 // push PC high, decrement S
                 system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
-                g_cpu_regs.sp--;
             }
+            g_cpu_regs.sp--;
 
             if (g_cur_interrupt == &INT_BRK && g_nmi_line) {
                 g_nmi_hijack = true;
@@ -571,8 +571,8 @@ static void _execute_interrupt() {
             if (g_cur_interrupt->push_pc) {
                 // push PC low, decrement S
                 system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
-                g_cpu_regs.sp--;
             }
+            g_cpu_regs.sp--;
 
             if (g_cur_interrupt == &INT_BRK && g_nmi_line) {
                 g_nmi_hijack = true;
@@ -595,8 +595,8 @@ static void _execute_interrupt() {
                 }
                 
                 system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
-                g_cpu_regs.sp--;
             }
+            g_cpu_regs.sp--;
             break;
         case 6:
             // clear PC high and set to vector value
