@@ -521,7 +521,7 @@ static void _reset_instr_state(void) {
 static void _poll_interrupts() {
     if (g_nmi_line) {
         g_queued_interrupt = &INT_NMI;
-    } else if (g_irq_line) {
+    } else if (g_irq_line && !g_cpu_regs.status.interrupt_disable) {
         g_queued_interrupt = &INT_IRQ;
     }
 }
@@ -587,9 +587,13 @@ static void _execute_interrupt() {
             if (g_cur_interrupt->push_pc) {
                 // push P, decrement S, set/clear B
                 g_cpu_regs.status.break_command = g_cur_interrupt->set_b;
+
+                uint8_t val = g_cpu_regs.status.serial;
                 if (g_cur_interrupt == &INT_BRK) {
-                    system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial | 0x30);
+                    val |= 0x30;
                 }
+                
+                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
                 g_cpu_regs.sp--;
             }
             break;
@@ -601,12 +605,14 @@ static void _execute_interrupt() {
                 g_cpu_regs.status.interrupt_disable = 1;
             }
             break;
-        case 7:
+        case 7: {
             // clear PC high and set to vector value
-            g_cpu_regs.pc = (system_ram_read(g_cur_interrupt->vector_loc + 1) << 8) | g_latched_val;
+            uint8_t pch = system_ram_read(g_cur_interrupt->vector_loc + 1);
+            g_cpu_regs.pc = (pch << 8) | g_latched_val;
             g_instr_cycle = 0; // reset for next instruction
             g_cur_interrupt = NULL;
             break;
+        }
     }
 }
 
