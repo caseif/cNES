@@ -58,6 +58,7 @@ static uint8_t g_prg_2 = 1;
 
 static uint8_t g_irq_counter;
 static uint8_t g_irq_latch;
+static bool g_irq_pending = false;
 static bool g_irq_reload;
 static bool g_irq_enabled = false;
 
@@ -225,7 +226,7 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             return;
         case 0xE000:
             if (g_irq_enabled) {
-                cpu_raise_irq_line();
+                g_irq_pending = false;
                 g_irq_enabled = false;
             }
             return;
@@ -280,20 +281,30 @@ static void _mmc3_tick(void) {
     #if MMC3_DEBUG_LOGGING
     printf("MMC3 counter: %d\n", g_irq_counter);
     #endif
+
+    if (g_irq_pending) {
+        cpu_raise_irq_line();
+    }
+
     uint16_t target_tick = ppu_get_swap_pattern_tables() ? 324 : 260;
     if (ppu_is_rendering_enabled() 
             && ((ppu_get_scanline() == PRE_RENDER_LINE)
                     || (ppu_get_scanline() >= FIRST_VISIBLE_LINE && ppu_get_scanline() <= LAST_VISIBLE_LINE))
             && (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2)) {
-        if (g_irq_counter == 0 || g_irq_reload) {
+
+        if (g_irq_reload) {
             g_irq_counter = g_irq_latch;
             g_irq_reload = false;
+        }
 
-            if (g_irq_counter == 0) {
-                if (g_irq_enabled) {
-                    cpu_raise_irq_line();
-                }
+        if (g_irq_counter == 0) {
+            if (g_irq_enabled) {
+                cpu_raise_irq_line();
+                g_irq_pending = true;
             }
+
+            g_irq_counter = g_irq_latch;
+            g_irq_reload = false;
         } else {
             g_irq_counter--;
         }
