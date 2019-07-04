@@ -195,11 +195,11 @@ void do_system_loop(void) {
                 g_cart->mapper->tick_func();
             }
 
-            cycle_cpu();
+            cycle_ppu();
+            cycle_ppu();
+            cycle_ppu();
 
-            cycle_ppu();
-            cycle_ppu();
-            cycle_ppu();
+            cycle_cpu();
 
             if (stepping) {
                 halted = true;

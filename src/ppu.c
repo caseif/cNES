@@ -47,8 +47,6 @@
 #define VBL_SCANLINE 241
 #define VBL_SCANLINE_TICK 1
 
-#define NMI_DELAY 14
-
 #define VRAM_SIZE 0x800
 #define PALETTE_RAM_SIZE 0x20
 #define OAM_PRIMARY_SIZE 0x100
@@ -121,7 +119,6 @@ static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
 static bool nmi_suppression = false;
-static int nmi_countdown = -1;
 
 static RenderMode g_render_mode;
 
@@ -220,7 +217,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             g_ppu_internal_regs.t.addr |= (val & 0b11) << 10; // set bits 10-11 to current nametable
 
             if (!old_gen_nmis && g_ppu_control.gen_nmis && g_ppu_status.vblank) {
-                nmi_countdown = NMI_DELAY;
+                cpu_raise_nmi_line();
             }
 
             break;
@@ -599,16 +596,12 @@ void _do_general_cycle_routine(void) {
                 }
 
                 if (g_ppu_control.gen_nmis) {
-                    nmi_countdown = NMI_DELAY;
+                    cpu_raise_nmi_line();
                 }
             }
 
             break;
         }
-    }
-
-    if (nmi_countdown-- == 0) {
-        cpu_raise_nmi_line();
     }
 }
 

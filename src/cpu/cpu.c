@@ -531,7 +531,7 @@ static void _reset_instr_state(void) {
     g_instr_cycle = 1; // skip opcode fetching
 }
 
-static void _poll_interrupts() {
+static void _poll_interrupts(void) {
     if (g_nmi_line) {
         g_queued_interrupt = &INT_NMI;
     } else if (g_irq_line && !g_cpu_regs.status.interrupt_disable) {
@@ -539,7 +539,7 @@ static void _poll_interrupts() {
     }
 }
 
-static void _execute_interrupt() {
+static void _execute_interrupt(void) {
     ASSERT_CYCLE(1, 7);
 
     switch (g_instr_cycle) {
@@ -1146,6 +1146,7 @@ static void _do_instr_cycle(void) {
         #endif
 
         if (g_queued_interrupt) {
+            g_cur_instr = NULL;
             g_cur_interrupt = g_queued_interrupt;
             g_queued_interrupt = NULL;
             _execute_interrupt();
