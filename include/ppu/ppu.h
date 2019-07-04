@@ -49,8 +49,8 @@ typedef struct {
 
 typedef struct {
     unsigned char monochrome:1 PACKED;
-    unsigned char clip_background:1 PACKED;
-    unsigned char clip_sprites:1 PACKED;
+    unsigned char show_background_left:1 PACKED;
+    unsigned char show_sprites_left:1 PACKED;
     unsigned char show_background:1 PACKED;
     unsigned char show_sprites:1 PACKED;
     unsigned char em_red:1 PACKED;

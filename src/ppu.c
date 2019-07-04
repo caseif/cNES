@@ -931,7 +931,7 @@ void cycle_ppu(void) {
 
         bool transparent_background = false;
 
-        if (palette_low) {
+        if (palette_low && !(!g_ppu_mask.show_background_left && g_scanline_tick < 8)) {
             // if the palette low bits are not zero, we select the color normally
             unsigned int palette_high = (((g_ppu_internal_regs.palette_shift_h >> g_ppu_internal_regs.x) & 1) << 1)
                     | ((g_ppu_internal_regs.palette_shift_l >> g_ppu_internal_regs.x) & 1);
@@ -950,6 +950,10 @@ void cycle_ppu(void) {
         for (unsigned int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
             // don't render sprites if sprite rendering is disabled
             if (!g_ppu_mask.show_sprites) {
+                continue;
+            }
+
+            if (!g_ppu_mask.show_sprites_left && g_scanline_tick < 8) {
                 continue;
             }
 
@@ -991,7 +995,7 @@ void cycle_ppu(void) {
             }
         }
 
-        uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR + final_palette_offset;
+        uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR | final_palette_offset;
 
         uint8_t palette_index = system_vram_read(palette_entry_addr);
 
