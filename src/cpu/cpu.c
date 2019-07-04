@@ -70,6 +70,7 @@ static bool g_irq_line = false;
 // state for implementing cycle-accuracy
 uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
 Instruction *g_cur_instr; // the instruction currently being executed
+static uint8_t g_last_opcode; // the last opcode decoded
 static uint16_t g_cur_operand; // the operand directly read from PRG
 static uint16_t g_eff_operand; // the effective operand (after being offset)
 static uint8_t g_latched_val; // typically the value to be read from or written to memory
@@ -115,7 +116,7 @@ static unsigned char _next_prg_byte(void) {
     return system_ram_read(g_cpu_regs.pc);
 }
 
-static void _set_alu_flags(uint16_t val) {
+static void _set_alu_flags(uint8_t val) {
     g_cpu_regs.status.zero = val ? 0 : 1;
     g_cpu_regs.status.negative = (val & 0x80) ? 1 : 0;
 }
@@ -142,7 +143,7 @@ static void _do_shift(bool right, bool rot) {
     g_latched_val = res;
 }
 
-static void _do_cmp(uint8_t reg, uint16_t m) {
+static void _do_cmp(uint8_t reg, uint8_t m) {
     g_cpu_regs.status.carry = reg >= m;
     g_cpu_regs.status.zero = reg == m;
     g_cpu_regs.status.negative = ((uint8_t) (reg - m)) >> 7;
@@ -299,12 +300,12 @@ void _do_instr_operation() {
             break;
         // math
         case ADC: {
-            _do_adc(g_latched_val & 0xFF);
+            _do_adc(g_latched_val);
 
             break;
         }
         case SBC: {
-            _do_sbc(g_latched_val & 0xFF);
+            _do_sbc(g_latched_val);
 
             break;
         }
@@ -430,7 +431,7 @@ void _do_instr_operation() {
         case RRA: { // unofficial
             _do_shift(true, true);
 
-            _do_adc(g_latched_val & 0xFF);
+            _do_adc(g_latched_val);
 
             break;
         }
@@ -854,10 +855,15 @@ static void _handle_instr_abi(void) {
 
             break;
         case 4:
-            system_ram_read(g_eff_operand);
+            g_latched_val = system_ram_read(g_eff_operand);
             // fix effective address
             if ((g_cur_operand & 0xFF) + (g_cur_instr->addr_mode == ABX ? g_cpu_regs.x : g_cpu_regs.y) >= 0x100) {
                 g_eff_operand += 0x100;
+            } else if (get_instr_type(g_cur_instr->mnemonic) == INS_R) {
+                // we're finished if the high byte was correct
+                _do_instr_operation();
+
+                g_instr_cycle = 0;
             }
             break;
         default:
@@ -904,8 +910,16 @@ static void _handle_instr_izy(void) {
             uint8_t tmp = system_ram_read(g_eff_operand);
             if (g_latched_val + g_cpu_regs.y >= 0x100) {
                 g_eff_operand += 0x100;
+            } else if (get_instr_type(g_cur_instr->mnemonic) == INS_R) {
+                // we're finished if the high byte was correct
+                g_latched_val = tmp;
+
+                _do_instr_operation();
+
+                g_instr_cycle = 0;
+            } else {
+                g_latched_val = tmp;
             }
-            g_latched_val = tmp;
             break;
         }
         default:
@@ -943,7 +957,7 @@ static void _handle_jmp(void) {
                     // page boundary crossing is not handled correctly - we emulate this bug here
                     g_cpu_regs.pc |= system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
                     // copy target low to PC
-                    g_cpu_regs.pc |= g_latched_val & 0xFF;
+                    g_cpu_regs.pc |= g_latched_val;
 
                     g_instr_cycle = 0;
 
@@ -1032,7 +1046,14 @@ static void _handle_branch(void) {
 
 static void _do_instr_cycle(void) {
     if (g_instr_cycle == 1) {
-        g_cur_instr = decode_instr(_next_prg_byte()); // fetch and decode opcode
+        #if PRINT_INSTRS
+        if (g_total_cycles != 7) {
+            print_last_instr();
+        }
+        #endif
+
+        g_last_opcode = _next_prg_byte(); // store last opcode (for logging)
+        g_cur_instr = decode_instr(g_last_opcode); // fetch and decode opcode
         g_cpu_regs.pc++; // increment PC
 
         _reset_instr_state();
@@ -1155,4 +1176,110 @@ void dump_ram(void) {
     fwrite(g_sys_memory, SYSTEM_MEMORY, 1, out_file);
 
     fclose(out_file);
+}
+
+void print_last_instr(void) {
+    uint8_t status;
+    memcpy(&status, &g_cpu_regs.status, 1);
+
+    char str_machine_code[9];
+    switch (get_instr_len(g_cur_instr)) {
+        case 1:
+            sprintf(str_machine_code, "%02X      ", g_last_opcode);
+            break;
+        case 2:
+            sprintf(str_machine_code, "%02X %02X   ", g_last_opcode, g_cur_operand);
+            break;
+        case 3:
+            sprintf(str_machine_code, "%02X %02X %02X", g_last_opcode, g_cur_operand & 0xFF,g_cur_operand >> 8);
+            break;
+    }
+
+    char str_param[32];
+    InstructionType instr_type = get_instr_type(g_cur_instr->mnemonic);
+    switch (g_cur_instr->addr_mode) {
+        case IMM:
+            sprintf(str_param, "#$%02X                   ", g_cur_operand);
+            break;
+        case ZRP:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%02X     -> $%02X         ", g_cur_operand, g_latched_val);
+                    break;
+                default:
+                    sprintf(str_param, "$%02X                    ", g_cur_operand);
+                    break;
+            }
+            break;
+        case ZPX:
+        case ZPY:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%02X,%c   -> $%02X   -> $%02X",
+                            g_cur_operand, g_cur_instr->addr_mode == ZPX ? 'X' : 'Y', g_eff_operand, g_latched_val);
+                    break;
+                default:
+                    sprintf(str_param, "$%02X,%c   -> $%02X         ",
+                            g_cur_operand, g_cur_instr->addr_mode == ZPX ? 'X' : 'Y', g_latched_val);
+                    break;
+            }
+            break;
+        case ABS:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%04X   -> $%02X         ", g_cur_operand, g_latched_val);
+                    break;
+                default:
+                    sprintf(str_param, "$%04X                  ", g_cur_operand);
+                    break;
+            }
+            break;
+        case ABX:
+        case ABY:
+            switch (instr_type) {
+                case INS_R:
+                case INS_RW:
+                    sprintf(str_param, "$%04X,%c -> $%04X -> $%02X",
+                            g_cur_operand, g_cur_instr->addr_mode == ABX ? 'X' : 'Y', g_eff_operand, g_latched_val);
+                    break;
+                default:
+                    sprintf(str_param, "$%04X,%c -> $%02X         ",
+                            g_cur_operand, g_cur_instr->addr_mode == ABX ? 'X' : 'Y', g_latched_val);
+                    break;
+            }
+            break;
+        case REL:
+            sprintf(str_param, "#$%02X    -> $%04X       ",
+                    g_cur_operand, g_cpu_regs.pc + ((int8_t) g_cur_operand));
+            break;
+        case IND:
+            sprintf(str_param, "($%04X) -> $%04X       ", g_cur_operand, g_eff_operand);
+            break;
+        case IZX:
+            sprintf(str_param, "($%02X,X) -> $%04X -> $%02X", g_cur_operand, g_eff_operand, g_latched_val);
+            break;
+        case IZY:
+            sprintf(str_param, "($%02X),Y -> $%04X -> $%02X", g_cur_operand, g_eff_operand, g_latched_val);
+            break;
+        case IMP:
+            sprintf(str_param, "                       ");
+            break;
+    }
+
+    printf("%04X  %s  %s %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d,ppu=%03d,%03d)\n",
+            g_cpu_regs.pc - get_instr_len(g_cur_instr),
+            str_machine_code,
+            mnemonic_to_str(g_cur_instr->mnemonic),
+            str_param,
+            g_cpu_regs.acc,
+            g_cpu_regs.x,
+            g_cpu_regs.y,
+            g_cpu_regs.sp,
+            status,
+            g_total_cycles,
+            ppu_get_scanline(),
+            ppu_get_scanline_tick());
 }

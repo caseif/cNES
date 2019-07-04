@@ -52,7 +52,14 @@ uint8_t _sc_poll(void *state) {
         g_poll_callback();
     }
 
-    bool res = state_cast->button_states[state_cast->bit];
+    // for some reason, the ternary expression originally here would sometimes evaluate to 2
+    uint8_t res;
+    if (state_cast->button_states[state_cast->bit]) {
+        res = 1;
+    } else {
+        res = 0;
+    }
+
     state_cast->bit += 1;
     return res;
 }

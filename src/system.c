@@ -141,8 +141,9 @@ uint8_t system_lower_memory_read(uint16_t addr) {
         case 0x4015:
             //TODO: APU MMIO
             return 0;
-        case 0x4016 ... 0x4017:
-            return controller_poll(addr - 0x4016);
+        case 0x4016 ... 0x4017: {
+            return 0x40 | controller_poll(addr - 0x4016);
+        }
         default:
             return 0; // open bus
     }
