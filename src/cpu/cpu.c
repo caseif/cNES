@@ -190,51 +190,6 @@ void cpu_clear_irq_line(void) {
     g_irq_line = false;
 }
 
-bool issue_interrupt(const InterruptType *type) {
-    // check if the interrupt should be masked
-    if (type->maskable && g_cpu_regs.status.interrupt_disable) {
-        return false;
-    }
-
-    // set B flag
-    if (type->set_b) {
-        g_cpu_regs.status.break_command = 1;
-        g_cpu_regs.status.unused = 1;
-    }
-
-    // push PC and P
-    if (type->push_pc) {
-        uint16_t pc_to_push = g_cpu_regs.pc + (type->set_b ? 2 : 0);
-
-        stack_push(pc_to_push >> 8);      // push MSB
-        stack_push(pc_to_push & 0xFF);    // push LSB
-
-        uint8_t status_serial;
-        memcpy(&status_serial, &g_cpu_regs.status, 1);
-
-        status_serial |= 0x30;
-
-        stack_push(status_serial);
-    }
-
-    // set I flag
-    if (type->set_i) {
-        g_cpu_regs.status.interrupt_disable = 1;
-    }
-
-    // little-Endian, so the LSB comes first
-    uint16_t vector = system_ram_read(type->vector_loc) | ((system_ram_read(type->vector_loc + 1)) << 8);
-
-    // set the PC
-    g_cpu_regs.pc = vector;
-
-    if (type == &INT_NMI) {
-        g_burn_cycles += 4;
-    }
-
-    return true;
-}
-
 void _do_instr_operation() {
     switch (g_cur_instr->mnemonic) {
         // storage
@@ -632,7 +587,9 @@ static void _execute_interrupt() {
             if (g_cur_interrupt->push_pc) {
                 // push P, decrement S, set/clear B
                 g_cpu_regs.status.break_command = g_cur_interrupt->set_b;
-                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial | 0x30);
+                if (g_cur_interrupt == &INT_BRK) {
+                    system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial | 0x30);
+                }
                 g_cpu_regs.sp--;
             }
             break;
@@ -1270,20 +1227,6 @@ void cycle_cpu(void) {
     if (g_burn_cycles > 0) {
         g_burn_cycles--;
     } else {
-        /*if (g_instr_cycle == 1) {
-            if (g_nmi_line) {
-                issue_interrupt(&INT_NMI);
-                cpu_clear_nmi_line();
-                cycle_cpu();
-                return;
-            } else if (g_irq_line) {
-                issue_interrupt(&INT_IRQ);
-                cpu_clear_irq_line();
-                cycle_cpu();
-                return;
-            }
-        }*/
-
         _do_instr_cycle();
         g_instr_cycle++;
     }
