@@ -52,11 +52,14 @@ typedef struct {
     unsigned char em_blue:1 PACKED;
 } PpuMask;
 
-typedef struct {
-    unsigned char last_write:5 PACKED;
-    unsigned char sprite_overflow:1 PACKED;
-    unsigned char sprite_0_hit:1 PACKED;
-    unsigned char vblank:1 PACKED;
+typedef union {
+    struct {
+        unsigned char last_write:5 PACKED;
+        unsigned char sprite_overflow:1 PACKED;
+        unsigned char sprite_0_hit:1 PACKED;
+        unsigned char vblank:1 PACKED;
+    };
+    uint8_t serial;
 } PpuStatus;
 
 typedef struct {

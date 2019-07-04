@@ -164,8 +164,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
     switch (index) {
         case 2: {
             // return the status
-            uint8_t res;
-            memcpy(&res, &g_ppu_status, 1);
+            uint8_t res = g_ppu_status.serial;
 
             // reading this register resets this latch
             g_ppu_internal_regs.w = 0;
@@ -175,7 +174,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
             cpu_clear_nmi_line();
 
             if (g_scanline == VBL_SCANLINE) {
-                if (g_scanline_tick == VBL_SCANLINE_TICK) {
+                if (g_scanline_tick >= VBL_SCANLINE_TICK - 1 && g_scanline_tick <= VBL_SCANLINE_TICK + 1) {
                     nmi_suppression = true;
                 }
             }
@@ -606,10 +605,6 @@ void _do_general_cycle_routine(void) {
 
             break;
         }
-    }
-
-    if (g_scanline == VBL_SCANLINE - 1 && g_scanline_tick >= CYCLES_PER_SCANLINE - 3) {
-        g_ppu_status.vblank = 1;
     }
 
     if (nmi_countdown-- == 0) {

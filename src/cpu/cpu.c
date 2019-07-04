@@ -97,6 +97,10 @@ void initialize_cpu(void) {
     memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
 
     g_queued_interrupt = &INT_RESET;
+
+    for (int i = 0; i < 7; i++) {
+        cycle_cpu();
+    }
 }
 
 void cpu_init_pc(uint16_t addr) {
