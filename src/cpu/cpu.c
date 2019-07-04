@@ -69,8 +69,8 @@ static bool g_nmi_line = false;
 static bool g_irq_line = false;
 
 // state for implementing cycle-accuracy
-static uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
-static Instruction *g_cur_instr; // the instruction currently being executed
+uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
+Instruction *g_cur_instr; // the instruction currently being executed
 static uint16_t g_cur_operand; // the operand directly read from PRG
 static uint16_t g_eff_operand; // the effective operand (after being offset)
 static uint8_t g_latched_val; // typically the value to be read from or written to memory
@@ -79,6 +79,7 @@ void initialize_cpu(void) {
     g_cpu_regs.sp = BASE_SP;
 
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
+    g_cpu_regs.sp = 0xFF;
     memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
 }
 
@@ -90,12 +91,14 @@ void cpu_init_pc(uint16_t addr) {
 
 uint8_t cpu_ram_read(uint16_t addr) {
     assert(addr < 0x800);
+    printf("$%04X -> %02X\n", addr, g_sys_memory[addr]);
     return g_sys_memory[addr];
 }
 
 void cpu_ram_write(uint16_t addr, uint8_t val) {
     assert(addr < 0x800);
     g_sys_memory[addr] = val;
+    printf("$%04X <- %02X\n", addr, val);
 }
 
 void cpu_start_oam_dma(uint8_t page) {
@@ -112,7 +115,7 @@ unsigned char stack_pop(void) {
 }
 
 static unsigned char _next_prg_byte(void) {
-    return system_ram_read(g_cpu_regs.pc++);
+    return system_ram_read(g_cpu_regs.pc);
 }
 
 static void _set_alu_flags(uint16_t val) {
@@ -564,9 +567,13 @@ static void _reset_instr_state(void) {
 }
 
 static void _handle_brk(void) {
-    ASSERT_CYCLE(3, 7);
+    ASSERT_CYCLE(2, 7);
 
     switch (g_instr_cycle) {
+        case 2:
+            _next_prg_byte(); // garbage read
+            g_cpu_regs.pc++; // increment PC anyway
+            break;
         case 3:
             // push PC high, decrement S
             system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
@@ -598,9 +605,12 @@ static void _handle_brk(void) {
 }
 
 static void _handle_rti(void) {
-    ASSERT_CYCLE(3, 6);
+    ASSERT_CYCLE(2, 6);
     
     switch (g_instr_cycle) {
+        case 2:
+            _next_prg_byte(); // garbage read
+            break;
         case 3:
             // increment S
             g_cpu_regs.sp++;
@@ -620,14 +630,19 @@ static void _handle_rti(void) {
             // clear PC high and set to stack value
             g_cpu_regs.pc &= ~0xFF00;
             g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+
+            g_instr_cycle = 0; // reset for next instruction
             break;
     }
 }
 
 static void _handle_rts(void) {
-    ASSERT_CYCLE(3, 6);
+    ASSERT_CYCLE(2, 6);
     
     switch (g_instr_cycle) {
+        case 2:
+            system_ram_read(g_cpu_regs.pc); // garbage read
+            break;
         case 3:
             // increment S
             g_cpu_regs.sp++;
@@ -636,35 +651,52 @@ static void _handle_rts(void) {
             // clear PC low and set to stack value, increment S
             g_cpu_regs.pc &= ~0xFF;
             g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            printf("popped PC low: %02x\n", g_cpu_regs.pc & 0xFF);
             g_cpu_regs.sp++;
             break;
         case 5:
             // clear PC high and set to stack value
             g_cpu_regs.pc &= ~0xFF00;
             g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+            printf("popped PC high: %02x\n", (g_cpu_regs.pc & 0xFF00) >> 8);
             break;
         case 6:
             // increment PC
             g_cpu_regs.pc++;
+
+            g_instr_cycle = 0; // reset for next instruction
     }
 }
 
 static void _handle_stack_push(void) {
-    ASSERT_CYCLE(3, 3);
+    ASSERT_CYCLE(2, 3);
 
-    // push register, decrement S
-    system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp,
-            g_cur_instr->mnemonic == PLA ? g_cpu_regs.acc : g_cpu_regs.status.serial);
-    g_cpu_regs.sp--;
+    switch (g_instr_cycle) {
+        case 2:
+            _next_prg_byte(); // garbage read
+            break;
+        case 3:
+            // push register, decrement S
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp,
+                    g_cur_instr->mnemonic == PLA ? g_cpu_regs.acc : g_cpu_regs.status.serial);
+            g_cpu_regs.sp--;
+
+            g_instr_cycle = 0; // reset for next instruction
+            break;
+    }
 }
 
 static void _handle_stack_pull(void) {
-    ASSERT_CYCLE(3, 4);
+    ASSERT_CYCLE(2, 4);
 
     switch (g_instr_cycle) {
+        case 2:
+            _next_prg_byte(); // garbage read
+            break;
         case 3:
             // increment S
             g_cpu_regs.sp++;
+            break;
         case 4: {
             // pull register
             uint8_t val = system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
@@ -673,6 +705,9 @@ static void _handle_stack_pull(void) {
             } else {
                 g_cpu_regs.status.serial = val;
             }
+
+            g_instr_cycle = 0; // reset for next instruction
+
             break;
         }
     }
@@ -695,11 +730,17 @@ static void _handle_jsr(void) {
             system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
             g_cpu_regs.sp--;
             break;
-        case 6:
+        case 6: {
             // copy low byte to PC, fetch high byte to PC (but don't increment PC)
-            g_cpu_regs.pc = g_cur_operand & 0xFF;
-            g_cpu_regs.pc |= system_ram_read(g_cpu_regs.pc) << 8;
+            uint8_t pch = system_ram_read(g_cpu_regs.pc);
+            g_cpu_regs.pc = 0;
+            g_cpu_regs.pc |= pch << 8;
+            g_cpu_regs.pc |= g_cur_operand & 0xFF;
+            printf("new pc: %04x\n", g_cpu_regs.pc);
+
+            g_instr_cycle = 0; // reset for next instruction
             break;
+        }
     }
 }
 
@@ -774,6 +815,7 @@ static void _handle_instr_rw(uint8_t offset) {
 }
 
 static void _handle_instr_zrp(void) {
+    g_eff_operand = g_cur_operand;
     _handle_instr_rw(3);
 }
 
@@ -795,6 +837,7 @@ static void _handle_instr_abs(void) {
         g_cur_operand |= (_next_prg_byte() << 8); // fetch high byte of operand
         g_cpu_regs.pc++; // increment PC
     } else {
+        g_eff_operand = g_cur_operand;
         _handle_instr_rw(4);
     }
 }
@@ -888,14 +931,23 @@ static void _handle_jmp(void) {
             ASSERT_CYCLE(3, 5);
             switch (g_instr_cycle) {
                 case 3:
-                    g_cur_operand |= (_next_prg_byte() << 8); // fetch high byte of operand
+                    g_cur_operand |= _next_prg_byte() << 8; // fetch high byte of operand
                     g_cpu_regs.pc++; // increment PC
                     break;
                 case 4:
-                    g_latched_val = system_ram_read(g_cur_operand);
+                    g_latched_val = system_ram_read(g_cur_operand); // fetch target low
+                    printf("operand: %04x\n", g_cur_operand);
+                    printf("target low: %02x\n", g_latched_val);
                     break;
                 case 5:
-                    g_cpu_regs.pc = system_ram_read((g_cur_operand & 0xFF00) | ((g_latched_val + 1) | 0xFF));
+                    g_cpu_regs.pc = 0; // clear PC (technically not accurate, but it has no practical consequence)
+                    // fetch target high to PC
+                    // page boundary crossing is not handled correctly - we emulate this bug here
+                    g_cpu_regs.pc |= system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
+                    // copy target low to PC
+                    g_cpu_regs.pc |= g_latched_val & 0xFF;
+
+                    printf("new PC: %d\n", g_cpu_regs.pc);
 
                     g_instr_cycle = 0;
 
@@ -907,8 +959,11 @@ static void _handle_jmp(void) {
     }
 }
 
+// forward declaration for branch handling
+static void _do_instr_cycle(void);
+
 static void _handle_branch(void) {
-    ASSERT_CYCLE(3, 5);
+    ASSERT_CYCLE(3, 4);
 
     switch (g_instr_cycle) {
         case 3:
@@ -947,14 +1002,13 @@ static void _handle_branch(void) {
             if (should_take) {
                 g_latched_val = g_cpu_regs.pc & 0xFF;
                 g_cpu_regs.pc = (g_cpu_regs.pc & 0xFF00) | ((g_cpu_regs.pc + (int8_t) g_cur_operand) & 0xFF);
+                return;
             } else {
-                g_cur_instr = decode_instr(g_latched_val);
-                g_cpu_regs.pc++;
-                _reset_instr_state();
-                g_instr_cycle = 1; // skip opcode fetching
+                // recursive call to fetch the next opcode
+                g_instr_cycle = 1;
+                _do_instr_cycle();
+                return;
             }
-
-            break;
         case 4: {
             uint8_t old_pcl = g_latched_val;
 
@@ -965,42 +1019,54 @@ static void _handle_branch(void) {
             } else if ((int8_t) g_cur_operand > 0 && g_cur_operand + old_pcl >= 0x100) {
                 g_cpu_regs.pc += 0x100;
             } else {
-                g_cpu_regs.pc++;
-                _reset_instr_state();
-                g_instr_cycle = 1; // skip opcode fetching
+                // recursive call to fetch the next opcode
+                g_instr_cycle = 1;
+                _do_instr_cycle();
+                return;
             }
+
+            g_instr_cycle = 0;
 
             break;
         }
-        case 5:
-            g_cur_instr = decode_instr(system_ram_read(g_cpu_regs.pc));
-            g_cpu_regs.pc++;
-            _reset_instr_state();
-            g_instr_cycle = 1; // skip opcode fetching
-            break;
+        default:
+            assert(false);
     }
 }
 
 static void _do_instr_cycle(void) {
+    printf("PC %04x\n", g_cpu_regs.pc);
+    printf("cycle: %d\n", g_instr_cycle);
+    printf("operand: %d\n", g_cur_operand);
+    printf("eff operand: %d\n", g_eff_operand);
+
     if (g_instr_cycle == 1) {
+        printf("decoding instr\n");
         g_cur_instr = decode_instr(_next_prg_byte()); // fetch and decode opcode
+        printf("decoded as %s, %s\n", mnemonic_to_str(g_cur_instr->mnemonic), addr_mode_to_str(g_cur_instr->addr_mode));
         g_cpu_regs.pc++; // increment PC
 
         _reset_instr_state();
 
         return;
-    } else if (g_instr_cycle == 2 && g_cur_instr->addr_mode != IMP) {
+    } else if (g_instr_cycle == 2 && g_cur_instr->addr_mode != IMP && g_cur_instr->addr_mode != IMM) {
+        // this doesn't execute for implicit/immediate instructions because they have additional steps beyond fetching
+        // on this cycle
+        printf("reading first operand byte\n");
         g_cur_operand |= _next_prg_byte(); // fetch low byte of operand
         g_cpu_regs.pc++; // increment PC
         return;
     } else if (_handle_stack_instr()) {
+        printf("handling stack\n");
         return;
     } else {
         InstructionType type = get_instr_type(g_cur_instr->mnemonic);
         if (type == INS_JUMP) {
+            printf("handling jump\n");
             _handle_jmp();
             return;
         } else if (type == INS_BRANCH) {
+            printf("handling branch\n");
             _handle_branch();
             return;
         }
@@ -1008,6 +1074,7 @@ static void _do_instr_cycle(void) {
         switch (g_cur_instr->addr_mode) {
             case IMP:
                 ASSERT_CYCLE(2, 2);
+
                 switch (get_instr_type(g_cur_instr->mnemonic)) {
                     case INS_R:
                         g_latched_val = g_cpu_regs.acc;
@@ -1023,15 +1090,23 @@ static void _do_instr_cycle(void) {
                         g_cpu_regs.acc = g_latched_val;
                         break;
                     case INS_NONE:
+                        _do_instr_operation();
                         break;
                     default:
                         assert(false);
                 }
+                g_instr_cycle = 0; // reset for next instruction
                 break;
             case IMM:
                 ASSERT_CYCLE(2, 2);
+        
+                g_cur_operand |= _next_prg_byte(); // fetch immediate byte
+                g_cpu_regs.pc++; // increment PC
+
                 g_latched_val = g_cur_operand & 0xFF;
                 _do_instr_operation();
+
+                g_instr_cycle = 0; // reset for next instruction
                 break;
             case ZRP:
                 _handle_instr_zrp();

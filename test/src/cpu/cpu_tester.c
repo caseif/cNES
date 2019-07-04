@@ -27,6 +27,7 @@
 
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
+#include "system.h"
 #include "test_assert.h"
 
 #include <stdio.h>
@@ -78,17 +79,29 @@ void load_cpu_test(char *file_name) {
         exit(-1);
     }
 
-    initialize_cpu();
+    Cartridge *cart = (Cartridge*) malloc(sizeof(Cartridge));
+    cart->prg_rom = (unsigned char*) malloc(program.size);
+    memcpy(cart->prg_rom, program.data, program.size);
+    cart->prg_size = program.size;
+    cart->chr_size = 0;
+    cart->mapper = (Mapper*) malloc(sizeof(Mapper));
+    mapper_init_nrom(cart->mapper);
+    cart->title = qualified;
 
-    load_program(program);
+    initialize_system(cart);
+
+    cpu_init_pc(0x8000);
 
     printf("Successfully loaded program file %s.\n", file_name);
 }
 
+extern Instruction *g_cur_instr;
+extern uint8_t g_instr_cycle;
+
 void pump_cpu(void) {
     do {
         cycle_cpu();
-    } while (!(g_burn_cycles == 0 && decode_instr(system_ram_read(g_cpu_regs.pc))->mnemonic == NOP));
+    } while (!(g_cur_instr->mnemonic == NOP && g_instr_cycle == 1));
 }
 
 bool do_cpu_tests(void) {

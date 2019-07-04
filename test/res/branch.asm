@@ -11,15 +11,15 @@
 
 LDX #$00            ; reset X register
 LDA #<ind_skip_1    ; low byte of target address
-STA $0050
+STA $0250
 LDA #>ind_skip_1    ; high byte of target address
-STA $0051
+STA $0251
 
-JMP ($0050)         ; jump to address specified at $0050 ($8012)
+JMP ($0250)         ; jump to address specified at $0050 ($8012)
 
 LDX #$01            ; set X=1 (this shouldn't execute)
 
-;;; this is offset $0011 in PRG ;;;
+;;; this is offset $8011 in PRG ;;;
 ind_skip_1:
 NOP                 ; perform assertions:
                     ; x = 0x0

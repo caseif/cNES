@@ -42,7 +42,7 @@ bool test_addition(void) {
 
     pump_cpu();
     ASSERT_EQ(0x01, g_cpu_regs.acc);
-    ASSERT_EQ(0, g_cpu_regs.status.carry);
+    ASSERT_EQ(1, g_cpu_regs.status.carry);
     ASSERT_EQ(0, g_cpu_regs.status.zero);
     ASSERT_EQ(0, g_cpu_regs.status.overflow);
     ASSERT_EQ(0, g_cpu_regs.status.negative);

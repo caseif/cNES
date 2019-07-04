@@ -183,7 +183,7 @@ uint8_t get_instr_len(const Instruction *instr) {
 }
 
 Instruction *decode_instr(unsigned char opcode) {
-    printf("%s\n", g_mnemonic_strs[opcode]);
+    printf("opcode: %02X\n", opcode);
     return (Instruction*) &g_instr_list[opcode];
 }
 
