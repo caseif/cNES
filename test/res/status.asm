@@ -54,14 +54,14 @@ NOP                 ; perform assertions:
 CMP #$02            ; a < 2
 NOP                 ; perform assertions:
                     ; c = 0
-                    ; n = 0
+                    ; n = 1
                     ; z = 0
 
 LDA #$81            ; set a=0x81 (-127)
 CMP #$80            ; a > 0x80
 NOP                 ; perform assertions:
                     ; c = 1
-                    ; n = 1
+                    ; n = 0
                     ; z = 0
 
 CMP #$01            ; a > 1 (when unsigned)

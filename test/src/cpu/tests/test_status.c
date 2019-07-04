@@ -66,13 +66,13 @@ bool test_status(void) {
     // a < v
     pump_cpu();
     ASSERT_EQ(0, g_cpu_regs.status.carry);
-    ASSERT_EQ(0, g_cpu_regs.status.negative);
+    ASSERT_EQ(1, g_cpu_regs.status.negative);
     ASSERT_EQ(0, g_cpu_regs.status.zero);
 
     // a > v && a is neg && v is neg
     pump_cpu();
     ASSERT_EQ(1, g_cpu_regs.status.carry);
-    ASSERT_EQ(1, g_cpu_regs.status.negative);
+    ASSERT_EQ(0, g_cpu_regs.status.negative);
     ASSERT_EQ(0, g_cpu_regs.status.zero);
 
     // a > v && a is neg && v is pos

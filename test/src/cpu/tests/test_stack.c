@@ -34,7 +34,7 @@ bool test_stack(void) {
     load_cpu_test("stack.bin");
 
     pump_cpu();
-        ASSERT_EQ(0x01, g_cpu_regs.acc);
+    ASSERT_EQ(0x01, g_cpu_regs.acc);
     ASSERT_EQ(0xFD, g_cpu_regs.x);
     ASSERT_EQ(0x02, g_cpu_regs.y);
     ASSERT_EQ(0xFF, g_cpu_regs.sp);
