@@ -73,6 +73,14 @@ uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
 Instruction *g_cur_instr; // the instruction currently being executed
 static uint8_t g_last_opcode; // the last opcode decoded
 
+#if PRINT_INSTRS
+// snapshots for logging
+static CpuRegisters g_last_reg_snapshot; // the state of the registers when the last instruction started execution
+static unsigned int g_total_cycles_snapshot;
+static uint16_t g_ppu_scanline_snapshot;
+static uint16_t g_ppu_scanline_tick_snapshot;
+#endif
+
 static uint16_t g_cur_operand; // the operand directly read from PRG
 static uint16_t g_eff_operand; // the effective operand (after being offset)
 
@@ -770,9 +778,10 @@ static void _handle_jsr(void) {
         case 6: {
             // copy low byte to PC, fetch high byte to PC (but don't increment PC)
             uint8_t pch = system_ram_read(g_cpu_regs.pc);
-            g_cpu_regs.pc = 0;
-            g_cpu_regs.pc |= pch << 8;
-            g_cpu_regs.pc |= g_cur_operand & 0xFF;
+            g_cur_operand |= pch << 8;
+            g_eff_operand = g_cur_operand;
+
+            g_cpu_regs.pc = g_cur_operand;
 
             g_instr_cycle = 0; // reset for next instruction
             break;
@@ -1024,10 +1033,11 @@ static void _handle_jmp(void) {
                 case 5:
                     g_cpu_regs.pc = 0; // clear PC (technically not accurate, but it has no practical consequence)
                     // fetch target high to PC
+                    // we technically don't do this properly, but sub-cycle accuracy is not necessarily a goal
                     // page boundary crossing is not handled correctly - we emulate this bug here
-                    g_cpu_regs.pc |= system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
-                    // copy target low to PC
-                    g_cpu_regs.pc |= g_latched_val;
+                    g_eff_operand = (system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8) | g_latched_val;
+                    // copy target to PC
+                    g_cpu_regs.pc = g_eff_operand;
 
                     g_instr_cycle = 0;
 
@@ -1048,6 +1058,8 @@ static void _handle_branch(void) {
     switch (g_instr_cycle) {
         case 3:
             g_latched_val = system_ram_read(g_cpu_regs.pc);
+
+            g_eff_operand = g_cpu_regs.pc + (int8_t) g_cur_operand;
 
             bool should_take;
             switch (g_cur_instr->mnemonic) {
@@ -1114,13 +1126,18 @@ static void _handle_branch(void) {
     }
 }
 
+#if PRINT_INSTRS
+// forward declaration
+static void _print_last_instr(void);
+#endif
+
 static void _do_instr_cycle(void) {
     if (g_cur_interrupt) {
         _execute_interrupt();
     } else if (g_instr_cycle == 1) {
         #if PRINT_INSTRS
-        if (g_total_cycles != 7) {
-            print_last_instr();
+        if (g_cur_instr != NULL) {
+            _print_last_instr();
         }
         #endif
 
@@ -1129,11 +1146,20 @@ static void _do_instr_cycle(void) {
             g_queued_interrupt = NULL;
             _execute_interrupt();
         } else {
-            g_last_opcode = _next_prg_byte(); // store last opcode (for logging)
+            g_last_opcode = _next_prg_byte(); // store last opcode
             g_cur_instr = decode_instr(g_last_opcode); // fetch and decode opcode
-            g_cpu_regs.pc++; // increment PC
 
             _reset_instr_state();
+
+            #if PRINT_INSTRS
+            // store snapshots for logging
+            g_last_reg_snapshot = g_cpu_regs;
+            g_total_cycles_snapshot = g_total_cycles;
+            g_ppu_scanline_snapshot = ppu_get_scanline();
+            g_ppu_scanline_tick_snapshot = ppu_get_scanline_tick();
+            #endif
+
+            g_cpu_regs.pc++; // increment PC
 
             if (g_cur_instr->addr_mode == IMP || g_cur_instr->addr_mode == IMM) {
                 _poll_interrupts();
@@ -1142,8 +1168,8 @@ static void _do_instr_cycle(void) {
 
         return;
     } else if (g_cur_instr->mnemonic == BRK) {
-        //g_cur_interrupt = &INT_BRK;
-        //_execute_interrupt();
+        g_cur_interrupt = &INT_BRK;
+        _execute_interrupt();
     } else if (g_instr_cycle == 2 && g_cur_instr->addr_mode != IMP && g_cur_instr->addr_mode != IMM) {
         if ((g_cur_instr->mnemonic == JMP && g_cur_instr->addr_mode == ABS)
                 || get_instr_type(g_cur_instr->mnemonic) == INS_BRANCH) {
@@ -1254,10 +1280,8 @@ void dump_ram(void) {
     fclose(out_file);
 }
 
-void print_last_instr(void) {
-    uint8_t status;
-    memcpy(&status, &g_cpu_regs.status, 1);
-
+#if PRINT_INSTRS
+static void _print_last_instr(void) {
     char str_machine_code[9];
     switch (get_instr_len(g_cur_instr)) {
         case 1:
@@ -1329,7 +1353,7 @@ void print_last_instr(void) {
             break;
         case REL:
             sprintf(str_param, "#$%02X    -> $%04X       ",
-                    g_cur_operand, g_cpu_regs.pc + ((int8_t) g_cur_operand));
+                    g_cur_operand, g_eff_operand);
             break;
         case IND:
             sprintf(str_param, "($%04X) -> $%04X       ", g_cur_operand, g_eff_operand);
@@ -1346,16 +1370,17 @@ void print_last_instr(void) {
     }
 
     printf("%04X  %s  %s %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d,ppu=%03d,%03d)\n",
-            g_cpu_regs.pc - get_instr_len(g_cur_instr),
+            g_last_reg_snapshot.pc,
             str_machine_code,
             mnemonic_to_str(g_cur_instr->mnemonic),
             str_param,
-            g_cpu_regs.acc,
-            g_cpu_regs.x,
-            g_cpu_regs.y,
-            g_cpu_regs.sp,
-            status,
-            g_total_cycles,
-            ppu_get_scanline(),
-            ppu_get_scanline_tick());
+            g_last_reg_snapshot.acc,
+            g_last_reg_snapshot.x,
+            g_last_reg_snapshot.y,
+            g_last_reg_snapshot.sp,
+            g_last_reg_snapshot.status.serial,
+            g_total_cycles_snapshot,
+            g_ppu_scanline_snapshot,
+            g_ppu_scanline_tick_snapshot);
 }
+#endif
