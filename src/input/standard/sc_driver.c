@@ -31,9 +31,34 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_events.h>
 
-static SDL_GameController *g_controller;
+#define BUTTON_COUNT 8
 
-static void _init_controller() {
+static SDL_GameController *g_controller_0;
+static SDL_GameController *g_controller_1;
+
+static SDL_Scancode g_poll_keys[BUTTON_COUNT] = {
+        SDL_SCANCODE_Z,
+        SDL_SCANCODE_X,
+        SDL_SCANCODE_COMMA,
+        SDL_SCANCODE_PERIOD,
+        SDL_SCANCODE_UP,
+        SDL_SCANCODE_DOWN,
+        SDL_SCANCODE_LEFT,
+        SDL_SCANCODE_RIGHT
+};
+
+static SDL_GameControllerButton g_poll_buttons[BUTTON_COUNT] = {
+        SDL_CONTROLLER_BUTTON_B,
+        SDL_CONTROLLER_BUTTON_A,
+        SDL_CONTROLLER_BUTTON_BACK,
+        SDL_CONTROLLER_BUTTON_START,
+        SDL_CONTROLLER_BUTTON_DPAD_UP,
+        SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+        SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+        SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+};
+
+static void _init_controllers() {
     if (SDL_Init(SDL_INIT_GAMECONTROLLER) < 0) {
         printf("Failed to initialize SDL: %s\n", SDL_GetError());
         return;
@@ -47,55 +72,93 @@ static void _init_controller() {
 
     printf("Found %d connected joysticks\n", num_joysticks);
 
-    unsigned int joystick;
-    for (joystick = 0; joystick < num_joysticks; joystick++) {
-        if (SDL_IsGameController(joystick)) {
+    unsigned int joystick_0;
+    for (joystick_0 = 0; joystick_0 < num_joysticks; joystick_0++) {
+        if (SDL_IsGameController(joystick_0)) {
             break;
         }
     }
-    if (joystick == num_joysticks) {
+    if (joystick_0 == num_joysticks) {
         printf("Failed to recognize any joysticks as game controllers\n");
         return;
     }
 
-    g_controller = SDL_GameControllerOpen(joystick);
+    g_controller_0 = SDL_GameControllerOpen(joystick_0);
 
-    if (!g_controller) {
-        printf("Failed to open joystick %d as controller\n", joystick);
+    if (!g_controller_0) {
+        printf("Failed to open joystick %d as controller\n", joystick_0);
+        return;
+    }
+
+    unsigned int joystick_1;
+    for (joystick_1 = 4; joystick_1 < num_joysticks; joystick_1++) {
+        if (SDL_IsGameController(joystick_1)) {
+            break;
+        }
+    }
+    if (joystick_1 != num_joysticks) {
+        g_controller_1 = SDL_GameControllerOpen(joystick_1);
+        if (!g_controller_1) {
+            printf("Failed to open joystick %d as controller\n", joystick_1);
+            return;
+        }
     }
 }
 
-static unsigned int _get_controller_button(SDL_GameControllerButton button) {
-    if (!g_controller) {
+static unsigned int _get_controller_button(unsigned int controller_id, SDL_GameControllerButton button) {
+    assert(controller_id <= 1);
+
+    SDL_GameController *controller = controller_id == 0 ? g_controller_0 : g_controller_1;
+
+    if (!controller) {
         return 0;
     }
 
-    return SDL_GameControllerGetButton(g_controller, button);
+    return SDL_GameControllerGetButton(controller, button);
+}
+
+static unsigned int _get_controller_axis(unsigned int controller_id, SDL_GameControllerAxis axis, bool expected) {
+    assert(controller_id <= 1);
+
+    SDL_GameController *controller = controller_id == 0 ? g_controller_0 : g_controller_1;
+
+    if (!controller) {
+        return 0;
+    }
+
+    int val = SDL_GameControllerGetAxis(controller, axis);
+    return expected ? val >= 16384 : val <= -16384;
 }
 
 void sc_init(void) {
-   _init_controller();
+   _init_controllers();
 }
 
-void sc_poll_input(void) {
+void sc_poll_input(unsigned int controller_id) {
+    assert(controller_id <= 1);
+
     int key_count;
 
     const uint8_t *key_states = SDL_GetKeyboardState(&key_count);
 
-    bool button_states[] = {
-        key_states[SDL_SCANCODE_Z] | _get_controller_button(SDL_CONTROLLER_BUTTON_B),               // a
-        key_states[SDL_SCANCODE_X] | _get_controller_button(SDL_CONTROLLER_BUTTON_A),               // b
-        key_states[SDL_SCANCODE_COMMA] | _get_controller_button(SDL_CONTROLLER_BUTTON_BACK),        // select
-        key_states[SDL_SCANCODE_PERIOD] | _get_controller_button(SDL_CONTROLLER_BUTTON_START),      // start
-        key_states[SDL_SCANCODE_UP] | _get_controller_button(SDL_CONTROLLER_BUTTON_DPAD_UP),        // up
-        key_states[SDL_SCANCODE_DOWN] | _get_controller_button(SDL_CONTROLLER_BUTTON_DPAD_DOWN),    // down
-        key_states[SDL_SCANCODE_LEFT] | _get_controller_button(SDL_CONTROLLER_BUTTON_DPAD_LEFT),    // left
-        key_states[SDL_SCANCODE_RIGHT] | _get_controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT)   // right
+    bool button_states[8];
+    for (int i = 0; i < BUTTON_COUNT; i++) {
+        if (controller_id == 0) {
+            button_states[i] = key_states[g_poll_keys[i]]
+                    | _get_controller_button(controller_id, g_poll_buttons[i]);
+        } else {
+            button_states[i] = _get_controller_button(controller_id, g_poll_buttons[i]);
+        }
     };
 
-    Controller *controller0 = get_controller(0);
+    button_states[4] |= _get_controller_axis(controller_id, SDL_CONTROLLER_AXIS_LEFTY, 0);
+    button_states[5] |= _get_controller_axis(controller_id, SDL_CONTROLLER_AXIS_LEFTY, 1);
+    button_states[6] |= _get_controller_axis(controller_id, SDL_CONTROLLER_AXIS_LEFTX, 0);
+    button_states[7] |= _get_controller_axis(controller_id, SDL_CONTROLLER_AXIS_LEFTX, 1);
 
-    assert(controller0);
+    Controller *controller = get_controller(controller_id);
 
-    sc_set_state(controller0, button_states);
+    assert(controller);
+
+    sc_set_state(controller, button_states);
 }

@@ -61,7 +61,8 @@ static Cartridge *g_cart;
 static void _init_controllers() {
     init_controllers();
 
-    controller_connect(0, create_standard_controller());
+    controller_connect(create_standard_controller(0));
+    controller_connect(create_standard_controller(1));
 
     sc_attach_driver(sc_init, sc_poll_input);
 }

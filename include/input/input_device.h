@@ -27,12 +27,17 @@
 
 #include <stdint.h>
 
-typedef uint8_t (*ControllerPollFunction)(void*);
-typedef void (*ControllerPushFunction)(void*, uint8_t);
+// forward declaration
+struct controller_t;
+
+typedef uint8_t (*ControllerPollFunction)(struct controller_t *controller);
+typedef void (*ControllerPushFunction)(struct controller_t *controller, uint8_t data);
 
 typedef void (*NullaryCallback)(void);
+typedef void (*UintConsumer)(unsigned int);
 
-typedef struct {
+typedef struct controller_t {
+    unsigned int id;
     ControllerPollFunction poller;
     ControllerPushFunction pusher;
     void *state;
@@ -42,7 +47,7 @@ void init_controllers(void);
 
 Controller *get_controller(unsigned int port);
 
-void controller_connect(unsigned int port, Controller *controller);
+void controller_connect(Controller *controller);
 
 void controller_disconnect(unsigned int port);
 
