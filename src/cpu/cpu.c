@@ -43,7 +43,6 @@
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
 
 #define PRINT_INSTRS 0
-#define PRINT_MEMORY_ACCESS 0
 
 #define ASSERT_CYCLE(l, h)  assert(g_instr_cycle >= l); \
                             assert(g_instr_cycle <= h)
@@ -91,21 +90,12 @@ void cpu_init_pc(uint16_t addr) {
 
 uint8_t cpu_ram_read(uint16_t addr) {
     assert(addr < 0x800);
-
-    #if PRINT_MEMORY_ACCESS
-    printf("$%04X -> %02X\n", addr, g_sys_memory[addr]);
-    #endif
-
     return g_sys_memory[addr];
 }
 
 void cpu_ram_write(uint16_t addr, uint8_t val) {
     assert(addr < 0x800);
     g_sys_memory[addr] = val;
-
-    #if PRINT_MEMORY_ACCESS
-    printf("$%04X <- %02X\n", addr, val);
-    #endif
 }
 
 void cpu_start_oam_dma(uint8_t page) {
@@ -158,7 +148,7 @@ static void _do_cmp(uint8_t reg, uint16_t m) {
     g_cpu_regs.status.negative = ((uint8_t) (reg - m)) >> 7;
 }
 
-static void _do_adc(uint16_t m) {
+static void _do_adc(uint8_t m) {
     uint8_t acc0 = g_cpu_regs.acc;
 
     g_cpu_regs.acc = (acc0 + m + g_cpu_regs.status.carry);
@@ -172,16 +162,8 @@ static void _do_adc(uint16_t m) {
     g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & (m ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
 }
 
-static void _do_sbc(uint16_t m) {
-    uint8_t acc0 = g_cpu_regs.acc;
-
-    g_cpu_regs.acc = (acc0 - m - !g_cpu_regs.status.carry);
-
-    _set_alu_flags(g_cpu_regs.acc);
-
-    g_cpu_regs.status.carry = g_cpu_regs.acc <= acc0;
-
-    g_cpu_regs.status.overflow = ((acc0 ^ g_cpu_regs.acc) & ((0xFF - m) ^ g_cpu_regs.acc) & 0x80) ? 1 : 0;
+static void _do_sbc(uint8_t m) {
+    return _do_adc(~m);
 }
 
 void cpu_raise_nmi_line(void) {
@@ -317,12 +299,12 @@ void _do_instr_operation() {
             break;
         // math
         case ADC: {
-            _do_adc(g_latched_val);
+            _do_adc(g_latched_val & 0xFF);
 
             break;
         }
         case SBC: {
-            _do_sbc(g_latched_val);
+            _do_sbc(g_latched_val & 0xFF);
 
             break;
         }
@@ -448,7 +430,7 @@ void _do_instr_operation() {
         case RRA: { // unofficial
             _do_shift(true, true);
 
-            _do_adc(g_latched_val);
+            _do_adc(g_latched_val & 0xFF);
 
             break;
         }
@@ -593,7 +575,7 @@ static void _handle_brk(void) {
             break;
         case 5:
             // push P, decrement S, set B
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial);
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.status.serial | 0x30);
             g_cpu_regs.sp--;
             g_cpu_regs.status.break_command = 1;
             break;
@@ -680,14 +662,21 @@ static void _handle_stack_push(void) {
         case 2:
             _next_prg_byte(); // garbage read
             break;
-        case 3:
+        case 3: {
             // push register, decrement S
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp,
-                    g_cur_instr->mnemonic == PHA ? g_cpu_regs.acc : g_cpu_regs.status.serial);
+            uint8_t val;
+            if (g_cur_instr->mnemonic == PHA) {
+                val = g_cpu_regs.acc;
+            } else {
+                val = g_cpu_regs.status.serial;
+                val |= 0x30;
+            }
+            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
             g_cpu_regs.sp--;
 
             g_instr_cycle = 0; // reset for next instruction
             break;
+        }
     }
 }
 

@@ -49,6 +49,9 @@
 
 #define SRAM_FILE_NAME "sram.bin"
 
+#define PRINT_SYS_MEMORY_ACCESS 0
+#define PRINT_PPU_MEMORY_ACCESS 0
+
 bool halted = false;
 bool stepping = false;
 bool dead = false;
@@ -88,18 +91,38 @@ void initialize_system(Cartridge *cart) {
 }
 
 uint8_t system_ram_read(uint16_t addr) {
-    return g_cart->mapper->ram_read_func(g_cart, addr);
+    uint8_t res = g_cart->mapper->ram_read_func(g_cart, addr);
+
+    #if PRINT_SYS_MEMORY_ACCESS
+    printf("$%04X -> %02X\n", addr, res);
+    #endif
+
+    return res;
 }
 
 void system_ram_write(uint16_t addr, uint8_t val) {
+    #if PRINT_SYS_MEMORY_ACCESS
+    printf("$%04X <- %02X\n", addr, val);
+    #endif
+
     g_cart->mapper->ram_write_func(g_cart, addr, val);
 }
 
 uint8_t system_vram_read(uint16_t addr) {
-    return g_cart->mapper->vram_read_func(g_cart, addr);
+    uint8_t res = g_cart->mapper->vram_read_func(g_cart, addr);
+
+    #if PRINT_PPU_MEMORY_ACCESS
+    printf("$%04X -> %02X\n", addr, res);
+    #endif
+
+    return res;
 }
 
 void system_vram_write(uint16_t addr, uint8_t val) {
+    #if PRINT_PPU_MEMORY_ACCESS
+    printf("$%04X <- %02X\n", addr, val);
+    #endif
+
     g_cart->mapper->vram_write_func(g_cart, addr, val);
 }
 
