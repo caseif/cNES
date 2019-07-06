@@ -26,7 +26,7 @@
 #include "renderer.h"
 #include "sdl_manager.h"
 #include "system.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
 #include <pthread.h>
 #include <stdbool.h>

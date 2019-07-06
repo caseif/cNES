@@ -28,7 +28,7 @@
 #include "cpu/cpu.h"
 #include "input/input_device.h"
 #include "mappers/mappers.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
 #include <assert.h>
 #include <stdio.h>

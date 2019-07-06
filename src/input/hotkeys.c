@@ -27,7 +27,7 @@
 #include "system.h"
 #include "cpu/cpu.h"
 #include "input/global/hotkeys.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
 #include <pthread.h>
 #include <SDL2/SDL.h>

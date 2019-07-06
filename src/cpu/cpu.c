@@ -28,7 +28,7 @@
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
 #include "input/input_device.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
 #include <assert.h>
 #include <errno.h>

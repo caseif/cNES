@@ -26,7 +26,7 @@
 #include "sdl_manager.h"
 #include "system.h"
 #include "util.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
 #include <stdbool.h>
 #include <SDL2/SDL.h>

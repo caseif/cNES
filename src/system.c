@@ -32,7 +32,7 @@
 #include "input/input_device.h"
 #include "input/standard/sc_driver.h"
 #include "input/standard/standard_controller.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
 #include <assert.h>
 #include <stdbool.h>
