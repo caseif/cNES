@@ -51,20 +51,19 @@ uint8_t _sc_poll(Controller *controller) {
         state_cast->bit = 0;
 
         g_poll_callback(controller->id);
-    } else if (state_cast->bit > 7) {
+    }
+
+    if (state_cast->bit > 7) {
+        state_cast->bit++;
         return 1; // input is tied to vcc, so extra reads reutrn 1
     }
 
     // for some reason, the ternary expression originally here would sometimes evaluate to 2
-    uint8_t res;
-    if (state_cast->button_states[state_cast->bit]) {
-        res = 1;
+    if (state_cast->button_states[state_cast->bit++]) {
+        return 1;
     } else {
-        res = 0;
+        return 0;
     }
-
-    state_cast->bit += 1;
-    return res;
 }
 
 void _sc_push(Controller *controller, uint8_t data) {
@@ -81,6 +80,7 @@ void _sc_push(Controller *controller, uint8_t data) {
 Controller *create_standard_controller(unsigned int controller_id) {
     Controller *controller = (Controller*) malloc(sizeof(Controller));
     controller->id = controller_id;
+    controller->type = CONTROLLER_TYPE_STANDARD;
     controller->poller = _sc_poll;
     controller->pusher = _sc_push;
     controller->state = (ScState*) malloc(sizeof(ScState));

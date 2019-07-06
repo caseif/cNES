@@ -41,7 +41,7 @@ uint8_t nil_poller(Controller *controller) {
 void nil_pusher(Controller *controller, uint8_t data) {
 }
 
-static Controller empty_controller = {0, nil_poller, nil_pusher, NULL};
+static Controller empty_controller = {0, CONTROLLER_TYPE_NONE, nil_poller, nil_pusher, NULL};
 
 void init_controllers(void) {
     for (unsigned int i = MIN_PORT; i <= MAX_PORT; i++) {
@@ -79,7 +79,8 @@ uint8_t controller_poll(unsigned int port) {
 }
 
 void controller_push(unsigned int port, uint8_t data) {
-    assert(port >= MIN_PORT && port <= MAX_PORT);
-
-    controllers[port]->pusher(controllers[port], data);
+    // there's only one output port, which is directed to both controllers
+    for (int port = MIN_PORT; port <= MAX_PORT; port++) {
+        controllers[port]->pusher(controllers[port], data);
+    }
 }

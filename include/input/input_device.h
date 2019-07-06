@@ -27,6 +27,9 @@
 
 #include <stdint.h>
 
+#define CONTROLLER_TYPE_NONE 0
+#define CONTROLLER_TYPE_STANDARD 1
+
 // forward declaration
 struct controller_t;
 
@@ -38,6 +41,7 @@ typedef void (*UintConsumer)(unsigned int);
 
 typedef struct controller_t {
     unsigned int id;
+    unsigned int type;
     ControllerPollFunction poller;
     ControllerPushFunction pusher;
     void *state;
