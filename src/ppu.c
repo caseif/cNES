@@ -984,14 +984,10 @@ void cycle_ppu(void) {
                 uint8_t palette_high = 0x4 | attrs.palette_index;
                 uint8_t sprite_palette_offset = (palette_high << 2) | palette_low;
 
-                if (!attrs.low_priority) {
-                    final_palette_offset = sprite_palette_offset;
-                    // since it's high priority, we can stop looking for a better sprite
-                    break;
-                } else if (transparent_background) {
-                    // just set the offset and continue looking
+                if (!attrs.low_priority || transparent_background) {
                     final_palette_offset = sprite_palette_offset;
                 }
+                break;
             }
         }
 
