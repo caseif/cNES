@@ -112,7 +112,8 @@ typedef struct {
     uint8_t sprite_attr_latch; // latch for sprite during evaluation
     bool has_latched_sprite;   // whether a byte is latched
     uint8_t loaded_sprites; // number of currently loaded sprites
-    uint8_t sprite_0_slot; // the slot sprite 0 is currently in, if any
+    uint8_t sprite_0_next_scanline; // whether sprite 0 is on the next scanline
+    uint8_t sprite_0_scanline; // whether sprite 0 is on the current scanline
 
     uint8_t sprite_tile_index_latch; // stores the tile index during fetching
     uint8_t sprite_y_latch; // stores the sprite y-position during fetching

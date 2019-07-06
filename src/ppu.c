@@ -608,7 +608,9 @@ void _do_sprite_evaluation(void) {
                 g_ppu_internal_regs.m = 0;
                 g_ppu_internal_regs.n = 0;
                 g_ppu_internal_regs.o = 0;
-                g_ppu_internal_regs.sprite_0_slot = 8; // set it out of bounds initially
+                // copy sprite 0 flag to flag for current scanline
+                g_ppu_internal_regs.sprite_0_scanline = g_ppu_internal_regs.sprite_0_next_scanline;
+                g_ppu_internal_regs.sprite_0_next_scanline = false;
                 break;
             case 1 ... 64:
                 // clear secondary OAM byte-by-byte, but only on even ticks
@@ -701,9 +703,8 @@ void _do_sprite_evaluation(void) {
                     // reset our registers
                     if (g_ppu_internal_regs.m == 4) {
                         if (g_ppu_internal_regs.n == 0) {
-                            g_ppu_internal_regs.sprite_0_slot = g_ppu_internal_regs.o;
+                            g_ppu_internal_regs.sprite_0_next_scanline = true;
                         }
-
                         // reset m and increment n/o
                         g_ppu_internal_regs.n++;
                         g_ppu_internal_regs.o++;
@@ -714,7 +715,9 @@ void _do_sprite_evaluation(void) {
 
                 break;
             }
-            case 257 ... 320: {
+        }
+        if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) || g_scanline == PRE_RENDER_LINE) {
+            if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
                 // sprite tile fetching
 
                 if (g_scanline_tick == 257) {
@@ -841,8 +844,6 @@ void _do_sprite_evaluation(void) {
                         // twiddle our thumbs
                     }
                 }
-
-                break;
             }
         }
     }
@@ -942,56 +943,57 @@ void cycle_ppu(void) {
             transparent_background = true;
         }
 
-        uint8_t final_palette_offset = bg_palette_offset;
+        uint8_t final_palette_offset;
+        if (g_ppu_mask.show_background) {
+            final_palette_offset = bg_palette_offset;
+        } else {
+            final_palette_offset = 0x0f;
+        }
 
         // time to read sprite data
 
-        // iterate all sprites for the current scanline
-        for (unsigned int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
-            // don't render sprites if sprite rendering is disabled
-            if (!g_ppu_mask.show_sprites) {
-                continue;
-            }
+        // don't render sprites if sprite rendering is disabled, or if they should be clipped
+        if (g_ppu_mask.show_sprites && !(!g_ppu_mask.show_sprites_left && g_scanline_tick < 8)) {
+            // iterate all sprites for the current scanline
+            for (unsigned int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
+                // if the x counter hasn't run down to zero, skip it
+                if (g_ppu_internal_regs.sprite_x_counters[i]) {
+                    continue;
+                }
 
-            if (!g_ppu_mask.show_sprites_left && g_scanline_tick < 8) {
-                continue;
-            }
+                // if the death counter went to zero, this sprite is done rendering
+                if (!g_ppu_internal_regs.sprite_death_counters[i]) {
+                    continue;
+                }
 
-            // if the x counter hasn't run down to zero, skip it
-            if (g_ppu_internal_regs.sprite_x_counters[i]) {
-                continue;
-            }
+                unsigned int palette_low = ((g_ppu_internal_regs.sprite_tile_shift_h[i] & 1) << 1)
+                                            | (g_ppu_internal_regs.sprite_tile_shift_l[i] & 1);
+                // if the pixel is transparent, just continue
+                if (!palette_low) {
+                    continue;
+                }
 
-            // if the death counter went to zero, this sprite is done rendering
-            if (!g_ppu_internal_regs.sprite_death_counters[i]) {
-                continue;
-            }
+                if (g_ppu_internal_regs.sprite_0_scanline
+                        && i == 0
+                        && g_ppu_mask.show_background
+                        && !transparent_background) {
+                    g_ppu_status.sprite_0_hit = 1; // set the hit flag
+                    break;
+                }
 
-            unsigned int palette_low = ((g_ppu_internal_regs.sprite_tile_shift_h[i] & 1) << 1)
-                                        | (g_ppu_internal_regs.sprite_tile_shift_l[i] & 1);
+                SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[i];
 
-            // if the pixel is transparent, just continue
-            if (!palette_low) {
-                continue;
-            }
+                uint8_t palette_high = 0x4 | attrs.palette_index;
+                uint8_t sprite_palette_offset = (palette_high << 2) | palette_low;
 
-            if (g_ppu_mask.show_background && !transparent_background && i == g_ppu_internal_regs.sprite_0_slot) {
-                g_ppu_status.sprite_0_hit = 1; // set the hit flag
-                g_ppu_internal_regs.sprite_0_slot = 8; // set it out-of-bounds until the next frame
-            }
-
-            SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[i];
-
-            uint8_t palette_high = 0x4 | attrs.palette_index;
-            uint8_t sprite_palette_offset = (palette_high << 2) | palette_low;
-
-            if (!attrs.low_priority) {
-                final_palette_offset = sprite_palette_offset;
-                // since it's high priority, we can stop looking for a better sprite
-                break;
-            } else if (transparent_background) {
-                // just set the offset and continue looking
-                final_palette_offset = sprite_palette_offset;
+                if (!attrs.low_priority) {
+                    final_palette_offset = sprite_palette_offset;
+                    // since it's high priority, we can stop looking for a better sprite
+                    //break;
+                } else if (transparent_background) {
+                    // just set the offset and continue looking
+                    final_palette_offset = sprite_palette_offset;
+                }
             }
         }
 
@@ -999,12 +1001,7 @@ void cycle_ppu(void) {
 
         uint8_t palette_index = system_vram_read(palette_entry_addr);
 
-        RGBValue rgb;
-        if (g_ppu_mask.show_background) {
-            rgb = g_palette[palette_index % (sizeof(g_palette) / sizeof(RGBValue))];
-        } else {
-            rgb = (RGBValue) {0, 0, 0};
-        }
+        RGBValue rgb = g_palette[palette_index % (sizeof(g_palette) / sizeof(RGBValue))];
 
         render_pixel(draw_pixel_x, draw_pixel_y, rgb);
 
