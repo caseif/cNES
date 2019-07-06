@@ -505,8 +505,6 @@ void _do_general_cycle_routine(void) {
                         // address = name table base + (v except fine y)
                         uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
 
-                        //printf("(%03d, %03d) @ (%03d, %03d) -> %04x\n", fetch_pixel_x, fetch_pixel_y, g_scanline_tick, g_scanline, name_table_addr);
-
                         g_ppu_internal_regs.name_table_entry_latch = system_vram_read(name_table_addr);
 
                         break;
@@ -932,7 +930,7 @@ void cycle_ppu(void) {
 
         bool transparent_background = false;
 
-        if (palette_low && !(!g_ppu_mask.show_background_left && g_scanline_tick < 8)) {
+        if (palette_low && !(!g_ppu_mask.show_background_left && g_scanline_tick <= 8)) {
             // if the palette low bits are not zero, we select the color normally
             unsigned int palette_high = (((g_ppu_internal_regs.palette_shift_h >> g_ppu_internal_regs.x) & 1) << 1)
                     | ((g_ppu_internal_regs.palette_shift_l >> g_ppu_internal_regs.x) & 1);
@@ -953,7 +951,7 @@ void cycle_ppu(void) {
         // time to read sprite data
 
         // don't render sprites if sprite rendering is disabled, or if they should be clipped
-        if (g_ppu_mask.show_sprites && !(!g_ppu_mask.show_sprites_left && g_scanline_tick < 8)) {
+        if (g_ppu_mask.show_sprites && !(!g_ppu_mask.show_sprites_left && g_scanline_tick <= 8)) {
             // iterate all sprites for the current scanline
             for (unsigned int i = 0; i < g_ppu_internal_regs.loaded_sprites; i++) {
                 // if the x counter hasn't run down to zero, skip it
@@ -976,9 +974,9 @@ void cycle_ppu(void) {
                 if (g_ppu_internal_regs.sprite_0_scanline
                         && i == 0
                         && g_ppu_mask.show_background
-                        && !transparent_background) {
+                        && !transparent_background
+                        && g_scanline_tick != 256) {
                     g_ppu_status.sprite_0_hit = 1; // set the hit flag
-                    break;
                 }
 
                 SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[i];
@@ -989,7 +987,7 @@ void cycle_ppu(void) {
                 if (!attrs.low_priority) {
                     final_palette_offset = sprite_palette_offset;
                     // since it's high priority, we can stop looking for a better sprite
-                    //break;
+                    break;
                 } else if (transparent_background) {
                     // just set the offset and continue looking
                     final_palette_offset = sprite_palette_offset;
