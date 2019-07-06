@@ -23,40 +23,43 @@
  * THE SOFTWARE.
  */
 
-#pragma once
-
 #include "cartridge.h"
+#include "system.h"
+#include "cpu/cpu.h"
+#include "mappers/mappers.h"
+#include "mappers/nrom.h"
 
-#include <stdint.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
 
-#define MAPPER_ID_NROM 0
-#define MAPPER_ID_MMC1 1
-#define MAPPER_ID_UNROM 2
-#define MAPPER_ID_CNROM 3
-#define MAPPER_ID_MMC3 4
+#define CHR_BANK_GRANULARITY 0x2000
 
-typedef void (*MapperInitFunction)(struct cartridge *cart);
-typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
-typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
-typedef void (*MapperTickFunction)(void);
+#define CHR_RAM_SIZE 0x2000
 
-typedef struct {
-    unsigned int id;
-    char name[12];
-    MapperInitFunction init_func;
-    MemoryReadFunction ram_read_func;
-    MemoryWriteFunction ram_write_func;
-    MemoryReadFunction vram_read_func;
-    MemoryWriteFunction vram_write_func;
-    MapperTickFunction tick_func;
-} Mapper;
+static unsigned char g_chr_bank;
 
-void mapper_init_nrom(Mapper *mapper);
+static uint32_t _cnrom_get_chr_offset(Cartridge *cart, uint16_t addr) {
+    assert(addr < 0x2000);
 
-void mapper_init_mmc1(Mapper *mapper);
+    return ((g_chr_bank * CHR_BANK_GRANULARITY) | (addr % CHR_BANK_GRANULARITY)) % cart->chr_size;
+}
 
-void mapper_init_unrom(Mapper *mapper);
+static uint8_t _cnrom_vram_read(Cartridge *cart, uint16_t addr) {
+    if (addr < 0x2000) {
+        return cart->chr_rom[_cnrom_get_chr_offset(cart, addr)];
+    } else {
+        return nrom_vram_read(cart, addr);
+    }
+}
 
-void mapper_init_cnrom(Mapper *mapper);
-
-void mapper_init_mmc3(Mapper *mapper);
+void mapper_init_cnrom(Mapper *mapper) {
+    mapper->id = MAPPER_ID_CNROM;
+    memcpy(mapper->name, "CNROM", strlen("CNROM"));
+    mapper->init_func       = NULL;
+    mapper->ram_read_func   = *nrom_ram_read;
+    mapper->ram_write_func  = *nrom_ram_write;
+    mapper->vram_read_func  = *_cnrom_vram_read;
+    mapper->vram_write_func = *nrom_vram_write;
+    mapper->tick_func       = NULL;
+}

@@ -51,6 +51,8 @@ uint8_t _sc_poll(Controller *controller) {
         state_cast->bit = 0;
 
         g_poll_callback(controller->id);
+    } else if (state_cast->bit > 7) {
+        return 1; // input is tied to vcc, so extra reads reutrn 1
     }
 
     // for some reason, the ternary expression originally here would sometimes evaluate to 2

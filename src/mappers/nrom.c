@@ -30,6 +30,8 @@
 #include "mappers/mappers.h"
 #include "ppu/ppu.h"
 
+#include <string.h>
+
 uint8_t nrom_ram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         case 0x0000 ... 0x7FFF:
@@ -105,6 +107,8 @@ void nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }   
 
 void mapper_init_nrom(Mapper *mapper) {
+    mapper->id = MAPPER_ID_NROM;
+    memcpy(mapper->name, "NROM", strlen("NROM"));
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *nrom_ram_read;
     mapper->ram_write_func  = *nrom_ram_write;

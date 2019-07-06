@@ -103,6 +103,8 @@ static void _unrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 void mapper_init_unrom(Mapper *mapper) {
+    mapper->id = MAPPER_ID_UNROM;
+    memcpy(mapper->name, "UNROM", strlen("UNROM"));
     mapper->init_func       = *_unrom_init;
     mapper->ram_read_func   = *_unrom_ram_read;
     mapper->ram_write_func  = *_unrom_ram_write;

@@ -33,6 +33,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#define MAPPER_MSG "Found mapper %d (%s)\n"
+
 #define NES_MAGIC 0x4E45531A
 #define PRG_CHUNK_SIZE ((size_t) 0x4000)
 #define CHR_CHUNK_SIZE ((size_t) 0x2000)
@@ -52,6 +54,39 @@ typedef struct {
     unsigned int nes2:2 PACKED;
     unsigned int mapper_high:4 PACKED;
 } Flag7;
+
+void _init_mapper(Mapper *mapper, void (*init_func)(Mapper*)) {
+    init_func(mapper);
+    printf(MAPPER_MSG, mapper->id, mapper->name);
+}
+
+Mapper *_create_mapper(unsigned int mapper_id) {
+    Mapper *mapper = (Mapper*) malloc(sizeof(Mapper));
+
+    switch (mapper_id) {
+        case MAPPER_ID_NROM:
+            _init_mapper(mapper, mapper_init_nrom);
+            break;
+        case MAPPER_ID_MMC1:
+            _init_mapper(mapper, mapper_init_mmc1);
+            break;
+        case MAPPER_ID_UNROM:
+            _init_mapper(mapper, mapper_init_unrom);
+            break;
+        case MAPPER_ID_CNROM:
+            _init_mapper(mapper, mapper_init_cnrom);
+            break;
+        case MAPPER_ID_MMC3:
+            _init_mapper(mapper, mapper_init_mmc3);
+            break;
+        default:
+            printf("Mapper %d is not supported at this time\n", mapper_id);
+            free(mapper);
+            return NULL;
+    }
+
+    return mapper;
+}
 
 Cartridge *load_rom(FILE *file, char *file_name) {
     unsigned char buffer[16];
@@ -82,30 +117,9 @@ Cartridge *load_rom(FILE *file, char *file_name) {
         return NULL;
     }
 
-    uint8_t mapper_id = (flag7.mapper_high << 4) | flag6.mapper_low;
-    Mapper *mapper = (Mapper*) malloc(sizeof(Mapper));
-
-    switch (mapper_id) {
-        case 0:
-            printf("Found mapper %d (NROM)\n", mapper_id);
-            mapper_init_nrom(mapper);
-            break;
-        case 1:
-            printf("Found mapper %d (MMC1)\n", mapper_id);
-            mapper_init_mmc1(mapper);
-            break;
-        case 2:
-            printf("Found mapper %d (UNROM)\n", mapper_id);
-            mapper_init_unrom(mapper);
-            break;
-        case 4:
-            printf("Found mapper %d (MMC3)\n", mapper_id);
-            mapper_init_mmc3(mapper);
-            break;
-        default:
-            printf("Mapper %d is not supported at this time\n", mapper_id);
-            free(mapper);
-            return NULL;
+    Mapper *mapper = _create_mapper((flag7.mapper_high << 4) | flag6.mapper_low);
+    if (!mapper) {
+        return NULL;
     }
 
     size_t prg_ram_size = buffer[8] * PRG_RAM_CHUNK_SIZE;

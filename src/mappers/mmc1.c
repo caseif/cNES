@@ -32,6 +32,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #define CHR_RAM_SIZE 0x2000
 
@@ -238,6 +239,8 @@ static void _mmc1_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 void mapper_init_mmc1(Mapper *mapper) {
+    mapper->id = MAPPER_ID_MMC1;
+    memcpy(mapper->name, "MMC1", strlen("MMC1"));
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc1_ram_read;
     mapper->ram_write_func  = *_mmc1_ram_write;

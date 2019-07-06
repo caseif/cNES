@@ -32,6 +32,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MMC3_DEBUG_LOGGING 0
 
@@ -312,6 +313,8 @@ static void _mmc3_tick(void) {
 }
 
 void mapper_init_mmc3(Mapper *mapper) {
+    mapper->id = MAPPER_ID_MMC3;
+    memcpy(mapper->name, "MMC3", strlen("MMC3"));
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc3_ram_read;
     mapper->ram_write_func  = *_mmc3_ram_write;
