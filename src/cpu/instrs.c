@@ -50,10 +50,10 @@ static const Instruction g_instr_list[] = {
     {SEI, IMP}, {ADC, ABY}, {NOP, IMP}, {RRA, ABY}, {NOP, ABX}, {ADC, ABX}, {ROR, ABX}, {RRA, ABX},
     {NOP, IMM}, {STA, IZX}, {NOP, IMM}, {SAX, IZX}, {STY, ZRP}, {STA, ZRP}, {STX, ZRP}, {SAX, ZRP},
     {DEY, IMP}, {NOP, IMM}, {TXA, IMP}, {XAA, IMM}, {STY, ABS}, {STA, ABS}, {STX, ABS}, {SAX, ABS},
-    {BCC, REL}, {STA, IZY}, {KIL, IMP}, {AHX, IZY}, {STY, ZPX}, {STA, ZPX}, {STX, ZPY}, {SAX, ZPY},
-    {TYA, IMP}, {STA, ABY}, {TXS, IMP}, {TAS, ABY}, {SHY, ABX}, {STA, ABX}, {SHX, ABY}, {AHX, ABY},
+    {BCC, REL}, {STA, IZY}, {KIL, IMP}, {AXA, IZY}, {STY, ZPX}, {STA, ZPX}, {STX, ZPY}, {SAX, ZPY},
+    {TYA, IMP}, {STA, ABY}, {TXS, IMP}, {TAS, ABY}, {SAY, ABX}, {STA, ABX}, {XAS, ABY}, {AXA, ABY},
     {LDY, IMM}, {LDA, IZX}, {LDX, IMM}, {LAX, IZX}, {LDY, ZRP}, {LDA, ZRP}, {LDX, ZRP}, {LAX, ZRP},
-    {TAY, IMP}, {LDA, IMM}, {TAX, IMP}, {ATX, IMM}, {LDY, ABS}, {LDA, ABS}, {LDX, ABS}, {LAX, ABS},
+    {TAY, IMP}, {LDA, IMM}, {TAX, IMP}, {LAX, IMM}, {LDY, ABS}, {LDA, ABS}, {LDX, ABS}, {LAX, ABS},
     {BCS, REL}, {LDA, IZY}, {KIL, IMP}, {LAX, IZY}, {LDY, ZPX}, {LDA, ZPX}, {LDX, ZPY}, {LAX, ZPY},
     {CLV, IMP}, {LDA, ABY}, {TSX, IMP}, {LAS, ABY}, {LDY, ABX}, {LDA, ABX}, {LDX, ABY}, {LAX, ABY},
     {CPY, IMM}, {CMP, IZX}, {NOP, IMM}, {DCP, IZX}, {CPY, ZRP}, {CMP, ZRP}, {DEC, ZRP}, {DCP, ZRP},
@@ -94,8 +94,8 @@ const char *g_mnemonic_strs[] = {
     "CLC", "CLD", "CLI", "CLV", "CMP", "CPX", "CPY", "SEC",
     "SED", "SEI", "PHA", "PHP", "PLA", "PLP", "BRK", "NOP",
     "KIL", "ANC", "SLO", "RLA", "SRE", "RRA", "SAX", "LAX",
-    "DCP", "ALR", "XAA", "TAS", "SHY", "SHX", "AHX", "ARR",
-    "LAS", "ISC", "AXS", "ATX"
+    "DCP", "ALR", "XAA", "TAS", "SAY", "XAS", "AXA", "ARR",
+    "LAS", "ISC", "AXS"
 };
 
 const char *g_addr_mode_strs[] = {
@@ -128,12 +128,18 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         // unofficial
         case NOP:
         case LAX:
+        case ANC:
+        case ALR:
+        case XAA:
+        case ARR: // matey
+        case LAS:
             return INS_R;
         case STA:
         case STX:
         case STY:
         // unofficial
         case SAX:
+        case AXS:
             return INS_W;
         case DEC:
         case INC:
@@ -148,6 +154,9 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         case RLA:
         case SRE:
         case RRA:
+        case SAY:
+        case XAS:
+        case AXA:
             return INS_RW;
         case BCC:
         case BCS:
@@ -161,8 +170,39 @@ const InstructionType get_instr_type(const Mnemonic mnemonic) {
         case JMP:
         case JSR:
             return INS_JUMP;
+        case PHA:
+        case PLA:
+        case PHP:
+        case PLP:
+            return INS_STACK;
+        case TAX:
+        case TAY:
+        case TXA:
+        case TYA:
+        case INX:
+        case INY:
+        case DEX:
+        case DEY:
+        case TSX:
+        case TXS:
+        case CLC:
+        case SEC:
+        case CLI:
+        case SEI:
+        case CLV:
+        case CLD:
+        case SED:
+        // unofficial
+        case TAS:
+            return INS_REG;
+        case RTS:
+        case RTI:
+            return INS_RET;
+        case BRK:
+        case KIL:
+            return INS_OTHER;
         default:
-            return INS_NONE;
+            assert(false);
     }
 }
 

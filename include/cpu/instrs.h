@@ -36,8 +36,8 @@ typedef enum {
     CLC, CLD, CLI, CLV, CMP, CPX, CPY, SEC,
     SED, SEI, PHA, PHP, PLA, PLP, BRK, NOP,
     KIL, ANC, SLO, RLA, SRE, RRA, SAX, LAX,
-    DCP, ALR, XAA, TAS, SHY, SHX, AHX, ARR,
-    LAS, ISC, AXS, ATX
+    DCP, ALR, XAA, TAS, SAY, XAS, AXA, ARR,
+    LAS, ISC, AXS
 } Mnemonic;
 
 typedef enum {
@@ -56,7 +56,7 @@ typedef struct {
     uint16_t adj_operand;
 } InstructionParameter;
 
-typedef enum { INS_NONE, INS_BRANCH, INS_JUMP, INS_R, INS_W, INS_RW } InstructionType;
+typedef enum { INS_OTHER, INS_BRANCH, INS_JUMP, INS_R, INS_W, INS_RW, INS_STACK, INS_REG, INS_RET } InstructionType;
 
 const char *mnemonic_to_str(const Mnemonic mnemonic);
 

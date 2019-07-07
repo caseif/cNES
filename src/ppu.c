@@ -112,7 +112,9 @@ static bool g_odd_frame;
 static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
-static bool nmi_suppression = false;
+// ugly NMI timing hacks
+static bool g_nmi_suppression = false;
+static bool g_vbl_flag_suppression = false;
 
 static RenderMode g_render_mode;
 
@@ -166,7 +168,10 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
             if (g_scanline == VBL_SCANLINE) {
                 if (g_scanline_tick >= VBL_SCANLINE_TICK - 1 && g_scanline_tick <= VBL_SCANLINE_TICK + 1) {
-                    nmi_suppression = true;
+                    g_nmi_suppression = true;
+                    if (g_scanline_tick >= VBL_SCANLINE_TICK - 1) {
+                        g_vbl_flag_suppression = true;
+                    }
                 }
             }
 
@@ -580,10 +585,13 @@ void _do_general_cycle_routine(void) {
         // set vblank flag
         case VBL_SCANLINE: {
             if (g_scanline_tick == VBL_SCANLINE_TICK) {
-                g_ppu_status.vblank = 1;
+                if (!g_vbl_flag_suppression) {
+                    g_ppu_status.vblank = 1;
+                }
+                g_vbl_flag_suppression = false;
 
-                if (nmi_suppression) {
-                    nmi_suppression = false;
+                if (g_nmi_suppression) {
+                    g_nmi_suppression = false;
                     break;
                 }
 
