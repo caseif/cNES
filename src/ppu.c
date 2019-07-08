@@ -151,12 +151,42 @@ bool ppu_get_swap_pattern_tables(void) {
     return g_ppu_control.background_table;
 }
 
+static void _update_ppu_open_bus(uint8_t val, uint8_t bitmask) {
+    g_ppu_internal_regs.ppu_open_bus &= ~bitmask;
+    g_ppu_internal_regs.ppu_open_bus |= val & bitmask;
+
+    for (unsigned int i = 0; i < 8; i++) {
+        // only refresh bits within the bitmask
+        if (bitmask & (1 << i)) {
+            g_ppu_internal_regs.ppu_open_bus_decay_timers[i] = PPU_OPEN_BUS_DECAY_CYCLES;
+        }
+    }
+}
+
+static void _check_open_bus_decay(void) {
+    for (unsigned int i = 0; i < 8; i++) {
+        // we don't want to decrement the timer if it's already 0
+        if (g_ppu_internal_regs.ppu_open_bus_decay_timers[i] == 0) {
+            continue;
+        }
+        if (--g_ppu_internal_regs.ppu_open_bus_decay_timers[i] == 0) {
+            g_ppu_internal_regs.ppu_open_bus &= ~(1 << i);
+        } else if (g_ppu_internal_regs.ppu_open_bus_decay_timers[i] < 1000) {
+        }
+    }
+}
+
 uint8_t ppu_read_mmio(uint8_t index) {
     assert(index <= 7);
 
     switch (index) {
+        case 0:
+        case 1:
+        case 3:
+        case 5:
+        case 6:
+            break; // just return the current open bus value
         case 2: {
-            // return the status
             uint8_t res = g_ppu_status.serial;
 
             // reading this register resets this latch
@@ -175,36 +205,54 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 }
             }
 
-            return res;
+            _update_ppu_open_bus(res, 0xE0);
+
+            break;
         }
         case 4: {
-            return ((unsigned char*) g_oam_ram)[g_ppu_internal_regs.s];
+            uint8_t res = ((unsigned char*) g_oam_ram)[g_ppu_internal_regs.s];
+
+            // weird special case
+            if (g_ppu_internal_regs.s % 4 == 2) {
+                res &= 0xE3;
+            }
+            
+            _update_ppu_open_bus(res, 0xFF);
+
+            break;
         }
         case 7: {
+            uint8_t res;
             if (g_ppu_internal_regs.v.addr < 0x3F00) {
                 // most VRAM goes through a read buffer
-                uint8_t res = g_ppu_internal_regs.read_buf;
+                res = g_ppu_internal_regs.read_buf;
 
                 g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr);
 
                 g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
-                return res;
+                _update_ppu_open_bus(res, 0xFF);
             } else {
                 // palette reading bypasses buffer, but still updates it in a weird way
 
                 // address is offset since the buffer is updated with the mirrored NT data "under" the palette data
                 g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr - 0x1000);
 
-                return system_vram_read(g_ppu_internal_regs.v.addr);
-            }
+                res = system_vram_read(g_ppu_internal_regs.v.addr);
 
+                _update_ppu_open_bus(res, 0x3F);
+            }
+            break;
         }
         default: {
-            //TODO: I think it returns a latch value here
-            return 0;
+            assert(false);
         }
     }
+
+    // we can get away with this because for registers that are readable, the open bus has already been updated
+    // with the appropriate value
+    // doing it this way simplifies handling of registers where some bits of the read value are from the open bus
+    return g_ppu_internal_regs.ppu_open_bus;
 }
 
 void ppu_write_mmio(uint8_t index, uint8_t val) {
@@ -214,7 +262,8 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
         case 0: {
             bool old_gen_nmis = g_ppu_control.gen_nmis;
 
-            memcpy(&g_ppu_control, &val, 1);
+            g_ppu_control.serial = val;
+
             g_ppu_internal_regs.t.addr &= ~(0b11 << 10); // clear bits 10-11
             g_ppu_internal_regs.t.addr |= (val & 0b11) << 10; // set bits 10-11 to current nametable
 
@@ -225,10 +274,10 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             break;
         }
         case 1:
-            memcpy(&g_ppu_mask, &val, 1);
+            g_ppu_mask.serial = val;
             break;
         case 2:
-            //TODO: not sure what to do here
+            // I don't think anything happens here besides the open bus update
             break;
         case 3:
             g_ppu_internal_regs.s = val;
@@ -301,7 +350,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             assert(false);
     }
 
-    g_ppu_status.last_write = val & 0x1F;
+    _update_ppu_open_bus(val, 0xFF);
 }
 
 uint16_t _translate_name_table_address(uint16_t addr) {
@@ -1047,6 +1096,8 @@ void cycle_ppu(void) {
             flush_frame();
         }
     }
+
+    _check_open_bus_decay();
 }
 
 void dump_vram(void) {

@@ -33,6 +33,10 @@ unsigned char g_prg_ram[PRG_RAM_SIZE];
 
 void initialize_system(Cartridge *cart);
 
+uint8_t system_open_bus_read(void);
+
+void system_open_bus_write(uint8_t val);
+
 uint8_t system_ram_read(uint16_t addr);
 
 void system_ram_write(uint16_t addr, uint8_t val);

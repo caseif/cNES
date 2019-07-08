@@ -37,30 +37,38 @@
 #define FIRST_VISIBLE_CYCLE 0
 #define LAST_VISIBLE_CYCLE 256
 
-typedef struct {
-    unsigned char name_table:2 PACKED;
-    unsigned char vertical_increment:1 PACKED;
-    unsigned char sprite_table:1 PACKED;
-    unsigned char background_table:1 PACKED;
-    unsigned char tall_sprites:1 PACKED;
-    unsigned char ext_master:1 PACKED;
-    unsigned char gen_nmis:1 PACKED;
+#define PPU_OPEN_BUS_DECAY_CYCLES 3220000 // ~600 ms
+
+typedef union {
+    struct {
+        unsigned char name_table:2 PACKED;
+        unsigned char vertical_increment:1 PACKED;
+        unsigned char sprite_table:1 PACKED;
+        unsigned char background_table:1 PACKED;
+        unsigned char tall_sprites:1 PACKED;
+        unsigned char ext_master:1 PACKED;
+        unsigned char gen_nmis:1 PACKED;
+    };
+    uint8_t serial;
 } PpuControl;
 
-typedef struct {
-    unsigned char monochrome:1 PACKED;
-    unsigned char show_background_left:1 PACKED;
-    unsigned char show_sprites_left:1 PACKED;
-    unsigned char show_background:1 PACKED;
-    unsigned char show_sprites:1 PACKED;
-    unsigned char em_red:1 PACKED;
-    unsigned char em_green:1 PACKED;
-    unsigned char em_blue:1 PACKED;
+typedef union {
+    struct {
+        unsigned char monochrome:1 PACKED;
+        unsigned char show_background_left:1 PACKED;
+        unsigned char show_sprites_left:1 PACKED;
+        unsigned char show_background:1 PACKED;
+        unsigned char show_sprites:1 PACKED;
+        unsigned char em_red:1 PACKED;
+        unsigned char em_green:1 PACKED;
+        unsigned char em_blue:1 PACKED;
+    };
+    uint8_t serial;
 } PpuMask;
 
 typedef union {
     struct {
-        unsigned char last_write:5 PACKED;
+        unsigned char :5 PACKED; // unused
         unsigned char sprite_overflow:1 PACKED;
         unsigned char sprite_0_hit:1 PACKED;
         unsigned char vblank:1 PACKED;
@@ -136,6 +144,9 @@ typedef struct {
     uint16_t pattern_shift_h;
     uint8_t palette_shift_l;
     uint8_t palette_shift_h;
+
+    uint8_t ppu_open_bus;
+    uint32_t ppu_open_bus_decay_timers[8];
 } PpuInternalRegisters;
 
 typedef enum {

@@ -58,6 +58,8 @@ bool dead = false;
 
 static Cartridge *g_cart;
 
+static uint8_t g_bus_val; // the value on the data bus
+
 static void _init_controllers() {
     init_controllers();
 
@@ -90,12 +92,22 @@ void initialize_system(Cartridge *cart) {
     _init_controllers();
 }
 
+uint8_t system_open_bus_read(void) {
+    return g_bus_val;
+}
+
+void system_open_bus_write(uint8_t val) {
+    g_bus_val = val;
+}
+
 uint8_t system_ram_read(uint16_t addr) {
     uint8_t res = g_cart->mapper->ram_read_func(g_cart, addr);
 
     #if PRINT_SYS_MEMORY_ACCESS
     printf("$%04X -> %02X\n", addr, res);
     #endif
+
+    g_bus_val = res;
 
     return res;
 }
@@ -106,6 +118,8 @@ void system_ram_write(uint16_t addr, uint8_t val) {
     #endif
 
     g_cart->mapper->ram_write_func(g_cart, addr, val);
+
+    g_bus_val = val;
 }
 
 uint8_t system_vram_read(uint16_t addr) {
@@ -145,7 +159,7 @@ uint8_t system_lower_memory_read(uint16_t addr) {
             return 0x40 | controller_poll(addr - 0x4016);
         }
         default:
-            return 0; // open bus
+            return system_open_bus_read(); // open bus
     }
 }
 
