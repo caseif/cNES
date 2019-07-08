@@ -75,9 +75,9 @@ uint8_t nrom_vram_read(Cartridge *cart, uint16_t addr) {
         case 0x3F00 ... 0x3FFF: {
             return ppu_palette_table_read(addr % 0x20);
         }
-        // unmapped
+        // open bus, generally returns low address byte
         default: {
-            return 0;
+            return addr & 0xFF;
         }
     }
 }

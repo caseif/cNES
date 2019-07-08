@@ -214,8 +214,9 @@ static uint8_t _mmc1_vram_read(Cartridge *cart, uint16_t addr) {
         // palette table
         case 0x3F00 ... 0x3FFF:
             return ppu_palette_table_read(addr % 0x20);
+        // open bus, generally returns low address byte
         default:
-            return 0; // technically open bus
+            return addr & 0xFF;
     }
 }
 
