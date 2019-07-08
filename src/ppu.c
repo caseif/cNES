@@ -177,6 +177,9 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
             return res;
         }
+        case 4: {
+            return ((unsigned char*) g_oam_ram)[g_ppu_internal_regs.s];
+        }
         case 7: {
             if (g_ppu_internal_regs.v.addr < 0x3F00) {
                 // most VRAM goes through a read buffer
@@ -231,7 +234,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             g_ppu_internal_regs.s = val;
             break;
         case 4:
-            ((char*) g_oam_ram)[g_ppu_internal_regs.s] = val;
+            ((unsigned char*) g_oam_ram)[g_ppu_internal_regs.s++] = val;
             break;
         case 5:
             // set either x- or y-scroll, depending on whether this is the first or second write
