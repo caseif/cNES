@@ -38,15 +38,21 @@
 #define KEY_MODE_PATTERN_TABLE SDLK_F3
 #define KEY_ACTION_CONTINUE SDLK_F5
 #define KEY_ACTION_STEP SDLK_F6
-#define KEY_ACTION_BREAK SDLK_F8
+#define KEY_ACTION_BREAK SDLK_F7
 #define KEY_ACTION_DUMP_RAM SDLK_F9
 #define KEY_ACTION_DUMP_VRAM SDLK_F10
 #define KEY_ACTION_DUMP_OAM SDLK_F11
+#define KEY_ACTION_RESET SDLK_r
+
+static bool g_ctrl_down = false;
 
 static void _global_hotkey_callback(SDL_Event *event) {
     switch (event->type) {
         case SDL_KEYDOWN:
             switch (event->key.keysym.sym) {
+                case SDLK_LCTRL:
+                    g_ctrl_down = true;
+                    break;
                 case KEY_MODE_NORMAL:
                     set_render_mode(RM_NORMAL);
                     printf("Showing normal output\n");
@@ -100,9 +106,19 @@ static void _global_hotkey_callback(SDL_Event *event) {
                     printf("Dumping OAM\n");
                     dump_oam();
                     break;
-                    
+                case KEY_ACTION_RESET:
+                    if (g_ctrl_down) {
+                        cpu_raise_rst_line();
+                    }
+                    break;
             }
             break;
+        case SDL_KEYUP:
+            switch (event->key.keysym.sym) {
+                case SDLK_LCTRL:
+                    g_ctrl_down = false;
+                    break;
+            }
     }
 }
 

@@ -47,10 +47,10 @@
 #define ASSERT_CYCLE(l, h)  assert(g_instr_cycle >= l); \
                             assert(g_instr_cycle <= h)
 
-const InterruptType INT_NMI   = (InterruptType) {0xFFFA, false, true, false, false};
-const InterruptType INT_RESET = (InterruptType) {0xFFFC, false, true,  false, false};
-const InterruptType INT_IRQ   = (InterruptType) {0xFFFE, true,  true,  false, true};
-const InterruptType INT_BRK   = (InterruptType) {0xFFFE, false, true,  true,  true};
+const InterruptType INT_NMI = (InterruptType) {0xFFFA, false, true, false, false};
+const InterruptType INT_RST = (InterruptType) {0xFFFC, false, false,  false, true};
+const InterruptType INT_IRQ = (InterruptType) {0xFFFE, true,  true,  false, true};
+const InterruptType INT_BRK = (InterruptType) {0xFFFE, false, true,  true,  true};
 
 unsigned char g_sys_memory[SYSTEM_MEMORY];
 
@@ -67,10 +67,12 @@ unsigned int g_total_cycles = 0;
 // interrupt lines
 static bool g_nmi_line = false;
 static bool g_irq_line = false;
+static bool g_rst_line = false;
 
 // interrupt reader lines (delayed by one cycle)
 static bool g_nmi_line_reader = false;
 static bool g_irq_line_reader = false;
+static bool g_rst_line_reader = false;
 
 // state for implementing cycle-accuracy
 uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
@@ -96,12 +98,10 @@ static const InterruptType *g_queued_interrupt; // the interrupt type currently 
 static bool g_nmi_hijack; // set when an NMI "hijacks" a software interrupt
 
 void initialize_cpu(void) {
-    g_cpu_regs.sp = BASE_SP;
-
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
     memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
 
-    g_queued_interrupt = &INT_RESET;
+    g_queued_interrupt = &INT_RST;
 
     for (int i = 0; i < 7; i++) {
         cycle_cpu();
@@ -127,14 +127,6 @@ void cpu_ram_write(uint16_t addr, uint8_t val) {
 void cpu_start_oam_dma(uint8_t page) {
     ppu_start_oam_dma(page);
     g_burn_cycles += 514;
-}
-
-void stack_push(char val) {
-    g_sys_memory[STACK_BOTTOM_ADDR + g_cpu_regs.sp--] = val;
-}
-
-unsigned char stack_pop(void) {
-    return g_sys_memory[STACK_BOTTOM_ADDR + ++g_cpu_regs.sp];
 }
 
 static unsigned char _next_prg_byte(void) {
@@ -206,6 +198,14 @@ void cpu_raise_irq_line(void) {
 
 void cpu_clear_irq_line(void) {
     g_irq_line = false;
+}
+
+void cpu_raise_rst_line(void) {
+    g_rst_line = true;
+}
+
+void cpu_clear_rst_line(void) {
+    g_rst_line = false;
 }
 
 void _do_instr_operation() {
@@ -536,6 +536,7 @@ static void _reset_instr_state(void) {
 static void _read_interrupt_lines(void) {
     g_nmi_line_reader = g_nmi_line;
     g_irq_line_reader = g_irq_line;
+    g_rst_line_reader = g_rst_line;
 }
 
 static void _poll_interrupts(void) {
@@ -543,6 +544,9 @@ static void _poll_interrupts(void) {
         g_queued_interrupt = &INT_NMI;
     } else if (g_irq_line_reader && !g_cpu_regs.status.interrupt_disable) {
         g_queued_interrupt = &INT_IRQ;
+    } else if (g_rst_line_reader) {
+        g_queued_interrupt = &INT_RST;
+        cpu_clear_rst_line();
     }
 }
 

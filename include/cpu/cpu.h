@@ -85,6 +85,10 @@ void cpu_raise_irq_line(void);
 
 void cpu_clear_irq_line(void);
 
+void cpu_raise_rst_line(void);
+
+void cpu_clear_rst_line(void);
+
 bool issue_interrupt(const InterruptType *type);
 
 void cycle_cpu(void);
