@@ -1069,6 +1069,8 @@ static void _handle_branch(void) {
             }
             return;
         case 4: {
+            _poll_interrupts();
+
             uint8_t old_pcl = g_latched_val;
 
             g_latched_val = system_ram_read(g_cpu_regs.pc);
@@ -1136,6 +1138,11 @@ static void _do_instr_cycle(void) {
         _execute_interrupt();
         return;
     } else if (g_instr_cycle == 2 && g_cur_instr->addr_mode != IMP && g_cur_instr->addr_mode != IMM) {
+        // special case
+        if (g_cur_instr->addr_mode == REL) {
+            _poll_interrupts();
+        }
+
         // this doesn't execute for implicit/immediate instructions because they have additional steps beyond fetching
         // on this cycle
         g_cur_operand |= _next_prg_byte(); // fetch low byte of operand
@@ -1239,7 +1246,7 @@ void cycle_cpu(void) {
     } else {
         _do_instr_cycle();
         
-        if (g_instr_cycle == 0) {
+        if (g_instr_cycle == 0 && !(g_cur_instr != NULL && g_cur_instr->addr_mode == REL)) {
             _poll_interrupts();
         }
 
