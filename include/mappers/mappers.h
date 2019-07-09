@@ -34,6 +34,7 @@
 #define MAPPER_ID_UNROM 2
 #define MAPPER_ID_CNROM 3
 #define MAPPER_ID_MMC3 4
+#define MAPPER_ID_AXROM 7
 
 typedef void (*MapperInitFunction)(struct cartridge *cart);
 typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
@@ -60,3 +61,5 @@ void mapper_init_unrom(Mapper *mapper);
 void mapper_init_cnrom(Mapper *mapper);
 
 void mapper_init_mmc3(Mapper *mapper);
+
+void mapper_init_axrom(Mapper *mapper);

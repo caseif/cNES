@@ -79,6 +79,9 @@ Mapper *_create_mapper(unsigned int mapper_id) {
         case MAPPER_ID_MMC3:
             _init_mapper(mapper, mapper_init_mmc3);
             break;
+        case MAPPER_ID_AXROM:
+            _init_mapper(mapper, mapper_init_axrom);
+            break;
         default:
             printf("Mapper %d is not supported at this time\n", mapper_id);
             free(mapper);

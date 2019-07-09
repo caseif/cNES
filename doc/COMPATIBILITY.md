@@ -2,30 +2,54 @@
 
 This page documents the compatibility of select games with cNES.
 
+Games are only considered "perfect" after fairly thorough testing - any games marked
+"playable" with no additional comment probably just need more testing done.
+
 Note that this list is non-exhaustive and only covers games which have been tested.
 
 | Game | | State | Description |
 | --- | --- | --- | :-- |
-| Astyanax | ![](res/circle_green.svg) | playable | Needs more testing |
-| Bubble Bobble | ![](res/circle_green.svg) | playable | Needs more testing |
-| Castlevania | ![](res/circle_green.svg) | playable | Needs more testing |
-| Castlevania II - Simon's Quest | ![](res/circle_green.svg) | playable | Needs more testing |
+| Arch Rivals: A Basketbrawl! | ![](res/circle_green.svg) | playable | |
+| Astyanax | ![](res/circle_green.svg) | playable | |
+| Battletoads | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
+| Battletoads & Double Dragon: The Ultimate Team | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
+| Beetlejuice | ![](res/circle_green.svg) | playable | |
+| Bubble Bobble | ![](res/circle_green.svg) | playable | |
+| Cabal | ![](res/circle_green.svg) | playable | |
+| Captain SkyHawk | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
+| Castlevania | ![](res/circle_green.svg) | playable | |
+| Castlevania II - Simon's Quest | ![](res/circle_green.svg) | playable | |
+| Cobra Triangle | ![](res/circle_green.svg) | playable | |
+| Digger T. Rock: The Legend of the Lost City | ![](res/circle_orange.svg) | intro | Severe graphical glitches |
 | Donkey Kong | ![](res/circle_blue.svg) | perfect | |
+| Double Dare | ![](res/circle_green.svg) | playable | |
 | Dragon Warrior III | ️![](res/circle_red.svg) | broken | Black screen |
-| Dr. Mario | ![](res/circle_green.svg) | playable | Needs more testing |
+| Dr. Mario | ![](res/circle_green.svg) | playable | |
 | EarthBound | ![](res/circle_yellow.svg) | ingame | Jumps into nowhere eventually, probably a PRG bank switching issue |
-| Excitebike | ![](res/circle_blue.svg) | perfect | Needs more testing |
+| Excitebike | ![](res/circle_green.svg) | playable | |
 | Ice Hockey | ![](res/circle_green.svg) | playable | |
-| Kickle Cubicle | ![](res/circle_green.svg) | playable | Needs more testing |
-| Legend of Zelda, The | ![](res/circle_green.svg) | playable | Needs more testing |
+| IronSword: Wizards & Warriors II | ![](res/circle_green.svg) | playable | |
+| Jeopardy | ![](res/circle_green.svg) | playable | |
+| Jeopardy!: 25th Anniversary Edition | ![](res/circle_green.svg) | playable | |
+| Jeopardy!: Junior Edition | ![](res/circle_green.svg) | playable | |
+| Kickle Cubicle | ![](res/circle_green.svg) | playable | |
+| Legend of Zelda, The | ![](res/circle_green.svg) | playable | |
+| Marble Madness | ![](res/circle_green.svg) | playable | |
 | Mario Bros. | ![](res/circle_blue.svg) | perfect | |
 | Mario Is Missing | ![](res/circle_orange.svg) | intro | Infinitely loops title sequence |
 | Mega Man 4 | ![](res/circle_orange.svg) | intro | Loops infinitely after "AD200X" |
+| Nightmare on Elm Street, A | ![](res/circle_green.svg) | playable | |
 | Mother | ![](res/circle_yellow.svg) | ingame | Massive rendering issues in battle interface |
+| NARC | ![](res/circle_green.svg) | playable | Minor graphical glitches at top of screen |
 | Paperboy | ![](res/circle_yellow.svg) | ingame | Sprite bank switching issues |
-| Rush'n Attack | ![](res/circle_green.svg) | playable | Needs more testing |
+| R.C. Pro-Am | ![](res/circle_green.svg) | playable | |
+| R.C. Pro-Am II | ![](res/circle_green.svg) | playable | |
+| Rush'n Attack | ![](res/circle_green.svg) | playable | |
+| Solar Jetman: Hunt for the Golden Warpship | ![](res/circle_green.svg) | playable | |
+| Solstice: The Quest for the Staff of Demnos | ![](res/circle_green.svg) | playable | |
 | Super Mario Bros. | ![](res/circle_blue.svg) | perfect | Has undergone rigorous testing |
-| Super Mario Bros. 2 | ![](res/circle_green.svg) | playable | Needs more testing |
+| Super Mario Bros. 2 | ![](res/circle_green.svg) | playable | |
 | Super Mario Bros. 3 | ![](res/circle_green.svg) | playable | Mid-screen flickering seems a bit off |
-| Teenage Mutant Ninja Turtles | ![](res/circle_green.svg) | playable | Needs more testing |
+| Teenage Mutant Ninja Turtles | ![](res/circle_green.svg) | playable | |
 | Tetris | ![](res/circle_blue.svg) | perfect | |
+| Time Lord | ![](res/circle_green.svg) | playable | |
