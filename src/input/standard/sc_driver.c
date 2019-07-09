@@ -48,8 +48,8 @@ static SDL_Scancode g_poll_keys[BUTTON_COUNT] = {
 };
 
 static SDL_GameControllerButton g_poll_buttons[BUTTON_COUNT] = {
-        SDL_CONTROLLER_BUTTON_B,
         SDL_CONTROLLER_BUTTON_A,
+        SDL_CONTROLLER_BUTTON_X,
         SDL_CONTROLLER_BUTTON_BACK,
         SDL_CONTROLLER_BUTTON_START,
         SDL_CONTROLLER_BUTTON_DPAD_UP,

@@ -1019,7 +1019,7 @@ void cycle_ppu(void) {
         if (g_ppu_mask.show_background) {
             final_palette_offset = bg_palette_offset;
         } else {
-            final_palette_offset = 0x0f;
+            final_palette_offset = 0xFF;
         }
 
         // time to read sprite data
@@ -1065,9 +1065,14 @@ void cycle_ppu(void) {
             }
         }
 
-        uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR | final_palette_offset;
+        uint8_t palette_index;
+        if (final_palette_offset == 0xFF) {
+            palette_index = 0x0F;
+        } else {
+            uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR | final_palette_offset;
 
-        uint8_t palette_index = system_vram_read(palette_entry_addr);
+            palette_index = system_vram_read(palette_entry_addr);
+        }
 
         RGBValue rgb = g_palette[palette_index % (sizeof(g_palette) / sizeof(RGBValue))];
 
