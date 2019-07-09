@@ -18,8 +18,7 @@ cNES is partially derived from the now-defunct
 - PPU timings are juuust a little bit off
 - No support for color masking
 - MMC3 implementation is a bit buggy
-- Many games are broken in one way or another (see [compatibility list](COMPATIBILITY.md))
-  - 
+- Many games are broken in one way or another (see [compatibility list](doc/COMPATIBILITY.md))
 
 ### Planned Features
 
@@ -49,7 +48,7 @@ Mostly for educational purposes, and also for fun.
 - [blargg](http://blargg.8bitalley.com/), whose tests have helped immensely with
   getting details (both large and small) locked down
 - Everyone responsible for the documents listed on the
-  [resources page](RESOURCES.md)
+  [resources page](doc/RESOURCES.md)
 
 ### License
 
