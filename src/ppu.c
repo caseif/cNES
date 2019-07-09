@@ -195,7 +195,8 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
             cpu_clear_nmi_line();
 
-            if (g_scanline == VBL_SCANLINE && g_scanline_tick == VBL_SCANLINE_TICK - 1) {
+            //TODO: figure out why this only passes blargg's test with VBL_SCANLINE_TICK (and not VBL_SCANLINE_TICK - 1)
+            if (g_scanline == VBL_SCANLINE && g_scanline_tick == VBL_SCANLINE_TICK) {
                 g_vbl_flag_suppression = true;
             }
 
@@ -958,11 +959,6 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
 }
 
 void cycle_ppu(void) {
-    // if the frame is odd and background rendering is enabled, skip the first cycle
-    if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
-        g_scanline_tick = 1;
-    }
-
     _do_general_cycle_routine();
 
     if (ppu_is_rendering_enabled()) {
@@ -1073,6 +1069,14 @@ void cycle_ppu(void) {
         // feed the attribute registers from the latch(es)
         g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
         g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
+    }
+
+    // if the frame is odd and background rendering is enabled, skip the last cycle
+    // we do this in an indirect way so the next block (which advances the internal counters) can execute normally
+    //TODO: figure out why we need to subtract 3 instead of 2
+    if (g_scanline == PRE_RENDER_LINE && g_scanline_tick == CYCLES_PER_SCANLINE - 3
+            && g_odd_frame && g_ppu_mask.show_background) {
+        g_scanline_tick++;
     }
 
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {
