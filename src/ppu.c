@@ -230,6 +230,9 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
                 g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
+                // copy to address bus
+                g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
+
                 _update_ppu_open_bus(res, 0xFF);
             } else {
                 // palette reading bypasses buffer, but still updates it in a weird way
@@ -241,6 +244,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
                 _update_ppu_open_bus(res, 0x3F);
             }
+
             break;
         }
         default: {
@@ -345,6 +349,9 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             system_vram_write(g_ppu_internal_regs.v.addr, val);
 
             g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
+
+            // copy to address bus
+            g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
 
             break;
         }
@@ -675,7 +682,7 @@ void _do_tile_fetching(void) {
 }
 
 void _do_sprite_evaluation(void) {
-    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE)) {
+    if (g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) {
         switch (g_scanline_tick) {
             // idle tick
             case 0:
@@ -791,142 +798,147 @@ void _do_sprite_evaluation(void) {
                 break;
             }
         }
-        if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) || g_scanline == PRE_RENDER_LINE) {
-            if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
-                // sprite tile fetching
+    }
+}
 
-                if (g_scanline_tick == 257) {
-                    g_ppu_internal_regs.loaded_sprites = g_ppu_internal_regs.o;
+void _do_sprite_fetching(void) {
+    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) || g_scanline == PRE_RENDER_LINE) {
+        if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
+            // sprite tile fetching
+
+            if (g_scanline_tick == 257) {
+                g_ppu_internal_regs.loaded_sprites = g_ppu_internal_regs.o;
+            }
+
+            if (g_scanline_tick == 257) {
+                // reset secondary oam index
+                g_ppu_internal_regs.o = 0;
+            }
+
+            unsigned int index = g_ppu_internal_regs.o;
+            switch ((g_scanline_tick - 1) % 8) {
+                case 0: {
+                    g_ppu_internal_regs.sprite_y_latch = g_secondary_oam_ram[index].y;
+
+                    break;
                 }
+                case 1: {
+                    g_ppu_internal_regs.sprite_tile_index_latch = g_secondary_oam_ram[index].tile_num;
 
-                if (g_scanline_tick == 257) {
-                    // reset secondary oam index
-                    g_ppu_internal_regs.o = 0;
+                    break;
                 }
+                case 2: {
+                    g_ppu_internal_regs.sprite_attr_latches[index] = g_secondary_oam_ram[index].attrs;
 
-                unsigned int index = g_ppu_internal_regs.o;
-                switch ((g_scanline_tick - 1) % 8) {
-                    case 0: {
-                        g_ppu_internal_regs.sprite_y_latch = g_secondary_oam_ram[index].y;
+                    break;
+                }
+                case 3: {
+                    g_ppu_internal_regs.sprite_x_counters[index] = g_secondary_oam_ram[index].x;
+                    // set the death counter latch to the sprite width
+                    g_ppu_internal_regs.sprite_death_counters[index] = 8;
 
-                        break;
-                    }
-                    case 1: {
-                        g_ppu_internal_regs.sprite_tile_index_latch = g_secondary_oam_ram[index].tile_num;
+                    break;
+                }
+                // compute tile address
+                case 4:{
+                    SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
-                        break;
-                    }
-                    case 2: {
-                        g_ppu_internal_regs.sprite_attr_latches[index] = g_secondary_oam_ram[index].attrs;
+                    uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
-                        break;
-                    }
-                    case 3: {
-                        g_ppu_internal_regs.sprite_x_counters[index] = g_secondary_oam_ram[index].x;
-                        // set the death counter latch to the sprite width
-                        g_ppu_internal_regs.sprite_death_counters[index] = 8;
-
-                        break;
-                    }
-                    // compute tile address
-                    case 4:{
-                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
-
-                        uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
-
-                        uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
-                        bool bottom_tile = false;
-                        if (g_ppu_control.tall_sprites) {
-                            bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
-                            if (cur_y > 7) {
-                                cur_y -= 8;
-                            }
-                        }
-                        if (attrs.flip_ver) {
-                            cur_y = 7 - cur_y;
-                        }
-
-                        if (g_ppu_control.tall_sprites) {
-                            uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                            g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
-                        } else {
-                            g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                    | (tile_index * 16 + cur_y);
+                    uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                    bool bottom_tile = false;
+                    if (g_ppu_control.tall_sprites) {
+                        bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
+                        if (cur_y > 7) {
+                            cur_y -= 8;
                         }
                     }
-                    // fetch tile lower byte
-                    case 5: {
-                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
-
-                        if (index < g_ppu_internal_regs.loaded_sprites) {
-                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
-
-                            if (!attrs.flip_hor) {
-                                res = reverse_bits(res);
-                            }
-
-                            g_ppu_internal_regs.sprite_tile_shift_l[index] = res;
-                        } else {
-                            // load transparent bitmap
-                            g_ppu_internal_regs.sprite_tile_shift_l[index] = 0;
-                        }
-
-                        break;
+                    if (attrs.flip_ver) {
+                        cur_y = 7 - cur_y;
                     }
-                    // compute tile address
-                    // same as above, but we add 8 to the address
-                    case 6: {
-                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
-                        uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
-
-                        uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
-                        bool bottom_tile = false;
-                        if (g_ppu_control.tall_sprites) {
-                            bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
-                            if (cur_y > 7) {
-                                cur_y -= 8;
-                            }
-                        }
-                        if (attrs.flip_ver) {
-                            cur_y = 7 - cur_y;
-                        }
-
-                        if (g_ppu_control.tall_sprites) {
-                            uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                            g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
-                        } else {
-                            g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                    | (tile_index * 16 + cur_y + 8);
-                        }
-
-                        break;
+                    if (g_ppu_control.tall_sprites) {
+                        uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
+                        g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
+                    } else {
+                        g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                | (tile_index * 16 + cur_y);
                     }
-                    // fetch tile upper byte
-                    case 7: {
-                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
-                        if (index < g_ppu_internal_regs.loaded_sprites) {
-                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
+                    break;
+                }
+                // fetch tile lower byte
+                case 5: {
+                    SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
-                            if (!attrs.flip_hor) {
-                                res = reverse_bits(res);
-                            }
+                    if (index < g_ppu_internal_regs.loaded_sprites) {
+                        uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
 
-                            g_ppu_internal_regs.sprite_tile_shift_h[index] = res;
-                        } else {
-                            // load transparent bitmap
-                            g_ppu_internal_regs.sprite_tile_shift_h[index] = 0;
+                        if (!attrs.flip_hor) {
+                            res = reverse_bits(res);
                         }
 
-                        g_ppu_internal_regs.o++;
+                        g_ppu_internal_regs.sprite_tile_shift_l[index] = res;
+                    } else {
+                        // load transparent bitmap
+                        g_ppu_internal_regs.sprite_tile_shift_l[index] = 0;
+                    }
 
-                        break;
+                    break;
+                }
+                // compute tile address
+                // same as above, but we add 8 to the address
+                case 6: {
+                    SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+
+                    uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
+
+                    uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                    bool bottom_tile = false;
+                    if (g_ppu_control.tall_sprites) {
+                        bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
+                        if (cur_y > 7) {
+                            cur_y -= 8;
+                        }
                     }
-                    default: {
-                        // twiddle our thumbs
-                        break;
+                    if (attrs.flip_ver) {
+                        cur_y = 7 - cur_y;
                     }
+
+                    if (g_ppu_control.tall_sprites) {
+                        uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
+                        g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
+                    } else {
+                        g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                | (tile_index * 16 + cur_y + 8);
+                    }
+
+                    break;
+                }
+                // fetch tile upper byte
+                case 7: {
+                    SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+
+                    if (index < g_ppu_internal_regs.loaded_sprites) {
+                        uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
+
+                        if (!attrs.flip_hor) {
+                            res = reverse_bits(res);
+                        }
+
+                        g_ppu_internal_regs.sprite_tile_shift_h[index] = res;
+                    } else {
+                        // load transparent bitmap
+                        g_ppu_internal_regs.sprite_tile_shift_h[index] = 0;
+                    }
+
+                    g_ppu_internal_regs.o++;
+
+                    break;
+                }
+                default: {
+                    // twiddle our thumbs
+                    break;
                 }
             }
         }
@@ -998,6 +1010,7 @@ void cycle_ppu(void) {
 
     if (ppu_is_rendering_enabled()) {
         _do_sprite_evaluation();
+        _do_sprite_fetching();
     }
 
     unsigned int draw_pixel_x = g_scanline_tick - 1;

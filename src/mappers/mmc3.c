@@ -65,11 +65,13 @@ static uint8_t g_prg_2 = 1;
 
 static uint8_t g_irq_counter;
 static uint8_t g_irq_latch;
-static bool g_irq_pending = false;
 static bool g_irq_reload;
 static bool g_irq_enabled = false;
-//static bool old_a12 = false;
-static uint8_t a12_cooldown = 0;
+static uint16_t a12_cooldown = 0;
+
+// submapper configurations
+static bool g_use_counter_edge = false;
+static bool g_use_a12_fall = false;
 
 static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
     assert(addr >= 0x8000);
@@ -236,8 +238,8 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             return;
         case 0xE000:
             if (g_irq_enabled) {
-                g_irq_pending = false;
                 g_irq_enabled = false;
+                cpu_clear_irq_line(); // acknowledge pending interrupts
             }
             return;
         case 0xE001:
@@ -301,15 +303,20 @@ static void _mmc3_tick(void) {
     printf("MMC3 counter: %d\n", g_irq_counter);
     #endif
 
-    if (g_irq_pending) {
-        //cpu_raise_irq_line();
-    }
-
-    bool new_a12 = (ppu_get_internal_regs()->addr_bus & 0x1000) && !(ppu_get_internal_regs()->addr_bus & 0x6000);
+    bool new_a12 = (ppu_get_internal_regs()->addr_bus & 0x1000);
     if (a12_cooldown > 0) {
         a12_cooldown--;
     }
-    if (!a12_cooldown && new_a12) {
+
+    bool clock_counter;
+    if (g_use_a12_fall) {
+        clock_counter = !a12_cooldown && !new_a12;
+    } else {
+        clock_counter = !a12_cooldown && new_a12;
+    }
+
+    if (clock_counter) {
+        //printf("counter clocked @ (%03d, %03d)\n", ppu_get_scanline(), ppu_get_scanline_tick());
         uint8_t counter_old = g_irq_counter;
 
         if (g_irq_reload || g_irq_counter == 0) {
@@ -319,14 +326,12 @@ static void _mmc3_tick(void) {
             g_irq_counter--;
         }
 
-        // clock on the falling edge
-        if (counter_old && g_irq_counter == 0 && g_irq_enabled) {
+        if ((!g_use_counter_edge || counter_old > 0) && g_irq_counter == 0 && g_irq_enabled) {
             cpu_raise_irq_line();
-            g_irq_pending = true;
         }
     }
 
-    if (new_a12) {
+    if (new_a12 == !g_use_a12_fall) {
         a12_cooldown = IRQ_COOLDOWN_PERIOD;
     }
 }
@@ -340,4 +345,10 @@ void mapper_init_mmc3(Mapper *mapper, unsigned int submapper_id) {
     mapper->vram_read_func  = *_mmc3_vram_read;
     mapper->vram_write_func = *_mmc3_vram_write;
     mapper->tick_func       = *_mmc3_tick;
+
+    if (submapper_id == 3) {
+        g_use_a12_fall = true;
+    } else if (submapper_id == 4) {
+        g_use_counter_edge = true; // trigger IRQ when counter changes to 0
+    }
 }
