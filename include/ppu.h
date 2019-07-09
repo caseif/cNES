@@ -169,6 +169,8 @@ uint16_t ppu_get_scanline_tick(void);
 
 bool ppu_get_swap_pattern_tables(void);
 
+PpuInternalRegisters *ppu_get_internal_regs(void);
+
 uint8_t ppu_read_mmio(uint8_t index);
 
 void ppu_write_mmio(uint8_t addr, uint8_t val);

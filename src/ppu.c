@@ -150,6 +150,10 @@ bool ppu_get_swap_pattern_tables(void) {
     return g_ppu_control.background_table;
 }
 
+PpuInternalRegisters *ppu_get_internal_regs(void) {
+    return &g_ppu_internal_regs;
+}
+
 static void _update_ppu_open_bus(uint8_t val, uint8_t bitmask) {
     g_ppu_internal_regs.ppu_open_bus &= ~bitmask;
     g_ppu_internal_regs.ppu_open_bus |= val & bitmask;

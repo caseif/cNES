@@ -39,7 +39,7 @@ Note that this list is non-exhaustive and only covers games which have been test
 | Mario Is Missing | ![](res/circle_orange.svg) | intro | Infinitely loops title sequence |
 | Mega Man 4 | ![](res/circle_orange.svg) | intro | Loops infinitely after "AD200X" |
 | Nightmare on Elm Street, A | ![](res/circle_green.svg) | playable | |
-| Mother | ![](res/circle_yellow.svg) | ingame | Massive rendering issues in battle interface |
+| Mother | ![](res/circle_yellow.svg) | ingame | Severe rendering issues in battle interface |
 | NARC | ![](res/circle_green.svg) | playable | Minor graphical glitches at top of screen |
 | Paperboy | ![](res/circle_yellow.svg) | ingame | Sprite bank switching issues |
 | R.C. Pro-Am | ![](res/circle_green.svg) | playable | |
@@ -47,6 +47,7 @@ Note that this list is non-exhaustive and only covers games which have been test
 | Rush'n Attack | ![](res/circle_green.svg) | playable | |
 | Solar Jetman: Hunt for the Golden Warpship | ![](res/circle_green.svg) | playable | |
 | Solstice: The Quest for the Staff of Demnos | ![](res/circle_green.svg) | playable | |
+| Star Wars | ![](res/circle_yellow.svg) | ingame | Weird flickering issues, probably due to bad IRQ timing |
 | Super Mario Bros. | ![](res/circle_blue.svg) | perfect | Has undergone rigorous testing |
 | Super Mario Bros. 2 | ![](res/circle_green.svg) | playable | |
 | Super Mario Bros. 3 | ![](res/circle_green.svg) | playable | Mid-screen flickering seems a bit off |

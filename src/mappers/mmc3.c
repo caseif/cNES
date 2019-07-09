@@ -133,6 +133,25 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
     return ((bank * CHR_BANK_GRANULARITY) | (addr % bank_size)) % cart->chr_size;
 }
 
+static void _mmc3_decrement_counter(void) {
+    if (g_irq_reload) {
+        g_irq_counter = g_irq_latch;
+        g_irq_reload = false;
+    }
+
+    if (g_irq_counter == 0) {
+        if (g_irq_enabled) {
+            cpu_raise_irq_line();
+            g_irq_pending = true;
+        }
+
+        g_irq_counter = g_irq_latch;
+        g_irq_reload = false;
+    } else {
+        g_irq_counter--;
+    }
+}
+
 static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr < 0x6000) {
         return system_lower_memory_read(addr);
@@ -305,23 +324,7 @@ static void _mmc3_tick(void) {
             && ((ppu_get_scanline() == PRE_RENDER_LINE)
                     || (ppu_get_scanline() >= FIRST_VISIBLE_LINE && ppu_get_scanline() <= LAST_VISIBLE_LINE))
             && (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2)) {
-
-        if (g_irq_reload) {
-            g_irq_counter = g_irq_latch;
-            g_irq_reload = false;
-        }
-
-        if (g_irq_counter == 0) {
-            if (g_irq_enabled) {
-                cpu_raise_irq_line();
-                g_irq_pending = true;
-            }
-
-            g_irq_counter = g_irq_latch;
-            g_irq_reload = false;
-        } else {
-            g_irq_counter--;
-        }
+        _mmc3_decrement_counter();
     }
 }
 
