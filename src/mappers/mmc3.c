@@ -36,8 +36,12 @@
 
 #define MMC3_DEBUG_LOGGING 0
 
+#define CHR_RAM_SIZE 0x2000
+
 #define CHR_BANK_GRANULARITY 0x400
 #define PRG_BANK_GRANULARITY 0x2000
+
+static unsigned char g_chr_ram[CHR_RAM_SIZE];
 
 // false -> $C000-DFFF fixed, $8000-9FFF swappable
 // true  -> $8000-9FFF fixed, $C000-DFFF swappable
@@ -242,6 +246,10 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         case 0x0000 ... 0x1FFF: {
+            if (cart->chr_size == 0) {
+                return g_chr_ram[addr];
+            }
+
             uint32_t chr_offset = _mmc3_get_chr_offset(cart, addr);
             
             if (chr_offset >= cart->chr_size) {
@@ -264,6 +272,10 @@ static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
 }
 
 static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    if (cart->chr_size == 0) {
+        g_chr_ram[addr] = val;
+    }
+
     switch (addr) {
         // PRG ROM
         case 0x0000 ... 0x1FFF:
