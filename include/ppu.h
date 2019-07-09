@@ -127,12 +127,16 @@ typedef struct {
     uint8_t sprite_y_latch; // stores the sprite y-position during fetching
     SpriteAttributes sprite_attr_latches[8]; // latches for sprite attribute data
     uint8_t sprite_x_counters[8]; // counters for sprite x-positions
+    // there's no analog to this in hardware (all sprite fetches after the first 8 pixels return 0, or transparent),
+    // but we introduce it here to improve efficiency slightly and aid with debugging (so that sprites only "exist" to
+    // the render routine while they're actually being rendered)
     uint8_t sprite_death_counters[8];
     uint8_t sprite_tile_shift_l[8]; // shift registers for sprite tile data
     uint8_t sprite_tile_shift_h[8]; // shift registers for sprite tile data
 
     uint8_t read_buf;
 
+    uint16_t addr_latch;
     uint8_t name_table_entry_latch;
     unsigned int attr_table_entry_latch:2;
     unsigned int attr_table_entry_latch_secondary:2;

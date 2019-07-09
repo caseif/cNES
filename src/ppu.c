@@ -502,7 +502,7 @@ void _update_v_horizontal(void) {
     g_ppu_internal_regs.v.addr = v;
 }
 
-void _do_general_cycle_routine(void) {
+void _do_tile_fetching(void) {
     switch (g_scanline) {
         // pre-render line
         case PRE_RENDER_LINE: {
@@ -533,12 +533,13 @@ void _do_general_cycle_routine(void) {
                     g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x41F; // copy horizontal bits to v from t
                 }
             } else {
-                if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick < 321) {
-                    // these cycles are for garbage NT fetches
+                // garbage fetches occur during sprite tile fetching
+                if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick < 321 && (g_scanline_tick - 1) % 8 >= 4) {
                     break;
                 }
 
                 switch ((g_scanline_tick - 1) % 8) {
+                    // update registers/latches and compute name table address
                     case 0: {
                         // copy the palette data from the secondary latch to the primary
                         g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
@@ -550,24 +551,28 @@ void _do_general_cycle_routine(void) {
                         g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
                         g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
 
-                        break;
-                    }
-                    // fetch name table entry
-                    case 1: {
+                        // compute NT address
                         // address = name table base + (v except fine y)
-                        uint16_t name_table_addr = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
-
-                        g_ppu_internal_regs.name_table_entry_latch = system_vram_read(name_table_addr);
+                        g_ppu_internal_regs.addr_latch = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
 
                         break;
                     }
-                    case 3: {
-                        // address = attr table base + (name table offset) + (shifted v)
+                    // fetch NT byte
+                    case 1: {
+                        g_ppu_internal_regs.name_table_entry_latch = system_vram_read(g_ppu_internal_regs.addr_latch);
+                        break;
+                    }
+                    // compute AT address
+                    case 2: {
                         unsigned int v = g_ppu_internal_regs.v.addr;
+                        // address = attr table base + (name table offset) + (shifted v)
+                        g_ppu_internal_regs.addr_latch = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
-                        uint16_t attr_table_addr = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
-
-                        uint8_t attr_table_byte = system_vram_read(attr_table_addr);
+                        break;
+                    }
+                    // fetch AT byte
+                    case 3: {
+                        uint8_t attr_table_byte = system_vram_read(g_ppu_internal_regs.addr_latch);
 
                         // check if it's in the bottom half of the table cell
                         if (g_ppu_internal_regs.v.y_coarse & 0b10) {
@@ -583,28 +588,38 @@ void _do_general_cycle_routine(void) {
 
                         break;
                     }
-                    case 5: {
+                    // compute tile address
+                    case 4: {
                         // multiply by 16 since each plane is 8 bytes, and there are 2 planes per tile
                         // then we just add the mod of the current line to get the sub-tile offset
                         unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
                                 + g_ppu_internal_regs.v.y_fine;
 
-                        uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                        g_ppu_internal_regs.addr_latch = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
-
-                        g_ppu_internal_regs.pattern_bitmap_l_latch = reverse_bits(system_vram_read(pattern_addr));
 
                         break;
                     }
-                    case 7: {
+                    // fetch tile low byte
+                    case 5: {
+                        g_ppu_internal_regs.pattern_bitmap_l_latch = reverse_bits(system_vram_read(g_ppu_internal_regs.addr_latch));
+
+                        break;
+                    }
+                    // compute tile address
+                    case 6: {
                         // basically the same as above, but we add 8 to get the second plane
                         unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
                                 + g_ppu_internal_regs.v.y_fine + 8;
 
-                        uint16_t pattern_addr = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                        g_ppu_internal_regs.addr_latch = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
 
-                        g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(system_vram_read(pattern_addr));
+                        break;
+                    }
+                    // fetch tile high byte
+                    case 7: {
+                        g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(system_vram_read(g_ppu_internal_regs.addr_latch));
 
                         // only update v if rendering is enabled
                         if (ppu_is_rendering_enabled()) {
@@ -620,8 +635,7 @@ void _do_general_cycle_routine(void) {
                         break;
                     }
                     default: {
-                        //TODO
-
+                        //assert(false);
                         break;
                     }
                 }
@@ -801,35 +815,38 @@ void _do_sprite_evaluation(void) {
 
                         break;
                     }
+                    // compute tile address
+                    case 4:{
+                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+
+                        uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
+
+                        uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                        bool bottom_tile = false;
+                        if (g_ppu_control.tall_sprites) {
+                            bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
+                            if (cur_y > 7) {
+                                cur_y -= 8;
+                            }
+                        }
+                        if (attrs.flip_ver) {
+                            cur_y = 7 - cur_y;
+                        }
+
+                        if (g_ppu_control.tall_sprites) {
+                            uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
+                            g_ppu_internal_regs.addr_latch = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
+                        } else {
+                            g_ppu_internal_regs.addr_latch = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                    | (tile_index * 16 + cur_y);
+                        }
+                    }
+                    // fetch tile lower byte
                     case 5: {
-                        // fetch tile lower byte
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                         if (index < g_ppu_internal_regs.loaded_sprites) {
-                            uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
-
-                            uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
-                            bool bottom_tile = false;
-                            if (g_ppu_control.tall_sprites) {
-                                bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
-                                if (cur_y > 7) {
-                                    cur_y -= 8;
-                                }
-                            }
-                            if (attrs.flip_ver) {
-                                cur_y = 7 - cur_y;
-                            }
-
-                            uint16_t addr;
-                            if (g_ppu_control.tall_sprites) {
-                                uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                                addr = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
-                            } else {
-                                addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                        | (tile_index * 16 + cur_y);
-                            }
-
-                            uint8_t res = system_vram_read(addr);
+                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_latch);
 
                             if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
@@ -843,36 +860,41 @@ void _do_sprite_evaluation(void) {
 
                         break;
                     }
+                    // compute tile address
+                    // same as above, but we add 8 to the address
+                    case 6: {
+                        SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
+
+                        uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
+
+                        uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                        bool bottom_tile = false;
+                        if (g_ppu_control.tall_sprites) {
+                            bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
+                            if (cur_y > 7) {
+                                cur_y -= 8;
+                            }
+                        }
+                        if (attrs.flip_ver) {
+                            cur_y = 7 - cur_y;
+                        }
+
+                        if (g_ppu_control.tall_sprites) {
+                            uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
+                            g_ppu_internal_regs.addr_latch = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
+                        } else {
+                            g_ppu_internal_regs.addr_latch = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                    | (tile_index * 16 + cur_y + 8);
+                        }
+
+                        break;
+                    }
+                    // fetch tile upper byte
                     case 7: {
-                        // fetch tile upper byte
-                        // same as above, but we add 8 to the address
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                         if (index < g_ppu_internal_regs.loaded_sprites) {
-                            uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
-
-                            uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
-                            bool bottom_tile = false;
-                            if (g_ppu_control.tall_sprites) {
-                                bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
-                                if (cur_y > 7) {
-                                    cur_y -= 8;
-                                }
-                            }
-                            if (attrs.flip_ver) {
-                                cur_y = 7 - cur_y;
-                            }
-
-                            uint16_t addr;
-                            if (g_ppu_control.tall_sprites) {
-                                uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                                addr = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
-                            } else {
-                                addr = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                        | (tile_index * 16 + cur_y + 8);
-                            }
-
-                            uint8_t res = system_vram_read(addr);
+                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_latch);
 
                             if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
@@ -959,7 +981,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
 }
 
 void cycle_ppu(void) {
-    _do_general_cycle_routine();
+    _do_tile_fetching();
 
     if (ppu_is_rendering_enabled()) {
         _do_sprite_evaluation();
