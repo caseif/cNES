@@ -328,7 +328,7 @@ static void _mmc3_tick(void) {
     }
 }
 
-void mapper_init_mmc3(Mapper *mapper) {
+void mapper_init_mmc3(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_MMC3;
     memcpy(mapper->name, "MMC3", strlen("MMC3"));
     mapper->init_func       = NULL;

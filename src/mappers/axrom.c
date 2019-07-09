@@ -77,7 +77,7 @@ static void _axrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     }
 }
 
-void mapper_init_axrom(Mapper *mapper) {
+void mapper_init_axrom(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_CNROM;
     memcpy(mapper->name, "AxROM", strlen("AxROM"));
     mapper->init_func       = NULL;

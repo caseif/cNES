@@ -53,7 +53,7 @@ static uint8_t _cnrom_vram_read(Cartridge *cart, uint16_t addr) {
     }
 }
 
-void mapper_init_cnrom(Mapper *mapper) {
+void mapper_init_cnrom(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_CNROM;
     memcpy(mapper->name, "CNROM", strlen("CNROM"));
     mapper->init_func       = NULL;

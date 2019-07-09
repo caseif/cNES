@@ -52,14 +52,14 @@ typedef struct {
     MapperTickFunction tick_func;
 } Mapper;
 
-void mapper_init_nrom(Mapper *mapper);
+void mapper_init_nrom(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_mmc1(Mapper *mapper);
+void mapper_init_mmc1(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_unrom(Mapper *mapper);
+void mapper_init_unrom(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_cnrom(Mapper *mapper);
+void mapper_init_cnrom(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_mmc3(Mapper *mapper);
+void mapper_init_mmc3(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_axrom(Mapper *mapper);
+void mapper_init_axrom(Mapper *mapper, unsigned int submapper_id);

@@ -55,32 +55,57 @@ typedef struct {
     unsigned int mapper_high:4 PACKED;
 } Flag7;
 
-void _init_mapper(Mapper *mapper, void (*init_func)(Mapper*)) {
-    init_func(mapper);
+typedef struct {
+    unsigned int mapper_highest:4 PACKED;
+    unsigned int submapper:4 PACKED;
+} Flag8;
+
+typedef struct {
+    unsigned int prg_rom_size_msb:4 PACKED;
+    unsigned int chr_rom_size_msb:4 PACKED;
+} Flag9;
+
+typedef struct {
+    unsigned int prg_ram_shift_count:4 PACKED;
+    unsigned int prg_nvram_shift_count:4 PACKED;
+} Flag10;
+
+typedef struct {
+    unsigned int chr_ram_shift_count:4 PACKED;
+    unsigned int chr_nvram_shift_count:4 PACKED;
+} Flag11;
+
+typedef struct {
+    unsigned int timing_mode:2 PACKED;
+    unsigned int :6 PACKED; // unused
+} Flag12;
+
+void _init_mapper(Mapper *mapper, void (*init_func)(Mapper*, unsigned int), unsigned int submapper_id) {
+    init_func(mapper, submapper_id);
     printf(MAPPER_MSG, mapper->id, mapper->name);
 }
 
-Mapper *_create_mapper(unsigned int mapper_id) {
+Mapper *_create_mapper(unsigned int mapper_id, unsigned int submapper_id) {
     Mapper *mapper = (Mapper*) malloc(sizeof(Mapper));
 
     switch (mapper_id) {
         case MAPPER_ID_NROM:
-            _init_mapper(mapper, mapper_init_nrom);
+            _init_mapper(mapper, mapper_init_nrom, submapper_id);
             break;
         case MAPPER_ID_MMC1:
-            _init_mapper(mapper, mapper_init_mmc1);
+            _init_mapper(mapper, mapper_init_mmc1, submapper_id);
             break;
         case MAPPER_ID_UNROM:
-            _init_mapper(mapper, mapper_init_unrom);
+            _init_mapper(mapper, mapper_init_unrom, submapper_id);
             break;
         case MAPPER_ID_CNROM:
-            _init_mapper(mapper, mapper_init_cnrom);
+            _init_mapper(mapper, mapper_init_cnrom, submapper_id);
             break;
         case MAPPER_ID_MMC3:
-            _init_mapper(mapper, mapper_init_mmc3);
+            _init_mapper(mapper, mapper_init_mmc3, submapper_id);
             break;
         case MAPPER_ID_AXROM:
-            _init_mapper(mapper, mapper_init_axrom);
+            _init_mapper(mapper, mapper_init_axrom, submapper_id);
             break;
         default:
             printf("Mapper %d is not supported at this time\n", mapper_id);
@@ -115,24 +140,73 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     Flag7 flag7 = (Flag7) {};
     memcpy(&flag7, &(buffer[7]), 1);
 
+    uint16_t mapper_id = (flag7.mapper_high << 4) | flag6.mapper_low;
+    uint8_t submapper_id = 0;
+    size_t prg_ram_size = PRG_RAM_CHUNK_SIZE;
+    size_t prg_nvram_size = PRG_RAM_CHUNK_SIZE;
+    size_t chr_ram_size = CHR_CHUNK_SIZE;
+    size_t chr_nvram_size = CHR_CHUNK_SIZE;
+    unsigned int timing_mode = TIMING_MODE_NTSC;
+
     if (flag7.nes2 == 2) {
-        printf("NES 2.0 format is not supported at this time.\n");
+        Flag8 flag8 = (Flag8) {};
+        memcpy(&flag8, &(buffer[8]), 1);
+        Flag9 flag9 = (Flag9) {};
+        memcpy(&flag9, &(buffer[9]), 1);
+        Flag10 flag10 = (Flag10) {};
+        memcpy(&flag10, &(buffer[10]), 1);
+        Flag11 flag11 = (Flag11) {};
+        memcpy(&flag11, &(buffer[11]), 1);
+        Flag12 flag12 = (Flag12) {};
+        memcpy(&flag12, &(buffer[12]), 1);
+        //TODO: rest of flags are unsupported for now
+
+        mapper_id |= flag8.mapper_highest << 8;
+        submapper_id = flag8.submapper;
+
+        prg_size |= flag9.prg_rom_size_msb << 8;
+        chr_size |= flag9.chr_rom_size_msb << 8;
+
+        if (flag10.prg_ram_shift_count > 20) {
+            printf("Refusing to grant more than 67 MB of PRG RAM\n");
+            return NULL;
+        } else if (flag10.prg_nvram_shift_count > 20) {
+            printf("Refusing to grant more than 67 MB of PRG NVRAM\n");
+            return NULL;
+        } else if (flag11.chr_ram_shift_count > 20) {
+            printf("Refusing to grant more than 67 MB of CHR RAM\n");
+            return NULL;
+        } else if (flag11.chr_nvram_shift_count > 20) {
+            printf("Refusing to grant more than 67 MB of CHR NVRAM\n");
+            return NULL;
+        }
+
+        prg_ram_size = flag10.prg_ram_shift_count > 0 ? (64 << flag10.prg_ram_shift_count) : 0;
+        prg_nvram_size = flag10.prg_ram_shift_count > 0 ? (64 << flag10.prg_nvram_shift_count) : 0;
+
+        chr_ram_size = flag11.chr_ram_shift_count > 0 ? (64 << flag11.chr_ram_shift_count) : 0;
+        chr_nvram_size = flag11.chr_ram_shift_count > 0 ? (64 << flag11.chr_nvram_shift_count) : 0;
+
+        timing_mode = flag12.timing_mode;
+    }
+
+    if (timing_mode == TIMING_MODE_PAL) {
+        printf("PAL ROMs are not supported at this time\n");
+        return NULL;
+    } else if (timing_mode == TIMING_MODE_DENDY) {
+        printf("Dendy ROMs are not supported at this time\n");
         return NULL;
     }
 
-    Mapper *mapper = _create_mapper((flag7.mapper_high << 4) | flag6.mapper_low);
+    Mapper *mapper = _create_mapper(mapper_id, submapper_id);
     if (!mapper) {
+        printf("Failed to create mapper\n");
         return NULL;
     }
 
-    size_t prg_ram_size = buffer[8] * PRG_RAM_CHUNK_SIZE;
-    if (prg_ram_size == 0) {
-        prg_ram_size = PRG_RAM_CHUNK_SIZE; // for compatibility
-    }
-
-    // skip the trainer if present
     if (flag6.has_trainer) {
-        fseek(file, 512, SEEK_CUR);
+        printf("ROMs with trainers are not supported at this time\n");
+        return NULL;
     }
 
     size_t read_items;
@@ -173,6 +247,11 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     cart->mirror_mode = flag6.mirror_mode;
     cart->has_nv_ram = flag6.has_nv_ram;
     cart->ignore_mirror_ctrl = flag6.ignore_mirror_ctrl;
+    cart->prg_ram_size = prg_ram_size;
+    cart->prg_nvram_size = prg_nvram_size;
+    cart->chr_ram_size = chr_ram_size;
+    cart->chr_nvram_size = chr_nvram_size;
+    cart->timing_mode = timing_mode;
 
     if (mapper->init_func != NULL) {
         mapper->init_func(cart);

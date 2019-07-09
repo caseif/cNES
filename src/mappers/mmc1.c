@@ -239,7 +239,7 @@ static void _mmc1_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     }
 }
 
-void mapper_init_mmc1(Mapper *mapper) {
+void mapper_init_mmc1(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_MMC1;
     memcpy(mapper->name, "MMC1", strlen("MMC1"));
     mapper->init_func       = NULL;
