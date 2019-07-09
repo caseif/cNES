@@ -136,7 +136,7 @@ typedef struct {
 
     uint8_t read_buf;
 
-    uint16_t addr_latch;
+    uint16_t addr_bus;
     uint8_t name_table_entry_latch;
     unsigned int attr_table_entry_latch:2;
     unsigned int attr_table_entry_latch_secondary:2;

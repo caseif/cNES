@@ -42,7 +42,7 @@
 #include <time.h>
 
 #define FRAMES_PER_SECOND 60.0988
-#define CYCLES_PER_FRAME 29780.5
+#define CYCLES_PER_FRAME 89342
 #define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
 
 #define SLEEP_INTERVAL 10 // milliseconds
@@ -59,6 +59,8 @@ bool dead = false;
 static Cartridge *g_cart;
 
 static uint8_t g_bus_val; // the value on the data bus
+
+static uint8_t cycle_index;
 
 static void _init_controllers() {
     init_controllers();
@@ -211,10 +213,11 @@ void do_system_loop(void) {
             }
 
             cycle_ppu();
-            cycle_ppu();
-            cycle_ppu();
 
-            cycle_cpu();
+            if (cycle_index++ == 2) {
+                cycle_index = 0;
+                cycle_cpu();
+            }
 
             if (stepping) {
                 halted = true;

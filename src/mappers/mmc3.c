@@ -41,6 +41,8 @@
 #define CHR_BANK_GRANULARITY 0x400
 #define PRG_BANK_GRANULARITY 0x2000
 
+#define IRQ_COOLDOWN_PERIOD 8
+
 static unsigned char g_chr_ram[CHR_RAM_SIZE];
 
 // false -> $C000-DFFF fixed, $8000-9FFF swappable
@@ -66,6 +68,8 @@ static uint8_t g_irq_latch;
 static bool g_irq_pending = false;
 static bool g_irq_reload;
 static bool g_irq_enabled = false;
+//static bool old_a12 = false;
+static uint8_t a12_cooldown = 0;
 
 static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
     assert(addr >= 0x8000);
@@ -131,25 +135,6 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
     }
 
     return ((bank * CHR_BANK_GRANULARITY) | (addr % bank_size)) % cart->chr_size;
-}
-
-static void _mmc3_decrement_counter(void) {
-    if (g_irq_reload) {
-        g_irq_counter = g_irq_latch;
-        g_irq_reload = false;
-    }
-
-    if (g_irq_counter == 0) {
-        if (g_irq_enabled) {
-            cpu_raise_irq_line();
-            g_irq_pending = true;
-        }
-
-        g_irq_counter = g_irq_latch;
-        g_irq_reload = false;
-    } else {
-        g_irq_counter--;
-    }
 }
 
 static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
@@ -246,6 +231,7 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             g_irq_latch = val;
             return;
         case 0xC001:
+            g_irq_counter = 0xFF;
             g_irq_reload = true;
             return;
         case 0xE000:
@@ -316,15 +302,32 @@ static void _mmc3_tick(void) {
     #endif
 
     if (g_irq_pending) {
-        cpu_raise_irq_line();
+        //cpu_raise_irq_line();
     }
 
-    uint16_t target_tick = ppu_get_swap_pattern_tables() ? 324 : 260;
-    if (ppu_is_rendering_enabled() 
-            && ((ppu_get_scanline() == PRE_RENDER_LINE)
-                    || (ppu_get_scanline() >= FIRST_VISIBLE_LINE && ppu_get_scanline() <= LAST_VISIBLE_LINE))
-            && (ppu_get_scanline_tick() >= target_tick && ppu_get_scanline_tick() <= target_tick + 2)) {
-        _mmc3_decrement_counter();
+    bool new_a12 = (ppu_get_internal_regs()->addr_bus & 0x1000) && !(ppu_get_internal_regs()->addr_bus & 0x6000);
+    if (a12_cooldown > 0) {
+        a12_cooldown--;
+    }
+    if (!a12_cooldown && new_a12) {
+        uint8_t counter_old = g_irq_counter;
+
+        if (g_irq_reload || g_irq_counter == 0) {
+            g_irq_counter = g_irq_latch;
+            g_irq_reload = false;
+        } else {
+            g_irq_counter--;
+        }
+
+        // clock on the falling edge
+        if (counter_old && g_irq_counter == 0 && g_irq_enabled) {
+            cpu_raise_irq_line();
+            g_irq_pending = true;
+        }
+    }
+
+    if (new_a12) {
+        a12_cooldown = IRQ_COOLDOWN_PERIOD;
     }
 }
 

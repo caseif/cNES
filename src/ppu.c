@@ -319,6 +319,9 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
 
                 // flush t to v
                 g_ppu_internal_regs.v.addr = g_ppu_internal_regs.t.addr;
+
+                // copy to address bus
+                g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
             } else {
                 // clear upper bits
                 g_ppu_internal_regs.t.addr &= ~0x7F00;
@@ -429,7 +432,7 @@ uint8_t ppu_palette_table_read(uint8_t index) {
     }
 
     if (g_ppu_mask.monochrome) {
-        index &= 0xF0;
+        index &= 0x30;
     }
 
     return g_palette_ram[index];
@@ -557,7 +560,7 @@ void _do_tile_fetching(void) {
 
                         // compute NT address
                         // address = name table base + (v except fine y)
-                        g_ppu_internal_regs.addr_latch = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
+                        g_ppu_internal_regs.addr_bus = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
 
                         break;
                     }
@@ -565,7 +568,7 @@ void _do_tile_fetching(void) {
                     case 1: {
                         // don't load the latch for unused fetches
                         if (g_scanline_tick <= 336) {
-                            g_ppu_internal_regs.name_table_entry_latch = system_vram_read(g_ppu_internal_regs.addr_latch);
+                            g_ppu_internal_regs.name_table_entry_latch = system_vram_read(g_ppu_internal_regs.addr_bus);
                         }
                         break;
                     }
@@ -573,13 +576,13 @@ void _do_tile_fetching(void) {
                     case 2: {
                         unsigned int v = g_ppu_internal_regs.v.addr;
                         // address = attr table base + (name table offset) + (shifted v)
-                        g_ppu_internal_regs.addr_latch = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
+                        g_ppu_internal_regs.addr_bus = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
                         break;
                     }
                     // fetch AT byte
                     case 3: {
-                        uint8_t attr_table_byte = system_vram_read(g_ppu_internal_regs.addr_latch);
+                        uint8_t attr_table_byte = system_vram_read(g_ppu_internal_regs.addr_bus);
 
                         // check if it's in the bottom half of the table cell
                         if (g_ppu_internal_regs.v.y_coarse & 0b10) {
@@ -605,14 +608,14 @@ void _do_tile_fetching(void) {
                         unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
                                 + g_ppu_internal_regs.v.y_fine;
 
-                        g_ppu_internal_regs.addr_latch = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                        g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
 
                         break;
                     }
                     // fetch tile low byte
                     case 5: {
-                        g_ppu_internal_regs.pattern_bitmap_l_latch = reverse_bits(system_vram_read(g_ppu_internal_regs.addr_latch));
+                        g_ppu_internal_regs.pattern_bitmap_l_latch = reverse_bits(system_vram_read(g_ppu_internal_regs.addr_bus));
 
                         break;
                     }
@@ -622,14 +625,14 @@ void _do_tile_fetching(void) {
                         unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
                                 + g_ppu_internal_regs.v.y_fine + 8;
 
-                        g_ppu_internal_regs.addr_latch = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                        g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                 + pattern_offset;
 
                         break;
                     }
                     // fetch tile high byte
                     case 7: {
-                        g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(system_vram_read(g_ppu_internal_regs.addr_latch));
+                        g_ppu_internal_regs.pattern_bitmap_h_latch = reverse_bits(system_vram_read(g_ppu_internal_regs.addr_bus));
 
                         // only update v if rendering is enabled
                         if (ppu_is_rendering_enabled()) {
@@ -845,9 +848,9 @@ void _do_sprite_evaluation(void) {
 
                         if (g_ppu_control.tall_sprites) {
                             uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                            g_ppu_internal_regs.addr_latch = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
+                            g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
                         } else {
-                            g_ppu_internal_regs.addr_latch = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                            g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                     | (tile_index * 16 + cur_y);
                         }
                     }
@@ -856,7 +859,7 @@ void _do_sprite_evaluation(void) {
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                         if (index < g_ppu_internal_regs.loaded_sprites) {
-                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_latch);
+                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
 
                             if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
@@ -891,9 +894,9 @@ void _do_sprite_evaluation(void) {
 
                         if (g_ppu_control.tall_sprites) {
                             uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                            g_ppu_internal_regs.addr_latch = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
+                            g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
                         } else {
-                            g_ppu_internal_regs.addr_latch = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                            g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
                                     | (tile_index * 16 + cur_y + 8);
                         }
 
@@ -904,7 +907,7 @@ void _do_sprite_evaluation(void) {
                         SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                         if (index < g_ppu_internal_regs.loaded_sprites) {
-                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_latch);
+                            uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
 
                             if (!attrs.flip_hor) {
                                 res = reverse_bits(res);
