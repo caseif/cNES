@@ -559,7 +559,10 @@ void _do_tile_fetching(void) {
                     }
                     // fetch NT byte
                     case 1: {
-                        g_ppu_internal_regs.name_table_entry_latch = system_vram_read(g_ppu_internal_regs.addr_latch);
+                        // don't load the latch for unused fetches
+                        if (g_scanline_tick <= 336) {
+                            g_ppu_internal_regs.name_table_entry_latch = system_vram_read(g_ppu_internal_regs.addr_latch);
+                        }
                         break;
                     }
                     // compute AT address
@@ -584,7 +587,10 @@ void _do_tile_fetching(void) {
                             attr_table_byte >>= 2;
                         }
 
-                        g_ppu_internal_regs.attr_table_entry_latch_secondary = attr_table_byte & 0b11;
+                        // don't load the latch for unused fetches
+                        if (g_scanline_tick <= 336) {
+                            g_ppu_internal_regs.attr_table_entry_latch_secondary = attr_table_byte & 0b11;
+                        }
 
                         break;
                     }
@@ -1080,9 +1086,9 @@ void cycle_ppu(void) {
         }
     }
 
-    if (g_scanline < RESOLUTION_V
-            && ((g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H)
-                    || (g_scanline_tick >= 329 && g_scanline_tick <= 336))) {
+    if ((g_scanline < RESOLUTION_V || g_scanline == PRE_RENDER_LINE)
+            && ((g_scanline_tick >= 1 && g_scanline_tick <= RESOLUTION_H)
+                    || (g_scanline_tick >= 321 && g_scanline_tick <= 336))) {
         // shift the internal registers
         g_ppu_internal_regs.pattern_shift_h >>= 1;
         g_ppu_internal_regs.pattern_shift_l >>= 1;
