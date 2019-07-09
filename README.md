@@ -7,7 +7,7 @@ cNES is partially derived from the now-defunct
 
 ### Features
 
-- Support for popular mappers (NROM, UNROM, MMC1, MMC3)
+- Support for popular mappers (NROM, MMC1, UNROM, CNROM, MMC3)
 - Cycle-accurate CPU and PPU emulation
 - Low-level emulation of PPU hardware latches/registers
 
@@ -15,16 +15,16 @@ cNES is partially derived from the now-defunct
 
 - No APU support
 - Attributes are a bit buggy on the left edge of the screen
-- PPU memory access is not cycle-accurate (it's done as a single operation at
-  the moment)
-- Interrupt timing is imperfect
+- PPU timings are juuust a little bit off
 - No support for color masking
+- MMC3 implementation is a bit buggy
+- Many games are broken in one way or another (see [compatibility list](COMPATIBILITY.md))
+  - 
 
 ### Planned Features
 
 - APU support
 - More mapper implementations
-- Cycle accurate memory access for PPU fetching
 - Color masking support
 
 ### Non-goals
@@ -33,11 +33,23 @@ cNES is partially derived from the now-defunct
     - This project is a technical challenge for myself, and as such a 
       user-friendly interface is not one of its goals. This is not to say that
       it will never exist, just that it's not a priority.
+- Save states
+    - Again, I'm interested in adding such a feature, but it's definitely not a
+      priority.
 
 ### Why?
 
-Mostly for educational purposes, and also for fun. Don't expect too much out of
-it.
+Mostly for educational purposes, and also for fun.
+
+### Special Thanks To
+
+- The NesDev [forums](https://forums.nesdev.com/) and
+  [wiki](http://wiki.nesdev.com), which have been an invaluable resource in
+  building this project
+- [blargg](http://blargg.8bitalley.com/), whose tests have helped immensely with
+  getting details (both large and small) locked down
+- Everyone responsible for the documents listed on the
+  [resources page](RESOURCES.md)
 
 ### License
 
