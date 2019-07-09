@@ -32,6 +32,11 @@
 
 #include <string.h>
 
+#define CHR_RAM_SIZE 0x2000
+
+// pretty sure this never existed in hardware, but some of blargg's tests rely on it
+static unsigned char g_chr_ram[CHR_RAM_SIZE];
+
 uint8_t nrom_ram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         case 0x0000 ... 0x7FFF:
@@ -66,7 +71,15 @@ uint8_t nrom_vram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         // pattern tables
         case 0x0000 ... 0x1FFF: {
-            return cart->chr_rom[addr];
+            if (cart->chr_size == 0) {
+                return g_chr_ram[addr];
+            }
+
+            if (addr < cart->chr_size) {
+                return cart->chr_rom[addr];
+            } else {
+                return addr & 0xFF; // open bus (typically the lower address byte)
+            }
         }
         // name tables
         case 0x2000 ... 0x3EFF: {
@@ -88,6 +101,10 @@ void nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     switch (addr) {
         // pattern tables
         case 0x0000 ... 0x1FFF: {
+            if (cart->chr_size == 0) {
+                g_chr_ram[addr] = val;
+            }
+
             break;
         }
         // name tables

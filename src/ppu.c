@@ -112,8 +112,7 @@ static bool g_odd_frame;
 static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
-// ugly NMI timing hacks
-static bool g_nmi_suppression = false;
+// ugly VBL flag suppression hack
 static bool g_vbl_flag_suppression = false;
 
 static RenderMode g_render_mode;
@@ -196,13 +195,8 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
             cpu_clear_nmi_line();
 
-            if (g_scanline == VBL_SCANLINE) {
-                if (g_scanline_tick >= VBL_SCANLINE_TICK - 1 && g_scanline_tick <= VBL_SCANLINE_TICK + 1) {
-                    g_nmi_suppression = true;
-                    if (g_scanline_tick >= VBL_SCANLINE_TICK - 1) {
-                        g_vbl_flag_suppression = true;
-                    }
-                }
+            if (g_scanline == VBL_SCANLINE && g_scanline_tick == VBL_SCANLINE_TICK - 1) {
+                g_vbl_flag_suppression = true;
             }
 
             _update_ppu_open_bus(res, 0xE0);
@@ -642,11 +636,6 @@ void _do_general_cycle_routine(void) {
                 }
                 g_vbl_flag_suppression = false;
 
-                if (g_nmi_suppression) {
-                    g_nmi_suppression = false;
-                    break;
-                }
-
                 if (g_ppu_control.gen_nmis) {
                     cpu_raise_nmi_line();
                 }
@@ -900,6 +889,7 @@ void _do_sprite_evaluation(void) {
                     }
                     default: {
                         // twiddle our thumbs
+                        break;
                     }
                 }
             }
@@ -970,12 +960,12 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
 void cycle_ppu(void) {
     // if the frame is odd and background rendering is enabled, skip the first cycle
     if (g_scanline == 0 && g_scanline_tick == 0 && g_odd_frame && g_ppu_mask.show_background) {
-        //g_scanline_tick = 1;
+        g_scanline_tick = 1;
     }
 
     _do_general_cycle_routine();
 
-    if (g_ppu_mask.show_sprites) {
+    if (ppu_is_rendering_enabled()) {
         _do_sprite_evaluation();
     }
 
