@@ -520,7 +520,7 @@ void _do_instr_operation() {
             break;
         case KIL:
         default:
-            printf("Encountered %s instruction @ $%x\n", mnemonic_to_str(g_cur_instr->mnemonic), g_cpu_regs.pc - 1);
+            printf("Encountered %s instruction @ $%04X\n", mnemonic_to_str(g_cur_instr->mnemonic), g_cpu_regs.pc - 1);
             exit(-1);
     }
 }
@@ -1296,10 +1296,10 @@ static void _print_last_instr(void) {
             switch (instr_type) {
                 case INS_R:
                 case INS_RW:
-                    sprintf(str_param, "$%02X     -> $%02X         ", g_cur_operand, g_latched_val);
+                    sprintf(str_param, "$%02X              -> $%02X", g_cur_operand, g_latched_val);
                     break;
                 default:
-                    sprintf(str_param, "$%02X                    ", g_cur_operand);
+                    sprintf(str_param, "$%02X              <- $%02X", g_cur_operand, g_latched_val);
                     break;
             }
             break;
@@ -1307,24 +1307,22 @@ static void _print_last_instr(void) {
         case ZPY:
             switch (instr_type) {
                 case INS_R:
-                case INS_RW:
-                    sprintf(str_param, "$%02X,%c   -> $%02X   -> $%02X",
+                    sprintf(str_param, "$%02X,%c   -> $%04X -> $%02X",
                             g_cur_operand, g_cur_instr->addr_mode == ZPX ? 'X' : 'Y', g_eff_operand, g_latched_val);
                     break;
                 default:
-                    sprintf(str_param, "$%02X,%c   -> $%02X         ",
-                            g_cur_operand, g_cur_instr->addr_mode == ZPX ? 'X' : 'Y', g_latched_val);
+                    sprintf(str_param, "$%02X,%c   -> $%04X <- $%02X",
+                            g_cur_operand, g_cur_instr->addr_mode == ZPX ? 'X' : 'Y', g_eff_operand, g_latched_val);
                     break;
             }
             break;
         case ABS:
             switch (instr_type) {
                 case INS_R:
-                case INS_RW:
-                    sprintf(str_param, "$%04X   -> $%02X         ", g_cur_operand, g_latched_val);
+                    sprintf(str_param, "$%04X            -> $%02X", g_cur_operand, g_latched_val);
                     break;
                 default:
-                    sprintf(str_param, "$%04X                  ", g_cur_operand);
+                    sprintf(str_param, "$%04X            <- $%02X", g_cur_operand, g_latched_val);
                     break;
             }
             break;
@@ -1332,13 +1330,12 @@ static void _print_last_instr(void) {
         case ABY:
             switch (instr_type) {
                 case INS_R:
-                case INS_RW:
                     sprintf(str_param, "$%04X,%c -> $%04X -> $%02X",
                             g_cur_operand, g_cur_instr->addr_mode == ABX ? 'X' : 'Y', g_eff_operand, g_latched_val);
                     break;
                 default:
-                    sprintf(str_param, "$%04X,%c -> $%02X         ",
-                            g_cur_operand, g_cur_instr->addr_mode == ABX ? 'X' : 'Y', g_latched_val);
+                    sprintf(str_param, "$%04X,%c -> $%04X <- $%02X",
+                            g_cur_operand, g_cur_instr->addr_mode == ABX ? 'X' : 'Y', g_eff_operand, g_latched_val);
                     break;
             }
             break;
