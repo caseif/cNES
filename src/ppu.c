@@ -845,14 +845,17 @@ void _do_sprite_fetching(void) {
 
                     uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
-                    uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                    uint8_t cur_y = (g_scanline - g_ppu_internal_regs.sprite_y_latch) % 16;
                     bool bottom_tile = false;
                     if (g_ppu_control.tall_sprites) {
                         bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
                         if (cur_y > 7) {
                             cur_y -= 8;
                         }
+                    } else {
+                        cur_y %= 8;
                     }
+
                     if (attrs.flip_ver) {
                         cur_y = 7 - cur_y;
                     }
@@ -893,14 +896,17 @@ void _do_sprite_fetching(void) {
 
                     uint16_t tile_index = g_ppu_internal_regs.sprite_tile_index_latch;
 
-                    uint8_t cur_y = g_scanline - g_ppu_internal_regs.sprite_y_latch;
+                    uint8_t cur_y = (g_scanline - g_ppu_internal_regs.sprite_y_latch) % 16;
                     bool bottom_tile = false;
                     if (g_ppu_control.tall_sprites) {
                         bottom_tile = (cur_y > 7) ^ attrs.flip_ver;
                         if (cur_y > 7) {
                             cur_y -= 8;
                         }
+                    } else {
+                        cur_y %= 8;
                     }
+
                     if (attrs.flip_ver) {
                         cur_y = 7 - cur_y;
                     }
@@ -937,7 +943,7 @@ void _do_sprite_fetching(void) {
                     break;
                 }
                 default: {
-                    // twiddle our thumbs
+                    assert(false);
                     break;
                 }
             }

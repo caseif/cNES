@@ -210,13 +210,13 @@ void do_system_loop(void) {
         if (!halted) {
             cycle_ppu();
 
+            if (g_cart->mapper->tick_func != NULL) {
+                g_cart->mapper->tick_func();
+            }
+
             if (cycle_index++ == 2) {
                 cycle_index = 0;
                 cycle_cpu();
-            }
-
-            if (g_cart->mapper->tick_func != NULL) {
-                g_cart->mapper->tick_func();
             }
 
             if (stepping) {
