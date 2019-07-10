@@ -27,9 +27,9 @@
 
 #include "cartridge.h"
 
+#define SYSTEM_MEMORY_SIZE 0x800
 #define PRG_RAM_SIZE 0x2000
-
-unsigned char g_prg_ram[PRG_RAM_SIZE];
+#define CHR_RAM_SIZE 0x2000
 
 void initialize_system(Cartridge *cart);
 
@@ -37,9 +37,29 @@ uint8_t system_open_bus_read(void);
 
 void system_open_bus_write(uint8_t val);
 
+unsigned char *system_get_ram(void);
+
+unsigned char *system_get_prg_ram(void);
+
+uint8_t system_prg_ram_read(uint16_t addr);
+
+void system_prg_ram_write(uint16_t addr, uint8_t val);
+
+unsigned char *system_get_chr_ram(void);
+
+uint8_t system_chr_ram_read(uint16_t addr);
+
+void system_chr_ram_write(uint16_t addr, uint8_t val);
+
+void system_ram_init(void);
+
 uint8_t system_ram_read(uint16_t addr);
 
 void system_ram_write(uint16_t addr, uint8_t val);
+
+uint8_t system_memory_read(uint16_t addr);
+
+void system_memory_write(uint16_t addr, uint8_t val);
 
 uint8_t system_vram_read(uint16_t addr);
 

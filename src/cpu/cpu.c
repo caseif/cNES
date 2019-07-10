@@ -37,7 +37,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SYSTEM_MEMORY 0x800
 #define STACK_BOTTOM_ADDR 0x100
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
@@ -51,8 +50,6 @@ const InterruptType INT_NMI = (InterruptType) {0xFFFA, false, true, false, false
 const InterruptType INT_RST = (InterruptType) {0xFFFC, false, false,  false, true};
 const InterruptType INT_IRQ = (InterruptType) {0xFFFE, true,  true,  false, true};
 const InterruptType INT_BRK = (InterruptType) {0xFFFE, false, true,  true,  true};
-
-unsigned char g_sys_memory[SYSTEM_MEMORY];
 
 CpuRegisters g_cpu_regs;
 
@@ -99,7 +96,7 @@ static bool g_nmi_hijack; // set when an NMI "hijacks" a software interrupt
 
 void initialize_cpu(void) {
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
-    memset(g_sys_memory, 0x00, SYSTEM_MEMORY);
+    memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
 
     g_queued_interrupt = &INT_RST;
 
@@ -114,23 +111,13 @@ void cpu_init_pc(uint16_t addr) {
     printf("Initialized PC to $%04x\n", g_cpu_regs.pc);
 }
 
-uint8_t cpu_ram_read(uint16_t addr) {
-    assert(addr < 0x800);
-    return g_sys_memory[addr];
-}
-
-void cpu_ram_write(uint16_t addr, uint8_t val) {
-    assert(addr < 0x800);
-    g_sys_memory[addr] = val;
-}
-
 void cpu_start_oam_dma(uint8_t page) {
     ppu_start_oam_dma(page);
     g_burn_cycles += 514;
 }
 
 static unsigned char _next_prg_byte(void) {
-    return system_ram_read(g_cpu_regs.pc);
+    return system_memory_read(g_cpu_regs.pc);
 }
 
 static void _set_alu_flags(uint8_t val) {
@@ -581,7 +568,7 @@ static void _execute_interrupt(void) {
         case 3:
             if (g_cur_interrupt->push_pc) {
                 // push PC high, decrement S
-                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
+                system_memory_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
             }
             g_cpu_regs.sp--;
 
@@ -593,7 +580,7 @@ static void _execute_interrupt(void) {
         case 4:
             if (g_cur_interrupt->push_pc) {
                 // push PC low, decrement S
-                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
+                system_memory_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
             }
             g_cpu_regs.sp--;
 
@@ -617,13 +604,13 @@ static void _execute_interrupt(void) {
                     val |= 0x30;
                 }
                 
-                system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
+                system_memory_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
             }
             g_cpu_regs.sp--;
             break;
         case 6:
             // clear PC high and set to vector value
-            g_latched_val = system_ram_read(g_cur_interrupt->vector_loc);
+            g_latched_val = system_memory_read(g_cur_interrupt->vector_loc);
 
             if (g_cur_interrupt->set_i) {
                 g_cpu_regs.status.interrupt_disable = 1;
@@ -631,7 +618,7 @@ static void _execute_interrupt(void) {
             break;
         case 7: {
             // clear PC high and set to vector value
-            uint8_t pch = system_ram_read(g_cur_interrupt->vector_loc + 1);
+            uint8_t pch = system_memory_read(g_cur_interrupt->vector_loc + 1);
             g_cpu_regs.pc = (pch << 8) | g_latched_val;
             g_instr_cycle = 0; // reset for next instruction
             g_cur_interrupt = NULL;
@@ -653,20 +640,20 @@ static void _handle_rti(void) {
             break;
         case 4:
             // pull P, increment S
-            g_cpu_regs.status.serial = system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            g_cpu_regs.status.serial = system_memory_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
             g_cpu_regs.sp++;
             break;
         case 5:
             // clear PC low and set to stack value, increment S
             g_cpu_regs.pc &= ~0xFF;
-            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            g_cpu_regs.pc |= system_memory_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
             g_cpu_regs.sp++;
 
             break;
         case 6:
             // clear PC high and set to stack value
             g_cpu_regs.pc &= ~0xFF00;
-            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+            g_cpu_regs.pc |= system_memory_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
 
             g_instr_cycle = 0; // reset for next instruction
             break;
@@ -678,7 +665,7 @@ static void _handle_rts(void) {
     
     switch (g_instr_cycle) {
         case 2:
-            system_ram_read(g_cpu_regs.pc); // garbage read
+            system_memory_read(g_cpu_regs.pc); // garbage read
             break;
         case 3:
             // increment S
@@ -687,13 +674,13 @@ static void _handle_rts(void) {
         case 4:
             // clear PC low and set to stack value, increment S
             g_cpu_regs.pc &= ~0xFF;
-            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            g_cpu_regs.pc |= system_memory_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
             g_cpu_regs.sp++;
             break;
         case 5:
             // clear PC high and set to stack value
             g_cpu_regs.pc &= ~0xFF00;
-            g_cpu_regs.pc |= system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
+            g_cpu_regs.pc |= system_memory_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp) << 8;
 
             break;
         case 6:
@@ -721,7 +708,7 @@ static void _handle_stack_push(void) {
                 val = g_cpu_regs.status.serial;
                 val |= 0x30;
             }
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
+            system_memory_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, val);
             g_cpu_regs.sp--;
 
             g_instr_cycle = 0; // reset for next instruction
@@ -744,7 +731,7 @@ static void _handle_stack_pull(void) {
             break;
         case 4: {
             // pull register
-            uint8_t val = system_ram_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
+            uint8_t val = system_memory_read(STACK_BOTTOM_ADDR + g_cpu_regs.sp);
             if (g_cur_instr->mnemonic == PLA) {
                 g_cpu_regs.acc = val;
             } else {
@@ -771,18 +758,18 @@ static void _handle_jsr(void) {
             break;
         case 4:
             // push PC high, decrement S
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
+            system_memory_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc >> 8);
             g_cpu_regs.sp--;
             break;
         case 5:
             // push PC low, decrement S
-            system_ram_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
+            system_memory_write(STACK_BOTTOM_ADDR + g_cpu_regs.sp, g_cpu_regs.pc & 0xFF);
             g_cpu_regs.sp--;
 
             break;
         case 6: {
             // copy low byte to PC, fetch high byte to PC (but don't increment PC)
-            uint8_t pch = system_ram_read(g_cpu_regs.pc);
+            uint8_t pch = system_memory_read(g_cpu_regs.pc);
             g_cur_operand |= pch << 8;
             g_eff_operand = g_cur_operand;
 
@@ -814,7 +801,7 @@ static void _handle_instr_rw(uint8_t offset) {
         case INS_R:
             ASSERT_CYCLE(offset, offset);
 
-            g_latched_val = system_ram_read(g_eff_operand);
+            g_latched_val = system_memory_read(g_eff_operand);
             _do_instr_operation();
 
             g_instr_cycle = 0;
@@ -824,7 +811,7 @@ static void _handle_instr_rw(uint8_t offset) {
             ASSERT_CYCLE(offset, offset);
 
             _do_instr_operation();
-            system_ram_write(g_eff_operand, g_latched_val);
+            system_memory_write(g_eff_operand, g_latched_val);
 
             g_instr_cycle = 0;
 
@@ -834,15 +821,15 @@ static void _handle_instr_rw(uint8_t offset) {
 
             switch (g_instr_cycle - offset) {
                 case 0:
-                    g_latched_val = system_ram_read(g_eff_operand);
+                    g_latched_val = system_memory_read(g_eff_operand);
                     break;
                 case 1:
-                    system_ram_write(g_eff_operand, g_latched_val);
+                    system_memory_write(g_eff_operand, g_latched_val);
                     _do_instr_operation();
 
                     break;
                 case 2:
-                    system_ram_write(g_eff_operand, g_latched_val);
+                    system_memory_write(g_eff_operand, g_latched_val);
                     g_instr_cycle = 0;
                     break;
             }
@@ -865,7 +852,7 @@ static void _handle_instr_zpi(void) {
     ASSERT_CYCLE(3, 6);
 
     if (g_instr_cycle == 3) {
-        g_latched_val = system_ram_read(g_cur_operand);
+        g_latched_val = system_memory_read(g_cur_operand);
         g_eff_operand = (g_cur_operand + (g_cur_instr->addr_mode == ZPX ? g_cpu_regs.x : g_cpu_regs.y)) & 0xFF;
     } else {
         _handle_instr_rw(4);
@@ -896,7 +883,7 @@ static void _handle_instr_abi(void) {
 
             break;
         case 4:
-            g_latched_val = system_ram_read(g_eff_operand);
+            g_latched_val = system_memory_read(g_eff_operand);
             // fix effective address
             if ((g_cur_operand & 0xFF) + (g_cur_instr->addr_mode == ABX ? g_cpu_regs.x : g_cpu_regs.y) >= 0x100) {
                 g_eff_operand += 0x100;
@@ -918,15 +905,15 @@ static void _handle_instr_izx(void) {
 
     switch (g_instr_cycle) {
         case 3:
-            system_ram_read(g_cur_operand);
+            system_memory_read(g_cur_operand);
             g_cur_operand = (g_cur_operand & 0xFF00) | ((g_cur_operand + g_cpu_regs.x) & 0xFF);
             break;
         case 4:
             g_eff_operand = 0;
-            g_eff_operand |= system_ram_read(g_cur_operand);
+            g_eff_operand |= system_memory_read(g_cur_operand);
             break;
         case 5:
-            g_eff_operand |= system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
+            g_eff_operand |= system_memory_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
 
             break;
         default:
@@ -941,15 +928,15 @@ static void _handle_instr_izy(void) {
     switch (g_instr_cycle) {
         case 3:
             g_eff_operand = 0;
-            g_eff_operand |= system_ram_read(g_cur_operand);
+            g_eff_operand |= system_memory_read(g_cur_operand);
             g_latched_val = g_eff_operand & 0xFF;
             break;
         case 4:
-            g_eff_operand |= system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
+            g_eff_operand |= system_memory_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8;
             g_eff_operand = (g_eff_operand & 0xFF00) | ((g_eff_operand + g_cpu_regs.y) & 0xFF);
             break;
         case 5: {
-            uint8_t tmp = system_ram_read(g_eff_operand);
+            uint8_t tmp = system_memory_read(g_eff_operand);
             if (g_latched_val + g_cpu_regs.y >= 0x100) {
                 g_eff_operand += 0x100;
             } else if (get_instr_type(g_cur_instr->mnemonic) == INS_R) {
@@ -976,7 +963,7 @@ static void _handle_jmp(void) {
         case ABS:
             ASSERT_CYCLE(3, 3);
             
-            uint8_t pch = system_ram_read(g_cpu_regs.pc);
+            uint8_t pch = system_memory_read(g_cpu_regs.pc);
             g_cpu_regs.pc++;
 
             g_cur_operand |= pch << 8;
@@ -995,7 +982,7 @@ static void _handle_jmp(void) {
                     g_cpu_regs.pc++; // increment PC
                     break;
                 case 4:
-                    g_latched_val = system_ram_read(g_cur_operand); // fetch target low
+                    g_latched_val = system_memory_read(g_cur_operand); // fetch target low
 
                     break;
                 case 5:
@@ -1003,7 +990,7 @@ static void _handle_jmp(void) {
                     // fetch target high to PC
                     // we technically don't do this properly, but sub-cycle accuracy is not necessarily a goal
                     // page boundary crossing is not handled correctly - we emulate this bug here
-                    g_eff_operand = (system_ram_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8) | g_latched_val;
+                    g_eff_operand = (system_memory_read((g_cur_operand & 0xFF00) | ((g_cur_operand + 1) & 0xFF)) << 8) | g_latched_val;
                     // copy target to PC
                     g_cpu_regs.pc = g_eff_operand;
 
@@ -1025,7 +1012,7 @@ static void _handle_branch(void) {
 
     switch (g_instr_cycle) {
         case 3:
-            g_latched_val = system_ram_read(g_cpu_regs.pc);
+            g_latched_val = system_memory_read(g_cpu_regs.pc);
 
             g_eff_operand = g_cpu_regs.pc + (int8_t) g_cur_operand;
 
@@ -1073,7 +1060,7 @@ static void _handle_branch(void) {
 
             uint8_t old_pcl = g_latched_val;
 
-            g_latched_val = system_ram_read(g_cpu_regs.pc);
+            g_latched_val = system_memory_read(g_cpu_regs.pc);
 
             if ((int8_t) g_cur_operand < 0 && -(int8_t) g_cur_operand > old_pcl) {
                 g_cpu_regs.pc -= 0x100;
@@ -1266,7 +1253,7 @@ void dump_ram(void) {
         return;
     }
 
-    fwrite(g_sys_memory, SYSTEM_MEMORY, 1, out_file);
+    fwrite(system_get_ram(), SYSTEM_MEMORY_SIZE, 1, out_file);
 
     fclose(out_file);
 }

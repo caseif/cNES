@@ -43,8 +43,6 @@
 
 #define IRQ_COOLDOWN_PERIOD 8
 
-static unsigned char g_chr_ram[CHR_RAM_SIZE];
-
 // false -> $C000-DFFF fixed, $8000-9FFF swappable
 // true  -> $8000-9FFF fixed, $C000-DFFF swappable
 static bool g_prg_switch_ranges = false;
@@ -143,7 +141,7 @@ static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr < 0x6000) {
         return system_lower_memory_read(addr);
     } else if (addr < 0x8000) {
-        return g_prg_ram[addr % 0x2000];
+        return system_get_prg_ram()[addr % 0x2000];
     }
 
     uint32_t prg_offset = _mmc3_get_prg_offset(cart, addr);
@@ -161,7 +159,7 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
         system_lower_memory_write(addr, val);
         return;
     } else if (addr < 0x8000) {
-        g_prg_ram[addr % 0x2000] = val;
+        system_get_prg_ram()[addr % 0x2000] = val;
         return;
     }
 
@@ -254,7 +252,7 @@ static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
     switch (addr) {
         case 0x0000 ... 0x1FFF: {
             if (cart->chr_size == 0) {
-                return g_chr_ram[addr];
+                return system_chr_ram_read(addr);
             }
 
             uint32_t chr_offset = _mmc3_get_chr_offset(cart, addr);
@@ -279,14 +277,13 @@ static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
 }
 
 static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    if (cart->chr_size == 0) {
-        g_chr_ram[addr] = val;
-    }
-
     switch (addr) {
-        // PRG ROM
+        // CHR
         case 0x0000 ... 0x1FFF:
-            return; // do nothing
+            if (cart->chr_size == 0) {
+                system_chr_ram_write(addr, val);
+            }
+            return;
         // name tables
         case 0x2000 ... 0x3EFF:
             ppu_name_table_write(addr % 0x1000, val);

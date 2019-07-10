@@ -56,6 +56,12 @@ bool halted = false;
 bool stepping = false;
 bool dead = false;
 
+unsigned char g_system_ram[SYSTEM_MEMORY_SIZE];
+unsigned char *g_prg_ram;
+size_t g_prg_ram_size;
+unsigned char *g_chr_ram;
+size_t g_chr_ram_size;
+
 static Cartridge *g_cart;
 
 static uint8_t g_bus_val; // the value on the data bus
@@ -71,19 +77,37 @@ static void _init_controllers() {
     sc_attach_driver(sc_init, sc_poll_input);
 }
 
-static void _write_prg_ram(void) {
+static void _write_prg_nvram(Cartridge *cart) {
     printf("Saving SRAM to disk\n");
-    write_game_data(g_cart->title, SRAM_FILE_NAME, g_prg_ram, sizeof(g_prg_ram));
+    write_game_data(g_cart->title, SRAM_FILE_NAME, g_prg_ram, cart->prg_nvram_size);
 }
 
 void initialize_system(Cartridge *cart) {
     g_cart = cart;
 
-    if (g_cart->has_nv_ram) {
-        unsigned char prg_ram_tmp[sizeof(g_prg_ram)];
-        if (read_game_data(cart->title, SRAM_FILE_NAME, prg_ram_tmp, sizeof(prg_ram_tmp), true)) {
+    if (cart->prg_ram_size > 0) {
+        g_prg_ram_size = cart->prg_ram_size;
+    } else if (cart->prg_nvram_size > 0) {
+        g_prg_ram_size = cart->prg_nvram_size;
+    }
+    if (g_prg_ram_size > 0) {
+        g_prg_ram = (unsigned char*) malloc(g_prg_ram_size);
+    }
+
+    if (cart->chr_ram_size > 0) {
+        g_chr_ram_size = cart->chr_ram_size;
+    } else if (cart->chr_nvram_size > 0) {
+        g_chr_ram_size = cart->chr_nvram_size;
+    }
+    if (g_chr_ram_size > 0) {
+        g_chr_ram = (unsigned char*) malloc(g_chr_ram_size);
+    }
+
+    if (g_cart->has_nv_ram && g_cart->prg_nvram_size > 0) {
+        unsigned char prg_ram_tmp[g_prg_ram_size];
+        if (read_game_data(cart->title, SRAM_FILE_NAME, prg_ram_tmp, g_prg_ram_size, true)) {
             printf("Loading SRAM from disk\n");
-            memcpy(g_prg_ram, prg_ram_tmp, sizeof(prg_ram_tmp));
+            memcpy(g_prg_ram, prg_ram_tmp, g_prg_ram_size);
         }
     }
 
@@ -102,7 +126,64 @@ void system_open_bus_write(uint8_t val) {
     g_bus_val = val;
 }
 
+unsigned char *system_get_ram(void) {
+    return g_system_ram;
+}
+
+unsigned char *system_get_prg_ram(void) {
+    return g_prg_ram;
+}
+
+uint8_t system_prg_ram_read(uint16_t addr) {
+    if (g_prg_ram_size > 0) {
+        return g_chr_ram[addr % g_prg_ram_size];
+    } else {
+        return system_open_bus_read();
+    }
+}
+
+void system_prg_ram_write(uint16_t addr, uint8_t val) {
+    if (g_prg_ram_size > 0) {
+        g_prg_ram[addr % g_prg_ram_size] = val;
+    }
+}
+
+unsigned char *system_get_chr_ram(void) {
+    return g_chr_ram;
+}
+
+uint8_t system_chr_ram_read(uint16_t addr) {
+    if (g_chr_ram_size > 0) {
+        return g_chr_ram[addr % g_chr_ram_size];
+    } else {
+        return addr >> 8; // PPU open bus, typically the high byte
+    }
+}
+
+void system_chr_ram_write(uint16_t addr, uint8_t val) {
+    if (g_chr_ram_size > 0) {
+        g_chr_ram[addr % g_chr_ram_size] = val;
+    }
+}
+
+void system_ram_init(void) {
+    srand(time(0));
+    for (size_t i = 0; i < SYSTEM_MEMORY_SIZE; i++) {
+        g_system_ram[i] = rand();
+    }
+}
+
 uint8_t system_ram_read(uint16_t addr) {
+    assert(addr < SYSTEM_MEMORY_SIZE);
+    return g_system_ram[addr];
+}
+
+void system_ram_write(uint16_t addr, uint8_t val) {
+    assert(addr < SYSTEM_MEMORY_SIZE);
+    g_system_ram[addr] = val;
+}
+
+uint8_t system_memory_read(uint16_t addr) {
     uint8_t res = g_cart->mapper->ram_read_func(g_cart, addr);
 
     #if PRINT_SYS_MEMORY_ACCESS
@@ -114,7 +195,7 @@ uint8_t system_ram_read(uint16_t addr) {
     return res;
 }
 
-void system_ram_write(uint16_t addr, uint8_t val) {
+void system_memory_write(uint16_t addr, uint8_t val) {
     #if PRINT_SYS_MEMORY_ACCESS
     printf("$%04X <- %02X\n", addr, val);
     #endif
@@ -147,7 +228,7 @@ uint8_t system_lower_memory_read(uint16_t addr) {
 
     switch (addr) {
         case 0 ... 0x1FFF:
-            return cpu_ram_read(addr % 0x800);
+            return system_ram_read(addr % SYSTEM_MEMORY_SIZE);
         case 0x2000 ... 0x3FFF:
             return ppu_read_mmio((uint8_t) (addr % 8));
         case 0x4014:
@@ -170,7 +251,7 @@ void system_lower_memory_write(uint16_t addr, uint8_t val) {
 
     switch (addr) {
         case 0 ... 0x1FFF: {
-            cpu_ram_write(addr % 0x800, val);
+            system_ram_write(addr % 0x800, val);
             return;
         }
         case 0x2000 ... 0x3FFF: {
@@ -252,7 +333,7 @@ bool is_execution_halted(void) {
 
 void kill_execution(void) {
     if (g_cart->has_nv_ram) {
-        _write_prg_ram();
+        _write_prg_nvram(g_cart);
     }
     dead = true;
 }

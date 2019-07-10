@@ -71,9 +71,9 @@ void initialize_cpu(void);
 
 void cpu_init_pc(uint16_t addr);
 
-uint8_t cpu_ram_read(uint16_t addr);
+uint8_t system_ram_read(uint16_t addr);
 
-void cpu_ram_write(uint16_t addr, uint8_t val);
+void system_ram_write(uint16_t addr, uint8_t val);
 
 void cpu_start_oam_dma(uint8_t page);
 

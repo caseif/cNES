@@ -464,7 +464,7 @@ void ppu_palette_table_write(uint8_t index, uint8_t val) {
 void ppu_start_oam_dma(uint8_t page) {
     for (unsigned int i = 0; i <= 0xFF; i++) {
         uint16_t addr = (page << 8) | i;
-        ((char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = system_ram_read(addr);
+        ((char*) g_oam_ram)[(uint8_t) (g_ppu_internal_regs.s + i)] = system_memory_read(addr);
     }
 }
 
