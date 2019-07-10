@@ -777,6 +777,11 @@ void _do_sprite_evaluation(void) {
                     if (g_ppu_internal_regs.has_latched_sprite) {
                         if (g_ppu_internal_regs.o < 8) {
                             assert(g_ppu_internal_regs.m <= 4);
+
+                            if (g_ppu_internal_regs.m == 0) {
+                                break;
+                            }
+
                             ((char*) &g_secondary_oam_ram[g_ppu_internal_regs.o])[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
                             g_ppu_internal_regs.has_latched_sprite = false;
                         }

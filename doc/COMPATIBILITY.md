@@ -12,8 +12,8 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Arch Rivals: A Basketbrawl! | ![](res/circle_green.svg) | playable | |
 | Astyanax | ![](res/circle_green.svg) | playable | |
 | Baseball | ![](res/circle_green.svg) | playable | |
-| Battletoads | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
-| Battletoads & Double Dragon: The Ultimate Team | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
+| Battletoads | ![](res/circle_green.svg) | playable | |
+| Battletoads & Double Dragon: The Ultimate Team | ![](res/circle_green.svg) | playable | |
 | Beetlejuice | ![](res/circle_green.svg) | playable | |
 | Bubble Bobble | ![](res/circle_green.svg) | playable | |
 | Cabal | ![](res/circle_green.svg) | playable | |
