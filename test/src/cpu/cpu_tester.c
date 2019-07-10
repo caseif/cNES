@@ -35,7 +35,6 @@
 #include <string.h>
 
 extern CpuRegisters g_cpu_regs;
-extern uint8_t g_burn_cycles;
 
 extern bool test_addition(void);
 extern bool test_arithmetic(void);

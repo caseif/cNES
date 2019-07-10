@@ -183,7 +183,7 @@ uint8_t ppu_palette_table_read(uint8_t index);
 
 void ppu_palette_table_write(uint8_t index, uint8_t val);
 
-void ppu_start_oam_dma(uint8_t page);
+void ppu_push_dma_byte(uint8_t val);
 
 void cycle_ppu(void);
 

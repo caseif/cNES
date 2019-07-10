@@ -57,8 +57,6 @@ unsigned char g_debug_buffer[0x1000];
 
 uint16_t base_pc;
 
-uint16_t g_burn_cycles = 0;
-
 unsigned int g_total_cycles = 0;
 
 // interrupt lines
@@ -94,9 +92,15 @@ static const InterruptType *g_cur_interrupt; // the interrupt type currently bei
 static const InterruptType *g_queued_interrupt; // the interrupt type currently queued
 static bool g_nmi_hijack; // set when an NMI "hijacks" a software interrupt
 
+static bool g_dma_in_progress;
+static uint8_t g_dma_page;
+static unsigned int g_dma_step;
+
 void initialize_cpu(void) {
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
     memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
+
+    g_dma_page = 0xFF;
 
     g_queued_interrupt = &INT_RST;
 
@@ -105,15 +109,10 @@ void initialize_cpu(void) {
     }
 }
 
-void cpu_init_pc(uint16_t addr) {
-    g_cpu_regs.pc = addr;
-
-    printf("Initialized PC to $%04x\n", g_cpu_regs.pc);
-}
-
 void cpu_start_oam_dma(uint8_t page) {
-    ppu_start_oam_dma(page);
-    g_burn_cycles += 514;
+    g_dma_in_progress = true;
+    g_dma_page = page;
+    g_dma_step = 0;
 }
 
 static unsigned char _next_prg_byte(void) {
@@ -1227,9 +1226,37 @@ static void _do_instr_cycle(void) {
     }
 }
 
+void _handle_dma(void) {
+    uint8_t index = ppu_get_internal_regs()->s;
+    if (g_dma_step == 0) {
+        // dummy read
+        g_latched_val = system_memory_read((g_dma_page << 8) | index);
+    } else {
+        if (g_dma_step == 1) {
+            g_dma_step++; // advance cycle count regardless of whether we skip or not
+            // skip cycle if cycle count is odd
+            if (g_total_cycles % 2) {
+                return;
+            }
+        }
+
+        if (g_dma_step % 2) {
+            // write
+            ppu_push_dma_byte(g_latched_val);
+        } else {
+            // read
+            g_latched_val = system_memory_read((g_dma_page << 8) | index);
+        }
+    }
+
+    if (++g_dma_step > 514) {
+        g_dma_in_progress = false;
+    }
+}
+
 void cycle_cpu(void) {
-    if (g_burn_cycles > 0) {
-        g_burn_cycles--;
+    if (g_dma_in_progress) {
+        _handle_dma();
     } else {
         _do_instr_cycle();
         
