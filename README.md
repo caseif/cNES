@@ -14,10 +14,8 @@ cNES is partially derived from the now-defunct
 ### Limitations
 
 - No APU support
-- Attributes are a bit buggy on the left edge of the screen
 - PPU timings are juuust a little bit off
 - No support for color masking
-- MMC3 implementation is a bit buggy
 - Many games are broken in one way or another (see [compatibility list](doc/COMPATIBILITY.md))
 
 ### Planned Features
