@@ -7,7 +7,7 @@ cNES is partially derived from the now-defunct
 
 ### Features
 
-- Support for popular mappers (NROM, MMC1, UNROM, CNROM, MMC3)
+- Support for popular mappers (NROM, MMC1, UNROM, CNROM, MMC3, AxROM)
 - Cycle-accurate CPU and PPU emulation
 - Low-level emulation of PPU hardware latches/registers
 
@@ -16,7 +16,7 @@ cNES is partially derived from the now-defunct
 - No APU support
 - PPU timings are juuust a little bit off
 - No support for color masking
-- Many games are broken in one way or another (see [compatibility list](doc/COMPATIBILITY.md))
+- Certain games are broken in one way or another (see [compatibility list](doc/COMPATIBILITY.md))
 
 ### Planned Features
 
@@ -38,7 +38,7 @@ cNES is partially derived from the now-defunct
 
 Mostly for educational purposes, and also for fun.
 
-### Special Thanks To
+### Special Thanks
 
 - The NesDev [forums](https://forums.nesdev.com/) and
   [wiki](http://wiki.nesdev.com), which have been an invaluable resource in
