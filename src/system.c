@@ -53,7 +53,7 @@
 #define PRINT_SYS_MEMORY_ACCESS 0
 #define PRINT_PPU_MEMORY_ACCESS 0
 
-#define PRINT_INSTRS 1
+#define PRINT_INSTRS 0
 
 bool halted = false;
 bool stepping = false;
@@ -69,7 +69,12 @@ static Cartridge *g_cart;
 
 static uint8_t g_bus_val; // the value on the data bus
 
-static uint8_t cycle_index;
+static uint8_t g_cycle_index = 0;
+static uint64_t g_total_cpu_cycles = 0;
+
+static bool g_dma_in_progress;
+static uint8_t g_dma_page;
+static unsigned int g_dma_step;
 
 #if PRINT_INSTRS
 // snapshots for logging
@@ -113,11 +118,39 @@ static void _log_callback(char *instr_str) {
     
     // store snapshots for logging
     g_last_reg_snapshot = cpu_get_registers();
-    g_total_cycles_snapshot = cpu_get_cycle_count();
+    g_total_cycles_snapshot = g_total_cpu_cycles;
     g_ppu_scanline_snapshot = ppu_get_scanline();
     g_ppu_scanline_tick_snapshot = ppu_get_scanline_tick();
 }
 #endif
+
+static void _handle_dma(void) {
+    uint8_t index = ppu_get_internal_regs()->s;
+    if (g_dma_step == 0) {
+        // dummy read
+        system_memory_read((g_dma_page << 8) | index);
+    } else {
+        if (g_dma_step == 1) {
+            g_dma_step++; // advance cycle count regardless of whether we skip or not
+            // skip cycle if cycle count is odd
+            if (g_total_cpu_cycles % 2) {
+                return;
+            }
+        }
+
+        if (g_dma_step % 2) {
+            // write
+            ppu_push_dma_byte(g_bus_val);
+        } else {
+            // read
+            g_bus_val = system_memory_read((g_dma_page << 8) | index);
+        }
+    }
+
+    if (++g_dma_step > 514) {
+        g_dma_in_progress = false;
+    }
+}
 
 void initialize_system(Cartridge *cart) {
     g_cart = cart;
@@ -153,6 +186,8 @@ void initialize_system(Cartridge *cart) {
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
 
     _init_controllers();
+
+    g_dma_page = 0xFF;
 
     #if PRINT_INSTRS
     cpu_set_log_callback(_log_callback);
@@ -300,7 +335,7 @@ void system_lower_memory_write(uint16_t addr, uint8_t val) {
             return;
         }
         case 0x4014: {
-            cpu_start_oam_dma(val);
+            system_start_oam_dma(val);
             return;
         }
         case 0x4000 ... 0x4013:
@@ -315,6 +350,12 @@ void system_lower_memory_write(uint16_t addr, uint8_t val) {
         default:
             return; // do nothing
     }
+}
+
+void system_start_oam_dma(uint8_t page) {
+    g_dma_in_progress = true;
+    g_dma_page = page;
+    g_dma_step = 0;
 }
 
 void do_system_loop(void) {
@@ -336,13 +377,16 @@ void do_system_loop(void) {
                 g_cart->mapper->tick_func();
             }
 
-            if (cycle_index++ == 2) {
-                cycle_index = 0;
+            if (g_cycle_index++ == 2) {
+                g_cycle_index = 0;
 
-                #if PRINT_INSTRS
-                #endif
+                if (g_dma_in_progress) {
+                    _handle_dma();
+                } else {
+                    cycle_cpu();
+                }
 
-                cycle_cpu();
+                g_total_cpu_cycles++;
             }
 
             if (stepping) {

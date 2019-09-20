@@ -26,7 +26,6 @@
 #include "system.h"
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
-#include "ppu.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -51,8 +50,6 @@ CpuRegisters g_cpu_regs;
 unsigned char g_debug_buffer[0x1000];
 
 uint16_t base_pc;
-
-uint64_t g_total_cycles = 0;
 
 // interrupt lines
 static bool g_nmi_line = false;
@@ -81,15 +78,9 @@ static bool g_nmi_hijack; // set when an NMI "hijacks" a software interrupt
 
 static void (*g_log_callback)(char*) = NULL;
 
-static bool g_dma_in_progress;
-static uint8_t g_dma_page;
-static unsigned int g_dma_step;
-
 void initialize_cpu(void) {
     memset(&g_cpu_regs.status, DEFAULT_STATUS, 1);
     memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
-
-    g_dma_page = 0xFF;
 
     g_queued_interrupt = &INT_RST;
 
@@ -102,10 +93,6 @@ CpuRegisters cpu_get_registers(void) {
     return g_cpu_regs;
 }
 
-uint64_t cpu_get_cycle_count(void) {
-    return g_total_cycles;
-}
-
 uint8_t cpu_get_instruction_step(void) {
     return g_instr_cycle;
 }
@@ -116,12 +103,6 @@ Instruction *cpu_get_current_instruction(void) {
 
 void cpu_set_log_callback(void (*callback)(char*)) {
     g_log_callback = callback;
-}
-
-void cpu_start_oam_dma(uint8_t page) {
-    g_dma_in_progress = true;
-    g_dma_page = page;
-    g_dma_step = 0;
 }
 
 static unsigned char _next_prg_byte(void) {
@@ -1221,50 +1202,16 @@ static void _do_instr_cycle(void) {
     }
 }
 
-void _handle_dma(void) {
-    uint8_t index = ppu_get_internal_regs()->s;
-    if (g_dma_step == 0) {
-        // dummy read
-        g_latched_val = system_memory_read((g_dma_page << 8) | index);
-    } else {
-        if (g_dma_step == 1) {
-            g_dma_step++; // advance cycle count regardless of whether we skip or not
-            // skip cycle if cycle count is odd
-            if (g_total_cycles % 2) {
-                return;
-            }
-        }
-
-        if (g_dma_step % 2) {
-            // write
-            ppu_push_dma_byte(g_latched_val);
-        } else {
-            // read
-            g_latched_val = system_memory_read((g_dma_page << 8) | index);
-        }
-    }
-
-    if (++g_dma_step > 514) {
-        g_dma_in_progress = false;
-    }
-}
-
 void cycle_cpu(void) {
-    if (g_dma_in_progress) {
-        _handle_dma();
-    } else {
-        _do_instr_cycle();
-        
-        if (g_instr_cycle == 0 && !(g_cur_instr != NULL && g_cur_instr->addr_mode == REL)) {
-            _poll_interrupts();
-        }
-
-        _read_interrupt_lines();
-
-        g_instr_cycle++;
+    _do_instr_cycle();
+    
+    if (g_instr_cycle == 0 && !(g_cur_instr != NULL && g_cur_instr->addr_mode == REL)) {
+        _poll_interrupts();
     }
 
-    g_total_cycles++;
+    _read_interrupt_lines();
+
+    g_instr_cycle++;
 }
 
 void dump_ram(void) {

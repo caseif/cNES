@@ -72,8 +72,6 @@ void initialize_cpu(void);
 
 CpuRegisters cpu_get_registers(void);
 
-uint64_t cpu_get_cycle_count(void);
-
 uint8_t cpu_get_instruction_step(void);
 
 Instruction *cpu_get_current_instruction(void);
@@ -83,8 +81,6 @@ void cpu_set_log_callback(void (*callback)(char*));
 uint8_t system_ram_read(uint16_t addr);
 
 void system_ram_write(uint16_t addr, uint8_t val);
-
-void cpu_start_oam_dma(uint8_t page);
 
 void cpu_raise_nmi_line(void);
 
