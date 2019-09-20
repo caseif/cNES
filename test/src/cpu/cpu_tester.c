@@ -89,8 +89,6 @@ void load_cpu_test(char *file_name) {
 
     initialize_system(cart);
 
-    cpu_init_pc(0x8000);
-
     printf("Successfully loaded program file %s.\n", file_name);
 }
 

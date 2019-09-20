@@ -29,6 +29,7 @@
 #include "system.h"
 #include "util.h"
 #include "cpu/cpu.h"
+#include "cpu/instrs.h"
 #include "input/input_device.h"
 #include "input/standard/sc_driver.h"
 #include "input/standard/standard_controller.h"
@@ -52,6 +53,8 @@
 #define PRINT_SYS_MEMORY_ACCESS 0
 #define PRINT_PPU_MEMORY_ACCESS 0
 
+#define PRINT_INSTRS 1
+
 bool halted = false;
 bool stepping = false;
 bool dead = false;
@@ -68,6 +71,14 @@ static uint8_t g_bus_val; // the value on the data bus
 
 static uint8_t cycle_index;
 
+#if PRINT_INSTRS
+// snapshots for logging
+static CpuRegisters g_last_reg_snapshot; // the state of the registers when the last instruction started execution
+static unsigned int g_total_cycles_snapshot;
+static uint16_t g_ppu_scanline_snapshot;
+static uint16_t g_ppu_scanline_tick_snapshot;
+#endif
+
 static void _init_controllers() {
     init_controllers();
 
@@ -81,6 +92,32 @@ static void _write_prg_nvram(Cartridge *cart) {
     printf("Saving SRAM to disk\n");
     write_game_data(g_cart->title, SRAM_FILE_NAME, g_prg_ram, cart->prg_nvram_size);
 }
+
+#if PRINT_INSTRS
+static void _print_last_instr(char *instr_str) {
+    printf("%04X  %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d,ppu=%03d,%03d)\n",
+            g_last_reg_snapshot.pc,
+            instr_str,
+            g_last_reg_snapshot.acc,
+            g_last_reg_snapshot.x,
+            g_last_reg_snapshot.y,
+            g_last_reg_snapshot.sp,
+            g_last_reg_snapshot.status.serial,
+            g_total_cycles_snapshot,
+            g_ppu_scanline_snapshot,
+            g_ppu_scanline_tick_snapshot);
+}
+
+static void _log_callback(char *instr_str) {
+    _print_last_instr(instr_str);
+    
+    // store snapshots for logging
+    g_last_reg_snapshot = cpu_get_registers();
+    g_total_cycles_snapshot = cpu_get_cycle_count();
+    g_ppu_scanline_snapshot = ppu_get_scanline();
+    g_ppu_scanline_tick_snapshot = ppu_get_scanline_tick();
+}
+#endif
 
 void initialize_system(Cartridge *cart) {
     g_cart = cart;
@@ -116,6 +153,10 @@ void initialize_system(Cartridge *cart) {
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
 
     _init_controllers();
+
+    #if PRINT_INSTRS
+    cpu_set_log_callback(_log_callback);
+    #endif
 }
 
 uint8_t system_open_bus_read(void) {
@@ -297,6 +338,10 @@ void do_system_loop(void) {
 
             if (cycle_index++ == 2) {
                 cycle_index = 0;
+
+                #if PRINT_INSTRS
+                #endif
+
                 cycle_cpu();
             }
 

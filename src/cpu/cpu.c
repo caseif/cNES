@@ -23,25 +23,20 @@
  * THE SOFTWARE.
  */
 
-#include "cartridge.h"
 #include "system.h"
 #include "cpu/cpu.h"
 #include "cpu/instrs.h"
-#include "input/input_device.h"
 #include "ppu.h"
 
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define STACK_BOTTOM_ADDR 0x100
 #define BASE_SP 0xFF
 #define DEFAULT_STATUS 0x24 // interrupt-disable and unused flag are set by default
-
-#define PRINT_INSTRS 0
 
 #define ASSERT_CYCLE(l, h)  assert(g_instr_cycle >= l); \
                             assert(g_instr_cycle <= h)
@@ -57,7 +52,7 @@ unsigned char g_debug_buffer[0x1000];
 
 uint16_t base_pc;
 
-unsigned int g_total_cycles = 0;
+uint64_t g_total_cycles = 0;
 
 // interrupt lines
 static bool g_nmi_line = false;
@@ -75,14 +70,6 @@ uint8_t g_instr_cycle = 1; // this is 1-indexed to match blargg's doc
 Instruction *g_cur_instr; // the instruction currently being executed
 static uint8_t g_last_opcode; // the last opcode decoded
 
-#if PRINT_INSTRS
-// snapshots for logging
-static CpuRegisters g_last_reg_snapshot; // the state of the registers when the last instruction started execution
-static unsigned int g_total_cycles_snapshot;
-static uint16_t g_ppu_scanline_snapshot;
-static uint16_t g_ppu_scanline_tick_snapshot;
-#endif
-
 static uint16_t g_cur_operand; // the operand directly read from PRG
 static uint16_t g_eff_operand; // the effective operand (after being offset)
 
@@ -91,6 +78,8 @@ static uint8_t g_latched_val; // typically the value to be read from or written 
 static const InterruptType *g_cur_interrupt; // the interrupt type currently being executed
 static const InterruptType *g_queued_interrupt; // the interrupt type currently queued
 static bool g_nmi_hijack; // set when an NMI "hijacks" a software interrupt
+
+static void (*g_log_callback)(char*) = NULL;
 
 static bool g_dma_in_progress;
 static uint8_t g_dma_page;
@@ -107,6 +96,26 @@ void initialize_cpu(void) {
     for (int i = 0; i < 7; i++) {
         cycle_cpu();
     }
+}
+
+CpuRegisters cpu_get_registers(void) {
+    return g_cpu_regs;
+}
+
+uint64_t cpu_get_cycle_count(void) {
+    return g_total_cycles;
+}
+
+uint8_t cpu_get_instruction_step(void) {
+    return g_instr_cycle;
+}
+
+Instruction *cpu_get_current_instruction(void) {
+    return g_cur_instr;
+}
+
+void cpu_set_log_callback(void (*callback)(char*)) {
+    g_log_callback = callback;
 }
 
 void cpu_start_oam_dma(uint8_t page) {
@@ -1081,20 +1090,14 @@ static void _handle_branch(void) {
     }
 }
 
-#if PRINT_INSTRS
-// forward declaration
-static void _print_last_instr(void);
-#endif
-
 static void _do_instr_cycle(void) {
     if (g_cur_interrupt) {
         _execute_interrupt();
     } else if (g_instr_cycle == 1) {
-        #if PRINT_INSTRS
-        if (g_cur_instr != NULL) {
-            _print_last_instr();
+        if (g_log_callback != NULL && g_cur_instr != NULL) {
+            char instr_str[40];
+            g_log_callback(cpu_print_current_instruction(instr_str));
         }
-        #endif
 
         if (g_queued_interrupt) {
             g_cur_instr = NULL;
@@ -1106,14 +1109,6 @@ static void _do_instr_cycle(void) {
             g_cur_instr = decode_instr(g_last_opcode); // fetch and decode opcode
 
             _reset_instr_state();
-
-            #if PRINT_INSTRS
-            // store snapshots for logging
-            g_last_reg_snapshot = g_cpu_regs;
-            g_total_cycles_snapshot = g_total_cycles;
-            g_ppu_scanline_snapshot = ppu_get_scanline();
-            g_ppu_scanline_tick_snapshot = ppu_get_scanline_tick();
-            #endif
 
             g_cpu_regs.pc++; // increment PC
         }
@@ -1285,8 +1280,7 @@ void dump_ram(void) {
     fclose(out_file);
 }
 
-#if PRINT_INSTRS
-static void _print_last_instr(void) {
+char *cpu_print_current_instruction(char *target) {
     char str_machine_code[9];
     switch (get_instr_len(g_cur_instr)) {
         case 1:
@@ -1300,7 +1294,7 @@ static void _print_last_instr(void) {
             break;
     }
 
-    char str_param[32];
+    char str_param[24];
     InstructionType instr_type = get_instr_type(g_cur_instr->mnemonic);
     switch (g_cur_instr->addr_mode) {
         case IMM:
@@ -1371,18 +1365,10 @@ static void _print_last_instr(void) {
             break;
     }
 
-    printf("%04X  %s  %s %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d,ppu=%03d,%03d)\n",
-            g_last_reg_snapshot.pc,
+    sprintf(target, "%s  %s %s",
             str_machine_code,
             mnemonic_to_str(g_cur_instr->mnemonic),
-            str_param,
-            g_last_reg_snapshot.acc,
-            g_last_reg_snapshot.x,
-            g_last_reg_snapshot.y,
-            g_last_reg_snapshot.sp,
-            g_last_reg_snapshot.status.serial,
-            g_total_cycles_snapshot,
-            g_ppu_scanline_snapshot,
-            g_ppu_scanline_tick_snapshot);
+            str_param);
+
+    return target;
 }
-#endif

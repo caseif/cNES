@@ -25,11 +25,12 @@
 
 #pragma once
 
-#include "cartridge.h"
-#include "util.h"
+#include "cpu/instrs.h"
 
 #include <stdbool.h>
 #include <stdint.h>
+
+#define PACKED __attribute__((packed))
 
 typedef union {
     struct {
@@ -69,7 +70,15 @@ extern const InterruptType INT_BRK;
 
 void initialize_cpu(void);
 
-void cpu_init_pc(uint16_t addr);
+CpuRegisters cpu_get_registers(void);
+
+uint64_t cpu_get_cycle_count(void);
+
+uint8_t cpu_get_instruction_step(void);
+
+Instruction *cpu_get_current_instruction(void);
+
+void cpu_set_log_callback(void (*callback)(char*));
 
 uint8_t system_ram_read(uint16_t addr);
 
@@ -94,3 +103,5 @@ bool issue_interrupt(const InterruptType *type);
 void cycle_cpu(void);
 
 void dump_ram(void);
+
+char *cpu_print_current_instruction(char *target);

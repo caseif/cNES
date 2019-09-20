@@ -66,25 +66,6 @@ static const Instruction g_instr_list[] = {
     {SED, IMP}, {SBC, ABY}, {NOP, IMP}, {ISC, ABY}, {NOP, ABX} ,{SBC, ABX}, {INC, ABX}, {ISC, ABX} 
 };
 
-static const uint8_t g_instr_cycles[] = {
-    7, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
-    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-    6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6,
-    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-    6, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6,
-    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-    6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,
-    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-    2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
-    2, 6, 0, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
-    2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
-    2, 5, 0, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
-    2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
-    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-    2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
-    2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7
-};
-
 const char *g_mnemonic_strs[] = {
     "LDA", "LDX", "LDY", "STA", "STX", "STY", "TAX", "TAY",
     "TSX", "TXA", "TYA", "TXS", "ADC", "SBC", "DEC", "DEX",
@@ -257,8 +238,4 @@ bool can_incur_page_boundary_penalty(const uint8_t opcode) {
     }
 
     return low_nybble == 0x0 || low_nybble == 0x1 || low_nybble == 0x9 || low_nybble == 0xC || low_nybble == 0xD;
-}
-
-uint8_t get_instr_cycles(const uint8_t opcode, InstructionParameter *param, CpuRegisters *regs) {
-    return g_instr_cycles[opcode];
 }

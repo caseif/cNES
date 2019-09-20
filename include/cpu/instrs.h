@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {
@@ -71,5 +72,3 @@ Instruction *decode_instr(unsigned char opcode);
 bool does_cross_page_boundary(uint8_t a, int16_t offset);
 
 bool can_incur_page_boundary_penalty(const uint8_t opcode);
-
-uint8_t get_instr_cycles(const uint8_t opcode, InstructionParameter *param, CpuRegisters *regs);
