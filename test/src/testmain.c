@@ -23,7 +23,7 @@
  * THE SOFTWARE.
  */
 
-#include "cpu/cpu_tester.h"
+#include "c6502/cpu_tester.h"
 
 #include "cartridge.h"
 #include "loader.h"

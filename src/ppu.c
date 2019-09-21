@@ -26,7 +26,7 @@
 #include "renderer.h"
 #include "system.h"
 #include "util.h"
-#include "cpu/cpu.h"
+#include "c6502/cpu.h"
 #include "ppu.h"
 
 #include <assert.h>

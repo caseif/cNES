@@ -23,10 +23,10 @@
  * THE SOFTWARE.
  */
 
-#include "cpu/cpu_tester.h"
+#include "c6502/cpu_tester.h"
 
-#include "cpu/cpu.h"
-#include "cpu/instrs.h"
+#include "c6502/cpu.h"
+#include "c6502/instrs.h"
 #include "system.h"
 #include "test_assert.h"
 

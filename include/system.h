@@ -69,6 +69,8 @@ uint8_t system_lower_memory_read(uint16_t addr);
 
 void system_lower_memory_write(uint16_t addr, uint8_t val);
 
+void system_dump_ram(void);
+
 void system_start_oam_dma(uint8_t page);
 
 void do_system_loop(void);

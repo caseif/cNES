@@ -28,14 +28,15 @@
 #include "renderer.h"
 #include "system.h"
 #include "util.h"
-#include "cpu/cpu.h"
-#include "cpu/instrs.h"
+#include "c6502/cpu.h"
+#include "c6502/instrs.h"
 #include "input/input_device.h"
 #include "input/standard/sc_driver.h"
 #include "input/standard/standard_controller.h"
 #include "ppu.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -52,7 +53,6 @@
 
 #define PRINT_SYS_MEMORY_ACCESS 0
 #define PRINT_PPU_MEMORY_ACCESS 0
-
 #define PRINT_INSTRS 0
 
 bool halted = false;
@@ -78,7 +78,6 @@ static unsigned int g_dma_step;
 
 #if PRINT_INSTRS
 // snapshots for logging
-static CpuRegisters g_last_reg_snapshot; // the state of the registers when the last instruction started execution
 static unsigned int g_total_cycles_snapshot;
 static uint16_t g_ppu_scanline_snapshot;
 static uint16_t g_ppu_scanline_tick_snapshot;
@@ -99,25 +98,24 @@ static void _write_prg_nvram(Cartridge *cart) {
 }
 
 #if PRINT_INSTRS
-static void _print_last_instr(char *instr_str) {
+static void _print_last_instr(char *instr_str, CpuRegisters *regs_snapshot) {
     printf("%04X  %s  (a=%02X,x=%02X,y=%02X,sp=%02X,p=%02X,cyc=%d,ppu=%03d,%03d)\n",
-            g_last_reg_snapshot.pc,
+            regs_snapshot->pc,
             instr_str,
-            g_last_reg_snapshot.acc,
-            g_last_reg_snapshot.x,
-            g_last_reg_snapshot.y,
-            g_last_reg_snapshot.sp,
-            g_last_reg_snapshot.status.serial,
+            regs_snapshot->acc,
+            regs_snapshot->x,
+            regs_snapshot->y,
+            regs_snapshot->sp,
+            regs_snapshot->status.serial,
             g_total_cycles_snapshot,
             g_ppu_scanline_snapshot,
             g_ppu_scanline_tick_snapshot);
 }
 
-static void _log_callback(char *instr_str) {
-    _print_last_instr(instr_str);
+static void _log_callback(char *instr_str, CpuRegisters regs_snapshot) {
+    _print_last_instr(instr_str, &regs_snapshot);
     
     // store snapshots for logging
-    g_last_reg_snapshot = cpu_get_registers();
     g_total_cycles_snapshot = g_total_cpu_cycles;
     g_ppu_scanline_snapshot = ppu_get_scanline();
     g_ppu_scanline_tick_snapshot = ppu_get_scanline_tick();
@@ -181,7 +179,9 @@ void initialize_system(Cartridge *cart) {
         }
     }
 
-    initialize_cpu();
+    memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
+
+    initialize_cpu(system_memory_read, system_memory_write);
     initialize_ppu();
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
 
@@ -350,6 +350,19 @@ void system_lower_memory_write(uint16_t addr, uint8_t val) {
         default:
             return; // do nothing
     }
+}
+
+void system_dump_ram(void) {
+    FILE *out_file = fopen("ram.bin", "w+");
+
+    if (!out_file) {
+        printf("Failed to dump RAM (couldn't open file: %s)\n", strerror(errno));
+        return;
+    }
+
+    fwrite(system_get_ram(), SYSTEM_MEMORY_SIZE, 1, out_file);
+
+    fclose(out_file);
 }
 
 void system_start_oam_dma(uint8_t page) {

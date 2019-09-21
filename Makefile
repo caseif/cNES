@@ -20,7 +20,7 @@ OBJEXT = o
 
 INCLUDES = ./include
 TEST_INCLUDES = ./test/include
-LIBS = c pthread SDL2
+LIBS = c c6502 pthread SDL2
 CFLAGS := -g -Wall -std=c11
 
 INCFLAGS := $(foreach d, $(INCLUDES), -I$d)

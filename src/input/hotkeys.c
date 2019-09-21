@@ -25,7 +25,7 @@
 
 #include "sdl_manager.h"
 #include "system.h"
-#include "cpu/cpu.h"
+#include "c6502/cpu.h"
 #include "input/global/hotkeys.h"
 #include "ppu.h"
 
@@ -96,7 +96,7 @@ static void _global_hotkey_callback(SDL_Event *event) {
                     break;
                 case KEY_ACTION_DUMP_RAM:
                     printf("Dumping system RAM\n");
-                    dump_ram();
+                    system_dump_ram();
                     break;
                 case KEY_ACTION_DUMP_VRAM:
                     printf("Dumping VRAM\n");

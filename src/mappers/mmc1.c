@@ -25,7 +25,7 @@
 
 #include "cartridge.h"
 #include "system.h"
-#include "cpu/cpu.h"
+#include "c6502/cpu.h"
 #include "input/input_device.h"
 #include "mappers/mappers.h"
 #include "ppu.h"
