@@ -182,7 +182,14 @@ void initialize_system(Cartridge *cart) {
     memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
 
     initialize_cpu(system_memory_read, system_memory_write);
-    initialize_ppu();
+    initialize_ppu((PpuSystemInterface){
+            system_vram_read,
+            system_vram_write,
+            cpu_raise_nmi_line,
+            cpu_clear_nmi_line,
+            set_pixel,
+            flush_frame
+    });
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
 
     _init_controllers();

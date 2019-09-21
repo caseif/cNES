@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include "cartridge.h"
-#include "util.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 #define RESOLUTION_H 256
 #define RESOLUTION_V 240
@@ -38,6 +38,23 @@
 #define LAST_VISIBLE_CYCLE 256
 
 #define PPU_OPEN_BUS_DECAY_CYCLES 3220000 // ~600 ms
+
+#define PACKED __attribute__((packed))
+
+typedef struct {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} RGBValue;
+
+typedef struct {
+    uint8_t (*vram_read)(uint16_t);
+    void (*vram_write)(uint16_t, uint8_t);
+    void (*nmi_raise)(void);
+    void (*nmi_clear)(void);
+    void (*emit_pixel)(unsigned int, unsigned int, const RGBValue);
+    void (*flush_frame)(void);
+} PpuSystemInterface;
 
 typedef union {
     struct {
@@ -157,7 +174,10 @@ typedef enum {
     RM_NORMAL, RM_NT0, RM_NT1, RM_NT2, RM_NT3, RM_PT
 } RenderMode;
 
-void initialize_ppu();
+typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL,
+                            MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER} MirroringMode;
+
+void initialize_ppu(PpuSystemInterface system_iface);
 
 void ppu_set_mirroring_mode(MirroringMode mirror_mode);
 

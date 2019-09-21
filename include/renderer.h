@@ -25,13 +25,9 @@
 
 #pragma once
 
-#include <stdint.h>
+#include "ppu.h"
 
-typedef struct {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-} RGBValue;
+#include <stdint.h>
 
 void initialize_renderer(void);
 

@@ -26,6 +26,7 @@
 #pragma once
 
 #include "util.h"
+#include "ppu.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -38,9 +39,6 @@ struct cartridge;
 #define TIMING_MODE_PAL 1
 #define TIMING_MODE_MULTI 2
 #define TIMING_MODE_DENDY 3
-
-typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL,
-                            MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER} MirroringMode;
 
 typedef struct cartridge {
     char *title;
