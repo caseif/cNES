@@ -181,7 +181,12 @@ void initialize_system(Cartridge *cart) {
 
     memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
 
-    initialize_cpu(system_memory_read, system_memory_write);
+    initialize_cpu((CpuSystemInterface){
+            system_memory_read,
+            system_memory_write,
+            system_bus_read,
+            system_bus_write
+    });
     initialize_ppu((PpuSystemInterface){
             system_vram_read,
             system_vram_write,
@@ -201,11 +206,11 @@ void initialize_system(Cartridge *cart) {
     #endif
 }
 
-uint8_t system_open_bus_read(void) {
+uint8_t system_bus_read(void) {
     return g_bus_val;
 }
 
-void system_open_bus_write(uint8_t val) {
+void system_bus_write(uint8_t val) {
     g_bus_val = val;
 }
 
@@ -221,7 +226,7 @@ uint8_t system_prg_ram_read(uint16_t addr) {
     if (g_prg_ram_size > 0) {
         return g_chr_ram[addr % g_prg_ram_size];
     } else {
-        return system_open_bus_read();
+        return system_bus_read();
     }
 }
 
@@ -325,7 +330,7 @@ uint8_t system_lower_memory_read(uint16_t addr) {
             return 0x40 | controller_poll(addr - 0x4016);
         }
         default:
-            return system_open_bus_read(); // open bus
+            return system_bus_read(); // open bus
     }
 }
 

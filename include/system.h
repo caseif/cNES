@@ -33,9 +33,9 @@
 
 void initialize_system(Cartridge *cart);
 
-uint8_t system_open_bus_read(void);
+uint8_t system_bus_read(void);
 
-void system_open_bus_write(uint8_t val);
+void system_bus_write(uint8_t val);
 
 unsigned char *system_get_ram(void);
 
