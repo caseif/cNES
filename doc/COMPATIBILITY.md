@@ -80,4 +80,4 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Tennis | ![](res/circle_green.svg) | playable | |
 | Tetris | ![](res/circle_blue.svg) | perfect | |
 | Time Lord | ![](res/circle_green.svg) | playable | |
-| Willow | ![](res/circle_green.svg) | playable | Some glitchy pixels on the top of the screen |
+| Willow | ![](res/circle_green.svg) | playable | |
