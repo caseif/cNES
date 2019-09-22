@@ -45,6 +45,7 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Legend of Zelda, The | ![](res/circle_green.svg) | playable | |
 | Little Samson | ![](res/circle_green.svg) | playable | |
 | Lode Runner | ![](res/circle_green.svg) | playable | |
+| Mappy | ![](res/circle_blue.svg) | perfect | |
 | Marble Madness | ![](res/circle_green.svg) | playable | |
 | Mario Bros. | ![](res/circle_blue.svg) | perfect | |
 | Mario Is Missing | ![](res/circle_green.svg) | playable | |

@@ -86,9 +86,11 @@ static void _init_controllers() {
     g_controller_0 = SDL_GameControllerOpen(joystick_0);
 
     if (!g_controller_0) {
-        printf("Failed to open joystick %d as controller\n", joystick_0);
+        printf("Failed to open joystick %d as controller 1\n", joystick_0);
         return;
     }
+
+    printf("Using joystick %d for player 1 controller\n", joystick_0);
 
     unsigned int joystick_1;
     for (joystick_1 = 4; joystick_1 < num_joysticks; joystick_1++) {
@@ -99,10 +101,12 @@ static void _init_controllers() {
     if (joystick_1 != num_joysticks) {
         g_controller_1 = SDL_GameControllerOpen(joystick_1);
         if (!g_controller_1) {
-            printf("Failed to open joystick %d as controller\n", joystick_1);
+            printf("Failed to open joystick %d as controller 2\n", joystick_1);
             return;
         }
     }
+
+    printf("Using joystick %d for player 2 controller\n", joystick_1);
 }
 
 static unsigned int _get_controller_button(unsigned int controller_id, SDL_GameControllerButton button) {
