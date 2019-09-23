@@ -55,15 +55,15 @@
 #define PRINT_PPU_MEMORY_ACCESS 0
 #define PRINT_INSTRS 0
 
-bool halted = false;
-bool stepping = false;
-bool dead = false;
+static bool g_halted = false;
+static bool g_stepping = false;
+static bool g_dead = false;
 
-unsigned char g_system_ram[SYSTEM_MEMORY_SIZE];
-unsigned char *g_prg_ram;
-size_t g_prg_ram_size;
-unsigned char *g_chr_ram;
-size_t g_chr_ram_size;
+static unsigned char g_system_ram[SYSTEM_MEMORY_SIZE];
+static unsigned char *g_prg_ram;
+static size_t g_prg_ram_size;
+static unsigned char *g_chr_ram;
+static size_t g_chr_ram_size;
 
 static Cartridge *g_cart;
 
@@ -390,11 +390,11 @@ void do_system_loop(void) {
     time_t last_sleep = 0;
 
     while (true) {
-        if (dead) {
+        if (g_dead) {
             break;
         }
 
-        if (!halted) {
+        if (!g_halted) {
             cycle_ppu();
 
             if (g_cart->mapper->tick_func != NULL) {
@@ -413,9 +413,9 @@ void do_system_loop(void) {
                 g_total_cpu_cycles++;
             }
 
-            if (stepping) {
-                halted = true;
-                stepping = false;
+            if (g_stepping) {
+                g_halted = true;
+                g_stepping = false;
             }
         }
 
@@ -428,25 +428,25 @@ void do_system_loop(void) {
 }
 
 void break_execution(void) {
-    halted = true;
+    g_halted = true;
 }
 
 void continue_execution(void) {
-    halted = false;
+    g_halted = false;
 }
 
 void step_execution(void) {
-    halted = false;
-    stepping = true;
+    g_halted = false;
+    g_stepping = true;
 }
 
 bool is_execution_halted(void) {
-    return halted;
+    return g_halted;
 }
 
 void kill_execution(void) {
     if (g_cart->has_nv_ram) {
         _write_prg_nvram(g_cart);
     }
-    dead = true;
+    g_dead = true;
 }

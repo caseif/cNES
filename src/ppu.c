@@ -73,7 +73,7 @@ typedef union {
     uint8_t serial;
 } AttributeTableEntry;
 
-const RGBValue g_palette[] = {
+static const RGBValue g_palette[] = {
     {0x66, 0x66, 0x66}, {0x00, 0x1E, 0x9A}, {0x0E, 0x09, 0xA8}, {0x44, 0x00, 0x93},
     {0x71, 0x00, 0x60}, {0x89, 0x01, 0x1D}, {0x86, 0x13, 0x00}, {0x69, 0x29, 0x00},
     {0x39, 0x3E, 0x00}, {0x04, 0x4C, 0x00}, {0x00, 0x4F, 0x00}, {0x00, 0x47, 0x2B},
@@ -92,21 +92,21 @@ const RGBValue g_palette[] = {
     {0xA6, 0xE5, 0xFF}, {0xB8, 0xB8, 0xB8}, {0x00, 0x00, 0x00}, {0x00, 0x00, 0x00}
 };
 
-PpuSystemInterface g_sys_iface;
+static PpuSystemInterface g_sys_iface;
 
 static MirroringMode g_mirror_mode;
 
-PpuControl g_ppu_control;
-PpuMask g_ppu_mask;
-PpuStatus g_ppu_status;
-PpuInternalRegisters g_ppu_internal_regs;
+static PpuControl g_ppu_control;
+static PpuMask g_ppu_mask;
+static PpuStatus g_ppu_status;
+static PpuInternalRegisters g_ppu_internal_regs;
 
 static bool g_nmi_occurred;
 
-unsigned char g_name_table_mem[VRAM_SIZE];
-unsigned char g_palette_ram[PALETTE_RAM_SIZE];
-Sprite g_oam_ram[OAM_PRIMARY_SIZE / sizeof(Sprite)];
-Sprite g_secondary_oam_ram[OAM_SECONDARY_SIZE / sizeof(Sprite)];
+static unsigned char g_name_table_mem[VRAM_SIZE];
+static unsigned char g_palette_ram[PALETTE_RAM_SIZE];
+static Sprite g_oam_ram[OAM_PRIMARY_SIZE / sizeof(Sprite)];
+static Sprite g_secondary_oam_ram[OAM_SECONDARY_SIZE / sizeof(Sprite)];
 
 static bool g_odd_frame;
 static uint16_t g_scanline;
