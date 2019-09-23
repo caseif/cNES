@@ -190,8 +190,7 @@ void initialize_system(Cartridge *cart) {
     initialize_ppu((PpuSystemInterface){
             system_vram_read,
             system_vram_write,
-            cpu_raise_nmi_line,
-            cpu_clear_nmi_line,
+            cpu_pull_down_nmi_line,
             set_pixel,
             flush_frame
     });

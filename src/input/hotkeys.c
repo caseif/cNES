@@ -108,7 +108,7 @@ static void _global_hotkey_callback(SDL_Event *event) {
                     break;
                 case KEY_ACTION_RESET:
                     if (g_ctrl_down) {
-                        cpu_raise_rst_line();
+                        cpu_pull_down_rst_line();
                     }
                     break;
             }

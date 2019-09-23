@@ -237,7 +237,6 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
         case 0xE000:
             if (g_irq_enabled) {
                 g_irq_enabled = false;
-                cpu_clear_irq_line(); // acknowledge pending interrupts
             }
             return;
         case 0xE001:
@@ -324,7 +323,7 @@ static void _mmc3_tick(void) {
         }
 
         if ((!g_use_counter_edge || counter_old > 0) && g_irq_counter == 0 && g_irq_enabled) {
-            cpu_raise_irq_line();
+            cpu_pull_down_irq_line();
         }
     }
 

@@ -101,6 +101,8 @@ PpuMask g_ppu_mask;
 PpuStatus g_ppu_status;
 PpuInternalRegisters g_ppu_internal_regs;
 
+static bool g_nmi_occurred;
+
 unsigned char g_name_table_mem[VRAM_SIZE];
 unsigned char g_palette_ram[PALETTE_RAM_SIZE];
 Sprite g_oam_ram[OAM_PRIMARY_SIZE / sizeof(Sprite)];
@@ -128,7 +130,7 @@ void initialize_ppu(PpuSystemInterface system_iface) {
     memset(g_name_table_mem, 0xFF, sizeof(g_name_table_mem));
     memset(g_palette_ram, 0xFF, sizeof(g_palette_ram));
     memset(g_oam_ram, 0xFF, sizeof(g_oam_ram));
-    
+
     g_odd_frame = false;
     g_scanline = 0;
     g_scanline_tick = 0;
@@ -197,14 +199,14 @@ uint8_t ppu_read_mmio(uint8_t index) {
         case 6:
             break; // just return the current open bus value
         case 2: {
+            // set bit 7 to value in nmi_occurred latch and reset the latch
+            g_ppu_status.vblank = g_nmi_occurred;
+            g_nmi_occurred = false;
+
             uint8_t res = g_ppu_status.serial;
 
             // reading this register resets this latch
             g_ppu_internal_regs.w = 0;
-            // and the vblank flag
-            g_ppu_status.vblank = 0;
-
-            g_sys_iface.nmi_clear();
 
             //TODO: figure out why this only passes blargg's test with VBL_SCANLINE_TICK (and not VBL_SCANLINE_TICK - 1)
             if (g_scanline == VBL_SCANLINE && g_scanline_tick == VBL_SCANLINE_TICK) {
@@ -270,16 +272,10 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
 
     switch (index) {
         case 0: {
-            bool old_gen_nmis = g_ppu_control.gen_nmis;
-
             g_ppu_control.serial = val;
 
             g_ppu_internal_regs.t.addr &= ~(0b11 << 10); // clear bits 10-11
             g_ppu_internal_regs.t.addr |= (val & 0b11) << 10; // set bits 10-11 to current nametable
-
-            if (!old_gen_nmis && g_ppu_control.gen_nmis && g_ppu_status.vblank) {
-                g_sys_iface.nmi_raise();
-            }
 
             break;
         }
@@ -526,6 +522,7 @@ void _do_tile_fetching(void) {
         case PRE_RENDER_LINE: {
             // clear status
             if (g_scanline_tick == 1) {
+                g_nmi_occurred = false;
                 g_ppu_status.vblank = 0;
                 g_ppu_status.sprite_0_hit = 0;
                 g_ppu_status.sprite_overflow = 0;
@@ -671,13 +668,9 @@ void _do_tile_fetching(void) {
         case VBL_SCANLINE: {
             if (g_scanline_tick == VBL_SCANLINE_TICK) {
                 if (!g_vbl_flag_suppression) {
-                    g_ppu_status.vblank = 1;
+                    g_nmi_occurred = true;
                 }
                 g_vbl_flag_suppression = false;
-
-                if (g_ppu_control.gen_nmis) {
-                    g_sys_iface.nmi_raise();
-                }
             }
 
             break;
@@ -1137,6 +1130,10 @@ void cycle_ppu(void) {
         // feed the attribute registers from the latch(es)
         g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
         g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
+    }
+
+    if (g_nmi_occurred && g_ppu_control.gen_nmis) {
+        g_sys_iface.pull_down_nmi_line();
     }
 
     // if the frame is odd and background rendering is enabled, skip the last cycle

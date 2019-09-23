@@ -50,8 +50,7 @@ typedef struct {
 typedef struct {
     uint8_t (*vram_read)(uint16_t);
     void (*vram_write)(uint16_t, uint8_t);
-    void (*nmi_raise)(void);
-    void (*nmi_clear)(void);
+    void (*pull_down_nmi_line)();
     void (*emit_pixel)(unsigned int, unsigned int, const RGBValue);
     void (*flush_frame)(void);
 } PpuSystemInterface;
