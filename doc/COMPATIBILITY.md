@@ -12,9 +12,12 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Arch Rivals: A Basketbrawl! | ![](res/circle_green.svg) | playable | |
 | Astyanax | ![](res/circle_green.svg) | playable | |
 | Baseball | ![](res/circle_green.svg) | playable | |
+| Baby Boomer | ![](res/circle_green.svg) | playable | |
 | Battletoads | ![](res/circle_green.svg) | playable | |
 | Battletoads & Double Dragon: The Ultimate Team | ![](res/circle_green.svg) | playable | |
 | Beetlejuice | ![](res/circle_green.svg) | playable | |
+| Bible Adventures | ![](res/circle_green.svg) | playable | |
+| Bible Buffet | ![](res/circle_green.svg) | playable | |
 | Bubble Bobble | ![](res/circle_green.svg) | playable | |
 | Cabal | ![](res/circle_green.svg) | playable | |
 | Captain SkyHawk | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
@@ -32,9 +35,10 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Dr. Mario | ![](res/circle_green.svg) | playable | |
 | EarthBound (Proto) | ![](res/circle_green.svg) | playable | |
 | Excitebike | ![](res/circle_green.svg) | playable | |
+| Exodus - A Journey to the Promised Land | ![](res/circle_green.svg) | playable | |
 | Galaga: Demons of Death | ![](res/circle_green.svg) | playable | |
 | Golf | ![](res/circle_green.svg) | playable | |
-| Guardian Legend, The | ![](res/circle_green.svg) | playable | |
+| The Guardian Legend | ![](res/circle_green.svg) | playable | |
 | Ice Climber | ![](res/circle_green.svg) | playable | |
 | Ice Hockey | ![](res/circle_green.svg) | playable | |
 | IronSword: Wizards & Warriors II | ![](res/circle_green.svg) | playable | |
@@ -42,7 +46,8 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Jeopardy!: 25th Anniversary Edition | ![](res/circle_green.svg) | playable | |
 | Jeopardy!: Junior Edition | ![](res/circle_green.svg) | playable | |
 | Kickle Cubicle | ![](res/circle_green.svg) | playable | |
-| Legend of Zelda, The | ![](res/circle_green.svg) | playable | |
+| The King of Kings - The Early Years | ![](res/circle_green.svg) | playable | |
+| The Legend of Zelda | ![](res/circle_green.svg) | playable | |
 | Little Samson | ![](res/circle_green.svg) | playable | |
 | Lode Runner | ![](res/circle_green.svg) | playable | |
 | Mappy | ![](res/circle_blue.svg) | perfect | |
@@ -60,7 +65,7 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Ms. Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Tengen) | ![](res/circle_yellow.svg) | ingame | Lots of graphical glitches; Nintendulator chokes on this too |
 | NARC | ![](res/circle_green.svg) | playable | Minor graphical glitches at top of screen |
-| Nightmare on Elm Street, A | ![](res/circle_green.svg) | playable | |
+| A Nightmare on Elm Street | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Tengen) | ![](res/circle_green.svg) | playable | |
 | Paperboy | ![](res/circle_yellow.svg) | ingame | Sprite bank switching issues |
