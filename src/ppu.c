@@ -100,7 +100,6 @@ static PpuControl g_ppu_control;
 static PpuMask g_ppu_mask;
 static PpuStatus g_ppu_status;
 static PpuInternalRegisters g_ppu_internal_regs;
-
 static bool g_nmi_occurred;
 
 static unsigned char g_name_table_mem[VRAM_SIZE];
