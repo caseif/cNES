@@ -37,19 +37,15 @@ uint8_t system_bus_read(void);
 
 void system_bus_write(uint8_t val);
 
-unsigned char *system_get_ram(void);
-
-unsigned char *system_get_prg_ram(void);
-
 uint8_t system_prg_ram_read(uint16_t addr);
 
 void system_prg_ram_write(uint16_t addr, uint8_t val);
 
-unsigned char *system_get_chr_ram(void);
-
 uint8_t system_chr_ram_read(uint16_t addr);
 
 void system_chr_ram_write(uint16_t addr, uint8_t val);
+
+void system_register_chip_ram(Cartridge *cart, unsigned char *ram, size_t size);
 
 void system_ram_init(void);
 

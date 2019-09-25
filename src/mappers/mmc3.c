@@ -28,6 +28,7 @@
 #include "c6502/cpu.h"
 #include "input/input_device.h"
 #include "mappers/mappers.h"
+#include "mappers/nrom.h"
 #include "ppu.h"
 
 #include <assert.h>
@@ -140,8 +141,10 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
 static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr < 0x6000) {
         return system_lower_memory_read(addr);
-    } else if (addr < 0x8000) {
-        return system_get_prg_ram()[addr % 0x2000];
+    }
+
+    if (addr < 0x8000) {
+        return system_prg_ram_read(addr % 0x2000);
     }
 
     uint32_t prg_offset = _mmc3_get_prg_offset(cart, addr);
@@ -158,8 +161,10 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     if (addr < 0x6000) {
         system_lower_memory_write(addr, val);
         return;
-    } else if (addr < 0x8000) {
-        system_get_prg_ram()[addr % 0x2000] = val;
+    }
+
+    if (addr < 0x8000) {
+        system_prg_ram_write(addr % 0x2000, val);
         return;
     }
 
@@ -334,7 +339,7 @@ static void _mmc3_tick(void) {
 
 void mapper_init_mmc3(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_MMC3;
-    memcpy(mapper->name, "MMC3", strlen("MMC3"));
+    memcpy(mapper->name, "MMC3", strlen("MMC3") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc3_ram_read;
     mapper->ram_write_func  = *_mmc3_ram_write;

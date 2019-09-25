@@ -33,32 +33,27 @@
 #include <stdio.h>
 #include <string.h>
 
-#define PRG_BANK_GRANULARITY 0x8000
+#define PRG_BANK_SHIFT 15
+#define PRG_BANK_GRANULARITY (1 << PRG_BANK_SHIFT)
 
 static unsigned char g_prg_bank;
 static unsigned char g_nametable;
 
-static uint32_t _axrom_get_prg_offset(Cartridge *cart, uint16_t addr) {
-    assert(addr >= 0x8000);
-
-    return ((g_prg_bank * PRG_BANK_GRANULARITY) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size;
-}
-
 static uint8_t _axrom_ram_read(Cartridge *cart, uint16_t addr) {
-    if (addr >= 0x8000) {
-        return cart->prg_rom[_axrom_get_prg_offset(cart, addr)];
-    } else {
-        return nrom_ram_read(cart, addr);
+    if (addr < 0x8000) {
+        return system_lower_memory_read(addr);
     }
+
+    return cart->prg_rom[((g_prg_bank * PRG_BANK_GRANULARITY) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size];
 }
 
 static void _axrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    if (addr >= 0x8000) {
-        g_prg_bank = val & 0x7;
-        g_nametable = (val >> 4) & 0x1;
-    } else {
-        nrom_ram_write(cart, addr, val);
+    if (addr < 0x8000) {
+        system_lower_memory_write(addr, val);
     }
+
+    g_prg_bank = val & 0x7;
+    g_nametable = (val >> 4) & 0x1;
 }
 
 static uint8_t _axrom_vram_read(Cartridge *cart, uint16_t addr) {
@@ -79,7 +74,7 @@ static void _axrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 
 void mapper_init_axrom(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_CNROM;
-    memcpy(mapper->name, "AxROM", strlen("AxROM"));
+    memcpy(mapper->name, "AxROM", strlen("AxROM") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_axrom_ram_read;
     mapper->ram_write_func  = *_axrom_ram_write;

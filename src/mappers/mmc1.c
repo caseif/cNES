@@ -28,6 +28,7 @@
 #include "c6502/cpu.h"
 #include "input/input_device.h"
 #include "mappers/mappers.h"
+#include "mappers/nrom.h"
 #include "ppu.h"
 
 #include <assert.h>
@@ -43,9 +44,9 @@ static uint8_t g_write_count = 0;
 static uint8_t g_write_val = 0;
 
 static struct {
-        unsigned int chr_bank_mode:1;
-        unsigned int prg_bank_mode:2;
-        unsigned int mirroring:2;
+    unsigned int chr_bank_mode:1;
+    unsigned int prg_bank_mode:2;
+    unsigned int mirroring:2;
 } g_mmc1_control;
 static unsigned char g_chr_bank_0;
 static unsigned char g_chr_bank_1;
@@ -114,8 +115,10 @@ static uint32_t _mmc1_get_chr_offset(Cartridge *cart, uint16_t addr) {
 static uint8_t _mmc1_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr < 0x6000) {
         return system_lower_memory_read(addr);
-    } else if (addr < 0x8000) {
-        return g_enable_prg_ram ? system_get_prg_ram()[addr % 0x2000] : 0;
+    }
+
+    if (addr < 0x8000) {
+        return g_enable_prg_ram ? system_prg_ram_read(addr % 0x2000) : system_bus_read();
     }
 
     uint32_t prg_offset = _mmc1_get_prg_offset(cart, addr);
@@ -132,9 +135,13 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     if (addr < 0x6000) {
         system_lower_memory_write(addr, val);
         return;
-    } else if (addr < 0x8000) {
+    }
+
+    if (addr < 0x8000) {
         if (g_enable_prg_ram) {
-            system_get_prg_ram()[addr % 0x2000] = val;
+            system_prg_ram_write(addr % 0x2000, val);
+        } else {
+            system_bus_write(addr & 0xFF);
         }
         return;
     }
@@ -239,7 +246,7 @@ static void _mmc1_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 
 void mapper_init_mmc1(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_MMC1;
-    memcpy(mapper->name, "MMC1", strlen("MMC1"));
+    memcpy(mapper->name, "MMC1", strlen("MMC1") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc1_ram_read;
     mapper->ram_write_func  = *_mmc1_ram_write;

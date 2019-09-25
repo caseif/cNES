@@ -44,7 +44,7 @@ static uint8_t _color_dreams_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr >= 0x8000) {
         return cart->prg_rom[((g_prg_bank << 15) | (addr - 0x8000)) % cart->prg_size];
     } else {
-        return nrom_ram_read(cart, addr);
+        return system_lower_memory_read(addr);
     }
 
 }
@@ -54,7 +54,7 @@ static void _color_dreams_ram_write(Cartridge *cart, uint16_t addr, uint8_t val)
         g_prg_bank = val & 3;
         g_chr_bank = val >> 4;
     } else {
-        nrom_ram_write(cart, addr, val);
+        system_lower_memory_write(addr, val);
     }
 }
 
@@ -68,7 +68,7 @@ static uint8_t _color_dreams_vram_read(Cartridge *cart, uint16_t addr) {
 
 void mapper_init_color_dreams(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_COLOR_DREAMS;
-    memcpy(mapper->name, "Color Dreams", strlen("Color Dreams"));
+    memcpy(mapper->name, "Color Dreams", strlen("Color Dreams") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_color_dreams_ram_read;
     mapper->ram_write_func  = *_color_dreams_ram_write;

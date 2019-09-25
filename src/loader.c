@@ -110,6 +110,9 @@ Mapper *_create_mapper(unsigned int mapper_id, unsigned int submapper_id) {
         case MAPPER_ID_COLOR_DREAMS:
             _init_mapper(mapper, mapper_init_color_dreams, submapper_id);
             break;
+        case MAPPER_ID_NAMCO_1XX:
+            _init_mapper(mapper, mapper_init_namco_1xx, submapper_id);
+            break;
         default:
             printf("Mapper %d is not supported at this time\n", mapper_id);
             free(mapper);

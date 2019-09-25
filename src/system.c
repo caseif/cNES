@@ -50,6 +50,7 @@
 #define SLEEP_INTERVAL 10 // milliseconds
 
 #define SRAM_FILE_NAME "sram.bin"
+#define CHIPRAM_FILE_NAME "chipram.bin"
 
 #define PRINT_SYS_MEMORY_ACCESS 0
 #define PRINT_PPU_MEMORY_ACCESS 0
@@ -64,6 +65,9 @@ static unsigned char *g_prg_ram;
 static size_t g_prg_ram_size;
 static unsigned char *g_chr_ram;
 static size_t g_chr_ram_size;
+
+static unsigned char *g_chip_ram = NULL;
+static size_t g_chip_ram_size = 0;
 
 static Cartridge *g_cart;
 
@@ -95,6 +99,9 @@ static void _init_controllers() {
 static void _write_prg_nvram(Cartridge *cart) {
     printf("Saving SRAM to disk\n");
     write_game_data(g_cart->title, SRAM_FILE_NAME, g_prg_ram, cart->prg_nvram_size);
+    if (g_chip_ram_size != 0) {
+        write_game_data(g_cart->title, CHIPRAM_FILE_NAME, g_chip_ram, g_chip_ram_size);
+    }
 }
 
 #if PRINT_INSTRS
@@ -179,7 +186,7 @@ void initialize_system(Cartridge *cart) {
         }
     }
 
-    memset(system_get_ram(), 0x00, SYSTEM_MEMORY_SIZE);
+    memset(g_system_ram, 0x00, SYSTEM_MEMORY_SIZE);
 
     initialize_cpu((CpuSystemInterface){
             system_memory_read,
@@ -213,43 +220,37 @@ void system_bus_write(uint8_t val) {
     g_bus_val = val;
 }
 
-unsigned char *system_get_ram(void) {
-    return g_system_ram;
-}
-
-unsigned char *system_get_prg_ram(void) {
-    return g_prg_ram;
-}
-
 uint8_t system_prg_ram_read(uint16_t addr) {
-    if (g_prg_ram_size > 0) {
-        return g_chr_ram[addr % g_prg_ram_size];
-    } else {
-        return system_bus_read();
-    }
+    return addr < g_prg_ram_size ? g_prg_ram[addr] : g_bus_val;
 }
 
 void system_prg_ram_write(uint16_t addr, uint8_t val) {
-    if (g_prg_ram_size > 0) {
-        g_prg_ram[addr % g_prg_ram_size] = val;
+    if (addr < g_prg_ram_size) {
+        g_prg_ram[addr] = val;
     }
-}
-
-unsigned char *system_get_chr_ram(void) {
-    return g_chr_ram;
+    g_bus_val = val;
 }
 
 uint8_t system_chr_ram_read(uint16_t addr) {
-    if (g_chr_ram_size > 0) {
-        return g_chr_ram[addr % g_chr_ram_size];
-    } else {
-        return addr >> 8; // PPU open bus, typically the high byte
-    }
+    return addr < g_chr_ram_size ? g_chr_ram[addr] : g_bus_val;
 }
 
 void system_chr_ram_write(uint16_t addr, uint8_t val) {
-    if (g_chr_ram_size > 0) {
-        g_chr_ram[addr % g_chr_ram_size] = val;
+    if (addr < g_chr_ram_size) {
+        g_chr_ram[addr] = val;
+    }
+    g_bus_val = val;
+}
+
+void system_register_chip_ram(Cartridge *cart, unsigned char *ram, size_t size) {
+    printf("Registering chip RAM for cartridge\n");
+    g_chip_ram = ram;
+    g_chip_ram_size = size;
+
+    unsigned char chip_ram_tmp[g_chip_ram_size];
+    if (read_game_data(cart->title, CHIPRAM_FILE_NAME, chip_ram_tmp, g_chip_ram_size, true)) {
+        printf("Loading chip RAM from disk\n");
+        memcpy(g_chip_ram, chip_ram_tmp, g_chip_ram_size);
     }
 }
 
@@ -371,7 +372,7 @@ void system_dump_ram(void) {
         return;
     }
 
-    fwrite(system_get_ram(), SYSTEM_MEMORY_SIZE, 1, out_file);
+    fwrite(g_system_ram, SYSTEM_MEMORY_SIZE, 1, out_file);
 
     fclose(out_file);
 }

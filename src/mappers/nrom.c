@@ -125,7 +125,7 @@ void nrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 
 void mapper_init_nrom(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_NROM;
-    memcpy(mapper->name, "NROM", strlen("NROM"));
+    memcpy(mapper->name, "NROM", strlen("NROM") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *nrom_ram_read;
     mapper->ram_write_func  = *nrom_ram_write;
