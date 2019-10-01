@@ -25,7 +25,6 @@
 
 #pragma once
 
-#include "util.h"
 #include "ppu.h"
 
 #include <stdbool.h>
