@@ -79,18 +79,14 @@ static uint8_t _namco_1xx_ram_read(Cartridge *cart, uint16_t addr) {
             g_chip_ram_addr = (g_chip_ram_addr & 80) | ((g_chip_ram_addr + 1) & 0x7F);
         }
         return val;
-    }
-
-    if (addr < 0x6000) {
+    } else if (addr < 0x6000) {
         return g_irq_counter >> ((addr >> REGISTER_SHIFT) & 1);
-    }
-
-    if (addr < 0x8000) {
+    } else if (addr < 0x8000) {
         return system_prg_ram_read(addr - 0x6000);
+    } else {
+        uint8_t bank = addr >= 0xE000 ? ((cart->prg_size >> PRG_BANK_SHIFT) - 1) : (g_prg_banks[(addr - 0x8000) >> PRG_BANK_SHIFT]);
+        return cart->prg_rom[((bank << PRG_BANK_SHIFT) | ((addr - 0x8000) % PRG_BANK_GRANULARITY)) % cart->prg_size];
     }
-
-    uint8_t bank = addr >= 0xE000 ? (cart->prg_size >> PRG_BANK_SHIFT) - 1 : g_prg_banks[(addr - 0x8000) >> PRG_BANK_SHIFT];
-    return cart->prg_rom[((bank << PRG_BANK_SHIFT) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size];
 }
 
 static void _namco_1xx_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
@@ -160,7 +156,7 @@ static uint8_t _namco_1xx_vram_read(Cartridge *cart, uint16_t addr) {
     uint16_t total_banks = cart->chr_size >> CHR_BANK_SHIFT;
     if (bank >= 0xE0) {
         if (_does_ref_ntram(addr)) {
-            return ppu_name_table_read(((bank % 2) * 0x400) | (addr & 0x03FF));
+            return ppu_name_table_read(((bank % 2) * 0x0400) | (addr & 0x03FF));
         } else {
             if ((bank - 0xE0) < total_banks) {
                 bank = total_banks - 0x20 + (bank - 0xE0);

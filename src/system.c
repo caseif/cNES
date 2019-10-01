@@ -43,7 +43,7 @@
 #include <string.h>
 #include <time.h>
 
-#define FRAMES_PER_SECOND 60.0988
+#define FRAMES_PER_SECOND 6000.0988
 #define CYCLES_PER_FRAME 89342
 #define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
 
