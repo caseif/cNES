@@ -43,9 +43,17 @@
 #include <string.h>
 #include <time.h>
 
-#define FRAMES_PER_SECOND 60.0988
-#define CYCLES_PER_FRAME 89342
-#define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
+#define FRAMES_PER_SECOND_NTSC 60.0988
+#define MASTER_CLOCK_SPEED_NTSC 21477272
+#define CPU_CLOCK_DIVIDER_NTSC 12
+#define PPU_CLOCK_DIVIDER_NTSC 4
+#define CLOCK_DIVIDER_LCD_NTSC 12
+
+#define FRAMES_PER_SECOND_PAL 50.0070
+#define MASTER_CLOCK_SPEED_PAL 26601712
+#define CPU_CLOCK_DIVIDER_PAL 16
+#define PPU_CLOCK_DIVIDER_PAL 5
+#define CLOCK_DIVIDER_LCD_PAL 80
 
 #define SLEEP_INTERVAL 10 // milliseconds
 
@@ -70,6 +78,12 @@ static unsigned char *g_chip_ram = NULL;
 static size_t g_chip_ram_size = 0;
 
 static Cartridge *g_cart;
+
+static TvSystem g_tv_system;
+static unsigned int g_master_clock_speed;
+static unsigned int g_cpu_clock_divider;
+static unsigned int g_ppu_clock_divider;
+static unsigned int g_clock_divider_lcd;
 
 static uint8_t g_bus_val; // the value on the data bus
 
@@ -160,6 +174,33 @@ static void _handle_dma(void) {
 void initialize_system(Cartridge *cart) {
     g_cart = cart;
 
+    switch (cart->timing_mode) {
+        case TIMING_MODE_NTSC:
+        case TIMING_MODE_MULTI:
+            printf("Using NTSC system timing\n");
+            g_tv_system = TV_SYSTEM_NTSC;
+            g_master_clock_speed = MASTER_CLOCK_SPEED_NTSC;
+            g_cpu_clock_divider = CPU_CLOCK_DIVIDER_NTSC;
+            g_ppu_clock_divider = PPU_CLOCK_DIVIDER_NTSC;
+            g_clock_divider_lcd = CLOCK_DIVIDER_LCD_NTSC;
+            break;
+        case TIMING_MODE_PAL:
+            printf("Using PAL system timing\n");
+            g_tv_system = TV_SYSTEM_PAL;
+            g_master_clock_speed = MASTER_CLOCK_SPEED_PAL;
+            g_cpu_clock_divider = CPU_CLOCK_DIVIDER_PAL;
+            g_ppu_clock_divider = PPU_CLOCK_DIVIDER_PAL;
+            g_clock_divider_lcd = CLOCK_DIVIDER_LCD_PAL;
+            break;
+        case TIMING_MODE_DENDY:
+            printf("Dendy ROMs are not supported at this time\n");
+            exit(1);
+            break;
+        default:
+            printf("Unhandled case %d\n", cart->timing_mode);
+            exit(1);
+    }
+
     if (cart->prg_ram_size > 0) {
         g_prg_ram_size = cart->prg_ram_size;
     } else if (cart->prg_nvram_size > 0) {
@@ -194,13 +235,7 @@ void initialize_system(Cartridge *cart) {
             system_bus_read,
             system_bus_write
     });
-    initialize_ppu((PpuSystemInterface){
-            system_vram_read,
-            system_vram_write,
-            cpu_pull_down_nmi_line,
-            set_pixel,
-            flush_frame
-    });
+    initialize_ppu();
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
 
     _init_controllers();
@@ -210,6 +245,10 @@ void initialize_system(Cartridge *cart) {
     #if PRINT_INSTRS
     cpu_set_log_callback(_log_callback);
     #endif
+}
+
+TvSystem system_get_tv_system(void) {
+    return g_tv_system;
 }
 
 uint8_t system_bus_read(void) {
@@ -384,7 +423,7 @@ void system_start_oam_dma(uint8_t page) {
 }
 
 void do_system_loop(void) {
-    unsigned int cycles_per_interval = CYCLES_PER_SECOND / 1000.0 * SLEEP_INTERVAL;
+    unsigned int cycles_per_interval = g_master_clock_speed / 1000.0 * SLEEP_INTERVAL;
 
     unsigned int cycles_since_sleep = 0;
 
@@ -396,15 +435,15 @@ void do_system_loop(void) {
         }
 
         if (!g_halted) {
-            cycle_ppu();
+            if ((g_cycle_index % g_ppu_clock_divider) == 0) {
+                cycle_ppu();                
 
-            if (g_cart->mapper->tick_func != NULL) {
-                g_cart->mapper->tick_func();
+                if (g_cart->mapper->tick_func != NULL) {
+                    g_cart->mapper->tick_func();
+                }
             }
 
-            if (g_cycle_index++ == 2) {
-                g_cycle_index = 0;
-
+            if ((g_cycle_index % g_cpu_clock_divider) == 0) {
                 if (g_dma_in_progress) {
                     _handle_dma();
                 } else {
@@ -412,6 +451,10 @@ void do_system_loop(void) {
                 }
 
                 g_total_cpu_cycles++;
+            }
+
+            if (++g_cycle_index == g_clock_divider_lcd) {
+                g_cycle_index = 0;
             }
 
             if (g_stepping) {
@@ -450,4 +493,24 @@ void kill_execution(void) {
         _write_prg_nvram(g_cart);
     }
     g_dead = true;
+}
+
+void system_pull_down_nmi_line(void) {
+    cpu_pull_down_nmi_line();
+}
+
+void system_pull_down_irq_line(void) {
+    cpu_pull_down_irq_line();
+}
+
+void system_pull_down_rst_line(void) {
+    cpu_pull_down_rst_line();
+}
+
+void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color) {
+    set_pixel(x, y, color);
+}
+
+void system_flush_frame(void) {
+    flush_frame();
 }

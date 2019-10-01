@@ -194,12 +194,14 @@ Cartridge *load_rom(FILE *file, char *file_name) {
         chr_nvram_size = flag11.chr_ram_shift_count > 0 ? (64 << flag11.chr_nvram_shift_count) : 0;
 
         timing_mode = flag12.timing_mode;
+    } else {
+        if (strstr(file_name, "(Europe)") != NULL || strstr(file_name, "(PAL)") != NULL) {
+            printf("Detected TV system as PAL from file name\n");
+            timing_mode = TIMING_MODE_PAL;
+        }
     }
 
-    if (timing_mode == TIMING_MODE_PAL) {
-        printf("PAL ROMs are not supported at this time\n");
-        return NULL;
-    } else if (timing_mode == TIMING_MODE_DENDY) {
+    if (timing_mode == TIMING_MODE_DENDY) {
         printf("Dendy ROMs are not supported at this time\n");
         return NULL;
     }

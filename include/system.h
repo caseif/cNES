@@ -31,7 +31,15 @@
 #define PRG_RAM_SIZE 0x2000
 #define CHR_RAM_SIZE 0x2000
 
+typedef enum tv_system_t {
+    TV_SYSTEM_NTSC,
+    TV_SYSTEM_PAL,
+    TV_SYSTEM_DENDY,
+} TvSystem;
+
 void initialize_system(Cartridge *cart);
+
+TvSystem system_get_tv_system(void);
 
 uint8_t system_bus_read(void);
 
@@ -80,3 +88,13 @@ void step_execution(void);
 bool is_execution_halted(void);
 
 void kill_execution(void);
+
+void system_pull_down_nmi_line(void);
+
+void system_pull_down_irq_line(void);
+
+void system_pull_down_rst_line(void);
+
+void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color);
+
+void system_flush_frame(void);

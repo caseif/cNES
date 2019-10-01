@@ -24,6 +24,7 @@
  */
 
 #include "ppu.h"
+#include "system.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -31,10 +32,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SCANLINE_COUNT 262
-#define CYCLES_PER_SCANLINE 341
+#define RESOLUTION_H 256
+#define RESOLUTION_V 240
 
-#define VBL_SCANLINE 241
+#define FIRST_VISIBLE_LINE 0
+#define FIRST_VISIBLE_CYCLE 0
+#define LAST_VISIBLE_CYCLE 256
+
+#define SCANLINE_COUNT_NTSC 262
+#define VBL_SCANLINE_NTSC 241
+#define g_last_visible_line_NTSC 239
+
+#define SCANLINE_COUNT_PAL 313
+#define VBL_SCANLINE_PAL 240
+#define g_last_visible_line_PAL 238
+
+#define CYCLES_PER_SCANLINE 341 // same across TV systems
 #define VBL_SCANLINE_TICK 1
 
 #define VRAM_SIZE 0x800
@@ -92,7 +105,10 @@ static const RGBValue g_palette[] = {
     {0xA6, 0xE5, 0xFF}, {0xB8, 0xB8, 0xB8}, {0x00, 0x00, 0x00}, {0x00, 0x00, 0x00}
 };
 
-static PpuSystemInterface g_sys_iface;
+static unsigned int g_scanline_count;
+static unsigned int g_vbl_scanline;
+static unsigned int g_last_visible_scanline;
+static unsigned int g_pre_render_line;
 
 static MirroringMode g_mirror_mode;
 
@@ -120,8 +136,24 @@ bool ppu_is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
 }
 
-void initialize_ppu(PpuSystemInterface system_iface) {
-    g_sys_iface = system_iface;
+void initialize_ppu(void) {
+    switch (system_get_tv_system()) {
+        case TV_SYSTEM_NTSC:
+            g_scanline_count = SCANLINE_COUNT_NTSC;
+            g_vbl_scanline = VBL_SCANLINE_NTSC;
+            g_last_visible_scanline = g_last_visible_line_NTSC;
+            break;
+        case TV_SYSTEM_PAL:
+            g_scanline_count = SCANLINE_COUNT_PAL;
+            g_vbl_scanline = VBL_SCANLINE_PAL;
+            g_last_visible_scanline = g_last_visible_line_PAL;
+            break;
+        default:
+            printf("Unhandled case %d\n", system_get_tv_system());
+            exit(1);
+    }
+
+    g_pre_render_line = g_scanline_count - 1;
 
     g_ppu_control = (PpuControl) {0};
     g_ppu_mask = (PpuMask) {0};
@@ -208,7 +240,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
             g_ppu_internal_regs.w = 0;
 
             //TODO: figure out why this only passes blargg's test with VBL_SCANLINE_TICK (and not VBL_SCANLINE_TICK - 1)
-            if (g_scanline == VBL_SCANLINE && g_scanline_tick == VBL_SCANLINE_TICK) {
+            if (g_scanline == g_vbl_scanline && g_scanline_tick == VBL_SCANLINE_TICK) {
                 g_vbl_flag_suppression = true;
             }
 
@@ -234,7 +266,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 // most VRAM goes through a read buffer
                 res = g_ppu_internal_regs.read_buf;
 
-                g_ppu_internal_regs.read_buf = g_sys_iface.vram_read(g_ppu_internal_regs.v.addr);
+                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr);
 
                 g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
@@ -246,9 +278,9 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 // palette reading bypasses buffer, but still updates it in a weird way
 
                 // address is offset since the buffer is updated with the mirrored NT data "under" the palette data
-                g_ppu_internal_regs.read_buf = g_sys_iface.vram_read(g_ppu_internal_regs.v.addr - 0x1000);
+                g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr - 0x1000);
 
-                res = g_sys_iface.vram_read(g_ppu_internal_regs.v.addr);
+                res = system_vram_read(g_ppu_internal_regs.v.addr);
 
                 _update_ppu_open_bus(res, 0x3F);
             }
@@ -348,7 +380,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             printf("PPU write: $%04x, %02x\n", g_ppu_internal_regs.v.addr, val);
             #endif
 
-            g_sys_iface.vram_write(g_ppu_internal_regs.v.addr, val);
+            system_vram_write(g_ppu_internal_regs.v.addr, val);
 
             g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
@@ -516,169 +548,161 @@ void _update_v_horizontal(void) {
 }
 
 void _do_tile_fetching(void) {
-    switch (g_scanline) {
-        // pre-render line
-        case PRE_RENDER_LINE: {
-            // clear status
-            if (g_scanline_tick == 1) {
-                g_nmi_occurred = false;
-                g_ppu_status.vblank = 0;
-                g_ppu_status.sprite_0_hit = 0;
-                g_ppu_status.sprite_overflow = 0;
+    if (g_scanline == g_vbl_scanline) {
+        // set vblank flag
+        if (g_scanline_tick == VBL_SCANLINE_TICK) {
+            if (!g_vbl_flag_suppression) {
+                g_nmi_occurred = true;
             }
-
-            // vert(v) = vert(t)
-            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && ppu_is_rendering_enabled()) {
-                g_ppu_internal_regs.v.addr &= ~0x7BE0; // clear vertical bits
-                g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x7BE0; // copy vertical bits to v from t
-            }
-
-            // intentional fall-through
+            g_vbl_flag_suppression = false;
         }
+    } else if (g_scanline == g_pre_render_line) {
+        // pre-render line
+        // clear status
+        if (g_scanline_tick == 1) {
+            g_nmi_occurred = false;
+            g_ppu_status.vblank = 0;
+            g_ppu_status.sprite_0_hit = 0;
+            g_ppu_status.sprite_overflow = 0;
+        }
+
+        // vert(v) = vert(t)
+        if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && ppu_is_rendering_enabled()) {
+            g_ppu_internal_regs.v.addr &= ~0x7BE0; // clear vertical bits
+            g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x7BE0; // copy vertical bits to v from t
+        }
+
+        // intentional fall-through
+    } else if (g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline) {
         // visible screen
-        case FIRST_VISIBLE_LINE ... LAST_VISIBLE_LINE: {
-            if (g_scanline_tick == 0) {
-                // idle tick
-                break;
-            } else if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick <= 320) {
-                // hori(v) = hori(t)
-                if (g_scanline_tick == 257 && ppu_is_rendering_enabled()) {
-                    g_ppu_internal_regs.v.addr &= ~0x41F; // clear horizontal bits
-                    g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x41F; // copy horizontal bits to v from t
-                }
-            } else {
-                // garbage fetches occur during sprite tile fetching
-                if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick < 321 && (g_scanline_tick - 1) % 8 >= 4) {
+        if (g_scanline_tick == 0) {
+            // idle tick
+            return;
+        } else if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick <= 320) {
+            // hori(v) = hori(t)
+            if (g_scanline_tick == 257 && ppu_is_rendering_enabled()) {
+                g_ppu_internal_regs.v.addr &= ~0x41F; // clear horizontal bits
+                g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x41F; // copy horizontal bits to v from t
+            }
+        } else {
+            // garbage fetches occur during sprite tile fetching
+            if (g_scanline_tick > LAST_VISIBLE_CYCLE && g_scanline_tick < 321 && (g_scanline_tick - 1) % 8 >= 4) {
+                return;
+            }
+
+            switch ((g_scanline_tick - 1) % 8) {
+                // update registers/latches and compute name table address
+                case 0: {
+                    // copy the palette data from the secondary latch to the primary
+                    g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
+
+                    // clear upper bits
+                    g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
+                    g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
+                    // set upper bits
+                    g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
+                    g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
+
+                    // compute NT address
+                    // address = name table base + (v except fine y)
+                    g_ppu_internal_regs.addr_bus = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
+
                     break;
                 }
-
-                switch ((g_scanline_tick - 1) % 8) {
-                    // update registers/latches and compute name table address
-                    case 0: {
-                        // copy the palette data from the secondary latch to the primary
-                        g_ppu_internal_regs.attr_table_entry_latch = g_ppu_internal_regs.attr_table_entry_latch_secondary;
-
-                        // clear upper bits
-                        g_ppu_internal_regs.pattern_shift_l &= ~0xFF00;
-                        g_ppu_internal_regs.pattern_shift_h &= ~0xFF00;
-                        // set upper bits
-                        g_ppu_internal_regs.pattern_shift_l |= g_ppu_internal_regs.pattern_bitmap_l_latch << 8;
-                        g_ppu_internal_regs.pattern_shift_h |= g_ppu_internal_regs.pattern_bitmap_h_latch << 8;
-
-                        // compute NT address
-                        // address = name table base + (v except fine y)
-                        g_ppu_internal_regs.addr_bus = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
-
-                        break;
+                // fetch NT byte
+                case 1: {
+                    // don't load the latch for unused fetches
+                    if (g_scanline_tick <= 336) {
+                        g_ppu_internal_regs.name_table_entry_latch = system_vram_read(g_ppu_internal_regs.addr_bus);
                     }
-                    // fetch NT byte
-                    case 1: {
-                        // don't load the latch for unused fetches
-                        if (g_scanline_tick <= 336) {
-                            g_ppu_internal_regs.name_table_entry_latch = g_sys_iface.vram_read(g_ppu_internal_regs.addr_bus);
-                        }
-                        break;
+                    break;
+                }
+                // compute AT address
+                case 2: {
+                    unsigned int v = g_ppu_internal_regs.v.addr;
+                    // address = attr table base + (name table offset) + (shifted v)
+                    g_ppu_internal_regs.addr_bus = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
+
+                    break;
+                }
+                // fetch AT byte
+                case 3: {
+                    uint8_t attr_table_byte = system_vram_read(g_ppu_internal_regs.addr_bus);
+
+                    // check if it's in the bottom half of the table cell
+                    if (g_ppu_internal_regs.v.y_coarse & 0b10) {
+                        attr_table_byte >>= 4;
                     }
-                    // compute AT address
-                    case 2: {
-                        unsigned int v = g_ppu_internal_regs.v.addr;
-                        // address = attr table base + (name table offset) + (shifted v)
-                        g_ppu_internal_regs.addr_bus = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 
-                        break;
+                    // check if it's in the right half of the table cell
+                    if (g_ppu_internal_regs.v.x_coarse & 0b10) {
+                        attr_table_byte >>= 2;
                     }
-                    // fetch AT byte
-                    case 3: {
-                        uint8_t attr_table_byte = g_sys_iface.vram_read(g_ppu_internal_regs.addr_bus);
 
-                        // check if it's in the bottom half of the table cell
-                        if (g_ppu_internal_regs.v.y_coarse & 0b10) {
-                            attr_table_byte >>= 4;
-                        }
-
-                        // check if it's in the right half of the table cell
-                        if (g_ppu_internal_regs.v.x_coarse & 0b10) {
-                            attr_table_byte >>= 2;
-                        }
-
-                        // don't load the latch for unused fetches
-                        if (g_scanline_tick <= 336) {
-                            g_ppu_internal_regs.attr_table_entry_latch_secondary = attr_table_byte & 0b11;
-                        }
-
-                        break;
+                    // don't load the latch for unused fetches
+                    if (g_scanline_tick <= 336) {
+                        g_ppu_internal_regs.attr_table_entry_latch_secondary = attr_table_byte & 0b11;
                     }
-                    // compute tile address
-                    case 4: {
-                        // multiply by 16 since each plane is 8 bytes, and there are 2 planes per tile
-                        // then we just add the mod of the current line to get the sub-tile offset
-                        unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
-                                + g_ppu_internal_regs.v.y_fine;
 
-                        g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                + pattern_offset;
+                    break;
+                }
+                // compute tile address
+                case 4: {
+                    // multiply by 16 since each plane is 8 bytes, and there are 2 planes per tile
+                    // then we just add the mod of the current line to get the sub-tile offset
+                    unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
+                            + g_ppu_internal_regs.v.y_fine;
 
-                        break;
-                    }
-                    // fetch tile low byte
-                    case 5: {
-                        g_ppu_internal_regs.pattern_bitmap_l_latch = _reverse_bits(g_sys_iface.vram_read(g_ppu_internal_regs.addr_bus));
+                    g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                            + pattern_offset;
 
-                        break;
-                    }
-                    // compute tile address
-                    case 6: {
-                        // basically the same as above, but we add 8 to get the second plane
-                        unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
-                                + g_ppu_internal_regs.v.y_fine + 8;
+                    break;
+                }
+                // fetch tile low byte
+                case 5: {
+                    g_ppu_internal_regs.pattern_bitmap_l_latch = _reverse_bits(system_vram_read(g_ppu_internal_regs.addr_bus));
 
-                        g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                + pattern_offset;
+                    break;
+                }
+                // compute tile address
+                case 6: {
+                    // basically the same as above, but we add 8 to get the second plane
+                    unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
+                            + g_ppu_internal_regs.v.y_fine + 8;
 
-                        break;
-                    }
-                    // fetch tile high byte
-                    case 7: {
-                        g_ppu_internal_regs.pattern_bitmap_h_latch = _reverse_bits(g_sys_iface.vram_read(g_ppu_internal_regs.addr_bus));
+                    g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                            + pattern_offset;
 
-                        // only update v if rendering is enabled
-                        if (ppu_is_rendering_enabled()) {
-                            // only update vertical v at the end of the visible part of the scanline
-                            if (g_scanline_tick == LAST_VISIBLE_CYCLE) {
-                                _update_v_vertical();
-                            }
+                    break;
+                }
+                // fetch tile high byte
+                case 7: {
+                    g_ppu_internal_regs.pattern_bitmap_h_latch = _reverse_bits(system_vram_read(g_ppu_internal_regs.addr_bus));
 
-                            // update horizontal v after every tile
-                            _update_v_horizontal();
+                    // only update v if rendering is enabled
+                    if (ppu_is_rendering_enabled()) {
+                        // only update vertical v at the end of the visible part of the scanline
+                        if (g_scanline_tick == LAST_VISIBLE_CYCLE) {
+                            _update_v_vertical();
                         }
 
-                        break;
+                        // update horizontal v after every tile
+                        _update_v_horizontal();
                     }
-                    default: {
-                        //assert(false);
-                        break;
-                    }
+
+                    break;
+                }
+                default: {
+                    //assert(false);
+                    break;
                 }
             }
-
-            break;
-        }
-        // set vblank flag
-        case VBL_SCANLINE: {
-            if (g_scanline_tick == VBL_SCANLINE_TICK) {
-                if (!g_vbl_flag_suppression) {
-                    g_nmi_occurred = true;
-                }
-                g_vbl_flag_suppression = false;
-            }
-
-            break;
         }
     }
 }
 
 void _do_sprite_evaluation(void) {
-    if (g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) {
+    if (g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline) {
         switch (g_scanline_tick) {
             // idle tick
             case 0:
@@ -803,7 +827,7 @@ void _do_sprite_evaluation(void) {
 }
 
 void _do_sprite_fetching(void) {
-    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= LAST_VISIBLE_LINE) || g_scanline == PRE_RENDER_LINE) {
+    if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline) || g_scanline == g_pre_render_line) {
         if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
             // sprite tile fetching
 
@@ -876,7 +900,7 @@ void _do_sprite_fetching(void) {
                     SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                     if (index < g_ppu_internal_regs.loaded_sprites) {
-                        uint8_t res = g_sys_iface.vram_read(g_ppu_internal_regs.addr_bus);
+                        uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
 
                         if (!attrs.flip_hor) {
                             res = _reverse_bits(res);
@@ -927,7 +951,7 @@ void _do_sprite_fetching(void) {
                     SpriteAttributes attrs = g_ppu_internal_regs.sprite_attr_latches[index];
 
                     if (index < g_ppu_internal_regs.loaded_sprites) {
-                        uint8_t res = g_sys_iface.vram_read(g_ppu_internal_regs.addr_bus);
+                        uint8_t res = system_vram_read(g_ppu_internal_regs.addr_bus);
 
                         if (!attrs.flip_hor) {
                             res = _reverse_bits(res);
@@ -968,7 +992,7 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
     switch (g_render_mode) {
         case RM_NORMAL:
         default:
-            g_sys_iface.emit_pixel(x, y, rgb);
+            system_emit_pixel(x, y, rgb);
             break;
         case RM_NT0:
         case RM_NT1:
@@ -977,8 +1001,8 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
             use_nt = true;
             uint8_t nt_index = g_render_mode - RM_NT0;
             uint16_t nt_base = NAME_TABLE_BASE_ADDR | (nt_index * NAME_TABLE_INTERVAL);
-            pt_tile = g_sys_iface.vram_read(nt_base | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
-            palette_num = g_sys_iface.vram_read(nt_base | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
+            pt_tile = system_vram_read(nt_base | ((y / NAME_TABLE_GRANULARITY) * NAME_TABLE_WIDTH + (x / NAME_TABLE_GRANULARITY)));
+            palette_num = system_vram_read(nt_base | ((y / ATTR_TABLE_GRANULARITY) * ATTR_TABLE_WIDTH + (x / ATTR_TABLE_GRANULARITY)));
             if ((y % 32) >= 16) {
                 palette_num >>= 4;
             }
@@ -1000,12 +1024,12 @@ void render_pixel(uint8_t x, uint8_t y, RGBValue rgb) {
                     : PT_LEFT_ADDR)
                     + pattern_offset;
 
-            uint8_t pattern_pixel = ((g_sys_iface.vram_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((g_sys_iface.vram_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
+            uint8_t pattern_pixel = ((system_vram_read(pattern_addr) >> (7 - (x % 8))) & 1) | (((system_vram_read(pattern_addr + 8) >> (7 - (x % 8))) & 1) << 1);
 
-            int8_t palette_index = g_sys_iface.vram_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
+            int8_t palette_index = system_vram_read(PALETTE_DATA_BASE_ADDR | (pattern_pixel ? (palette_num << 2) : 0) | pattern_pixel);
             RGBValue pixel_rgb = g_palette[palette_index];
 
-            g_sys_iface.emit_pixel(x, y, pixel_rgb);
+            system_emit_pixel(x, y, pixel_rgb);
             
             break;
         }
@@ -1023,7 +1047,7 @@ void cycle_ppu(void) {
     unsigned int draw_pixel_x = g_scanline_tick - 1;
     unsigned int draw_pixel_y = g_scanline;
 
-    if (g_scanline < RESOLUTION_V && g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H) {
+    if (g_scanline <= g_last_visible_scanline && g_scanline_tick > 0 && g_scanline_tick <= RESOLUTION_H) {
         unsigned int palette_low = (((g_ppu_internal_regs.pattern_shift_h >> g_ppu_internal_regs.x) & 1) << 1)
                 | ((g_ppu_internal_regs.pattern_shift_l >> g_ppu_internal_regs.x) & 1);
 
@@ -1095,10 +1119,14 @@ void cycle_ppu(void) {
         uint8_t palette_index;
         if (final_palette_offset == 0xFF) {
             palette_index = 0x0F;
+        } else if (system_get_tv_system() == TV_SYSTEM_PAL && (draw_pixel_y == 0
+                || draw_pixel_x == 0 || draw_pixel_x == 1
+                || draw_pixel_x == 254 || draw_pixel_x == 255)) {
+            palette_index = 0x0E;
         } else {
             uint16_t palette_entry_addr = PALETTE_DATA_BASE_ADDR | final_palette_offset;
 
-            palette_index = g_sys_iface.vram_read(palette_entry_addr);
+            palette_index = system_vram_read(palette_entry_addr);
         }
 
         RGBValue rgb = g_palette[palette_index % (sizeof(g_palette) / sizeof(RGBValue))];
@@ -1118,7 +1146,7 @@ void cycle_ppu(void) {
         }
     }
 
-    if ((g_scanline < RESOLUTION_V || g_scanline == PRE_RENDER_LINE)
+    if ((g_scanline <= g_last_visible_scanline || g_scanline == g_pre_render_line)
             && ((g_scanline_tick >= 1 && g_scanline_tick <= RESOLUTION_H)
                     || (g_scanline_tick >= 321 && g_scanline_tick <= 336))) {
         // shift the internal registers
@@ -1132,26 +1160,26 @@ void cycle_ppu(void) {
     }
 
     if (g_nmi_occurred && g_ppu_control.gen_nmis) {
-        g_sys_iface.pull_down_nmi_line();
+        system_pull_down_nmi_line();
     }
 
     // if the frame is odd and background rendering is enabled, skip the last cycle
     // we do this in an indirect way so the next block (which advances the internal counters) can execute normally
     //TODO: figure out why we need to subtract 3 instead of 2
-    if (g_scanline == PRE_RENDER_LINE && g_scanline_tick == CYCLES_PER_SCANLINE - 3
-            && g_odd_frame && g_ppu_mask.show_background) {
+    if (g_scanline == g_pre_render_line && g_scanline_tick == CYCLES_PER_SCANLINE - 3
+            && g_odd_frame && g_ppu_mask.show_background && system_get_tv_system() == TV_SYSTEM_NTSC) {
         g_scanline_tick++;
     }
 
     if (++g_scanline_tick >= CYCLES_PER_SCANLINE) {
         g_scanline_tick = 0;
 
-        if (++g_scanline >= SCANLINE_COUNT) {
+        if (++g_scanline >= g_scanline_count) {
             g_scanline = 0;
 
             g_odd_frame = !g_odd_frame;
 
-            g_sys_iface.flush_frame();
+            system_flush_frame();
         }
     }
 

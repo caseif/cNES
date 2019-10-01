@@ -28,15 +28,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define RESOLUTION_H 256
-#define RESOLUTION_V 240
-
-#define PRE_RENDER_LINE 261
-#define FIRST_VISIBLE_LINE 0
-#define LAST_VISIBLE_LINE 239
-#define FIRST_VISIBLE_CYCLE 0
-#define LAST_VISIBLE_CYCLE 256
-
 #define PPU_OPEN_BUS_DECAY_CYCLES 3220000 // ~600 ms
 
 #define PACKED __attribute__((packed))
@@ -46,14 +37,6 @@ typedef struct {
     uint8_t g;
     uint8_t b;
 } RGBValue;
-
-typedef struct {
-    uint8_t (*vram_read)(uint16_t);
-    void (*vram_write)(uint16_t, uint8_t);
-    void (*pull_down_nmi_line)();
-    void (*emit_pixel)(unsigned int, unsigned int, const RGBValue);
-    void (*flush_frame)(void);
-} PpuSystemInterface;
 
 typedef union {
     struct {
@@ -176,7 +159,7 @@ typedef enum {
 typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL,
                             MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER} MirroringMode;
 
-void initialize_ppu(PpuSystemInterface system_iface);
+void initialize_ppu(void);
 
 void ppu_set_mirroring_mode(MirroringMode mirror_mode);
 

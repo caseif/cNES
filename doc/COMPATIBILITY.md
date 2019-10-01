@@ -20,12 +20,12 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Bible Buffet | ![](res/circle_green.svg) | playable | |
 | Bubble Bobble | ![](res/circle_green.svg) | playable | |
 | Cabal | ![](res/circle_green.svg) | playable | |
-| Captain SkyHawk | ![](res/circle_orange.svg) | intro | Crashes shortly after level start |
+| Captain SkyHawk | ![](res/circle_greep.svg) | playable | |
 | Castlevania | ![](res/circle_green.svg) | playable | |
 | Castlevania II - Simon's Quest | ![](res/circle_green.svg) | playable | |
 | Cobra Triangle | ![](res/circle_green.svg) | playable | |
 | Crystalis | ![](res/circle_green.svg) | playable | |
-| Digger T. Rock: The Legend of the Lost City | ![](res/circle_yellow.svg) | ingame | Severe graphical glitches |
+| Digger T. Rock: The Legend of the Lost City | ![](res/circle_green.svg) | playable | |
 | Donkey Kong | ![](res/circle_blue.svg) | perfect | |
 | Double Dare | ![](res/circle_green.svg) | playable | |
 | Double Dragon | ![](res/circle_green.svg) | playable | |
@@ -61,7 +61,7 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Mega Man 5 | ![](res/circle_green.svg) | playable | |
 | Mega Man 6 | ![](res/circle_orange.svg) | intro | Crashes immediately after main menu |
 | Mickey Mousecapade | ![](res/circle_red.svg) | broken | Black screen |
-| Mother _(Japan)_ | ![](res/circle_green.svg) | playable | |
+| Mother | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Tengen) | ![](res/circle_yellow.svg) | ingame | Lots of graphical glitches; Nintendulator chokes on this too |
 | NARC | ![](res/circle_green.svg) | playable | Minor graphical glitches at top of screen |
