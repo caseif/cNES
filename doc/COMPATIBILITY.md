@@ -37,6 +37,8 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Excitebike | ![](res/circle_green.svg) | playable | |
 | Exodus - A Journey to the Promised Land | ![](res/circle_green.svg) | playable | |
 | Galaga: Demons of Death | ![](res/circle_green.svg) | playable | |
+| Gauntlet | ![](res/circle_yellow.svg) | ingame | Severe graphical corruption |
+| Gauntlet II | ![](res/circle_green.svg) | playable | |
 | Golf | ![](res/circle_green.svg) | playable | |
 | The Guardian Legend | ![](res/circle_green.svg) | playable | |
 | Ice Climber | ![](res/circle_green.svg) | playable | |
@@ -47,6 +49,8 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Jeopardy!: Junior Edition | ![](res/circle_green.svg) | playable | |
 | Kickle Cubicle | ![](res/circle_green.svg) | playable | |
 | The King of Kings - The Early Years | ![](res/circle_green.svg) | playable | |
+| Kirby's Adventure | ![](circle_green.svg) | playable | |
+| Kirby's Adventure (PAL) | ![](circle_green.svg) | playable | Minor graphical glitches near screen split |
 | The Legend of Zelda | ![](res/circle_green.svg) | playable | |
 | Little Samson | ![](res/circle_green.svg) | playable | |
 | Lode Runner | ![](res/circle_green.svg) | playable | |
