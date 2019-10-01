@@ -50,6 +50,7 @@ static uint8_t _axrom_ram_read(Cartridge *cart, uint16_t addr) {
 static void _axrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     if (addr < 0x8000) {
         system_lower_memory_write(addr, val);
+        return;
     }
 
     g_prg_bank = val & 0x7;

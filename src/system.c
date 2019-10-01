@@ -43,7 +43,7 @@
 #include <string.h>
 #include <time.h>
 
-#define FRAMES_PER_SECOND 6000.0988
+#define FRAMES_PER_SECOND 60.0988
 #define CYCLES_PER_FRAME 89342
 #define CYCLES_PER_SECOND (FRAMES_PER_SECOND * CYCLES_PER_FRAME)
 
@@ -74,7 +74,7 @@ static Cartridge *g_cart;
 static uint8_t g_bus_val; // the value on the data bus
 
 static uint8_t g_cycle_index = 0;
-static uint64_t g_total_cpu_cycles = 0;
+static uint64_t g_total_cpu_cycles = 7; // the initial reset's cycles aren't counted automatically
 
 static bool g_dma_in_progress;
 static uint8_t g_dma_page;
