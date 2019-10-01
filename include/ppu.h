@@ -28,7 +28,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PPU_OPEN_BUS_DECAY_CYCLES 3220000 // ~600 ms
+// ~600 ms
+#define PPU_OPEN_BUS_DECAY_CYCLES 3220000
 
 #define PACKED __attribute__((packed))
 

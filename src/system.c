@@ -55,6 +55,12 @@
 #define PPU_CLOCK_DIVIDER_PAL 5
 #define CLOCK_DIVIDER_LCD_PAL 80
 
+#define FRAMES_PER_SECOND_DENDY 50.0070
+#define MASTER_CLOCK_SPEED_DENDY 26601712
+#define CPU_CLOCK_DIVIDER_DENDY 15
+#define PPU_CLOCK_DIVIDER_DENDY 5
+#define CLOCK_DIVIDER_LCD_DENDY 15
+
 #define SLEEP_INTERVAL 10 // milliseconds
 
 #define SRAM_FILE_NAME "sram.bin"
@@ -193,8 +199,12 @@ void initialize_system(Cartridge *cart) {
             g_clock_divider_lcd = CLOCK_DIVIDER_LCD_PAL;
             break;
         case TIMING_MODE_DENDY:
-            printf("Dendy ROMs are not supported at this time\n");
-            exit(1);
+            printf("Using Dendy system timing\n");
+            g_tv_system = TV_SYSTEM_DENDY;
+            g_master_clock_speed = MASTER_CLOCK_SPEED_DENDY;
+            g_cpu_clock_divider = CPU_CLOCK_DIVIDER_DENDY;
+            g_ppu_clock_divider = PPU_CLOCK_DIVIDER_DENDY;
+            g_clock_divider_lcd = CLOCK_DIVIDER_LCD_DENDY;
             break;
         default:
             printf("Unhandled case %d\n", cart->timing_mode);

@@ -195,15 +195,12 @@ Cartridge *load_rom(FILE *file, char *file_name) {
 
         timing_mode = flag12.timing_mode;
     } else {
-        if (strstr(file_name, "(Europe)") != NULL || strstr(file_name, "(PAL)") != NULL) {
+        if (strstr(file_name, "(Europe)")
+                || strstr(file_name, "(PAL)")
+                || strstr(file_name, "(E)")) {
             printf("Detected TV system as PAL from file name\n");
             timing_mode = TIMING_MODE_PAL;
         }
-    }
-
-    if (timing_mode == TIMING_MODE_DENDY) {
-        printf("Dendy ROMs are not supported at this time\n");
-        return NULL;
     }
 
     Mapper *mapper = _create_mapper(mapper_id, submapper_id);

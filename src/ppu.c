@@ -40,12 +40,16 @@
 #define LAST_VISIBLE_CYCLE 256
 
 #define SCANLINE_COUNT_NTSC 262
-#define VBL_SCANLINE_NTSC 241
-#define g_last_visible_line_NTSC 239
+#define VBL_START_SCANLINE_NTSC 241
+#define LAST_VISIBLE_LINE_NTSC 239
 
-#define SCANLINE_COUNT_PAL 313
-#define VBL_SCANLINE_PAL 240
-#define g_last_visible_line_PAL 238
+#define SCANLINE_COUNT_PAL 312
+#define VBL_START_SCANLINE_PAL 241
+#define LAST_VISIBLE_LINE_PAL 238
+
+#define SCANLINE_COUNT_DENDY 313
+#define VBL_START_SCANLINE_DENDY 291
+#define LAST_VISIBLE_LINE_DENDY 238
 
 #define CYCLES_PER_SCANLINE 341 // same across TV systems
 #define VBL_SCANLINE_TICK 1
@@ -106,7 +110,7 @@ static const RGBValue g_palette[] = {
 };
 
 static unsigned int g_scanline_count;
-static unsigned int g_vbl_scanline;
+static unsigned int g_vbl_start_scanline;
 static unsigned int g_last_visible_scanline;
 static unsigned int g_pre_render_line;
 
@@ -140,13 +144,18 @@ void initialize_ppu(void) {
     switch (system_get_tv_system()) {
         case TV_SYSTEM_NTSC:
             g_scanline_count = SCANLINE_COUNT_NTSC;
-            g_vbl_scanline = VBL_SCANLINE_NTSC;
-            g_last_visible_scanline = g_last_visible_line_NTSC;
+            g_vbl_start_scanline = VBL_START_SCANLINE_NTSC;
+            g_last_visible_scanline = LAST_VISIBLE_LINE_NTSC;
             break;
         case TV_SYSTEM_PAL:
             g_scanline_count = SCANLINE_COUNT_PAL;
-            g_vbl_scanline = VBL_SCANLINE_PAL;
-            g_last_visible_scanline = g_last_visible_line_PAL;
+            g_vbl_start_scanline = VBL_START_SCANLINE_PAL;
+            g_last_visible_scanline = LAST_VISIBLE_LINE_PAL;
+            break;
+        case TV_SYSTEM_DENDY:
+            g_scanline_count = SCANLINE_COUNT_DENDY;
+            g_vbl_start_scanline = VBL_START_SCANLINE_DENDY;
+            g_last_visible_scanline = LAST_VISIBLE_LINE_DENDY;
             break;
         default:
             printf("Unhandled case %d\n", system_get_tv_system());
@@ -240,7 +249,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
             g_ppu_internal_regs.w = 0;
 
             //TODO: figure out why this only passes blargg's test with VBL_SCANLINE_TICK (and not VBL_SCANLINE_TICK - 1)
-            if (g_scanline == g_vbl_scanline && g_scanline_tick == VBL_SCANLINE_TICK) {
+            if (g_scanline == g_vbl_start_scanline && g_scanline_tick == VBL_SCANLINE_TICK) {
                 g_vbl_flag_suppression = true;
             }
 
@@ -548,7 +557,7 @@ void _update_v_horizontal(void) {
 }
 
 void _do_tile_fetching(void) {
-    if (g_scanline == g_vbl_scanline) {
+    if (g_scanline == g_vbl_start_scanline) {
         // set vblank flag
         if (g_scanline_tick == VBL_SCANLINE_TICK) {
             if (!g_vbl_flag_suppression) {
@@ -1119,7 +1128,8 @@ void cycle_ppu(void) {
         uint8_t palette_index;
         if (final_palette_offset == 0xFF) {
             palette_index = 0x0F;
-        } else if (system_get_tv_system() == TV_SYSTEM_PAL && (draw_pixel_y == 0
+        } else if ((system_get_tv_system() == TV_SYSTEM_PAL || system_get_tv_system() == TV_SYSTEM_DENDY)
+                && (draw_pixel_y == 0
                 || draw_pixel_x == 0 || draw_pixel_x == 1
                 || draw_pixel_x == 254 || draw_pixel_x == 255)) {
             palette_index = 0x0E;
