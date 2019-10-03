@@ -89,11 +89,11 @@ bool is_execution_halted(void);
 
 void kill_execution(void);
 
-void system_pull_down_nmi_line(void);
+void system_connect_nmi_line(unsigned int (*nmi_line_callback)(void));
 
-void system_pull_down_irq_line(void);
+void system_connect_irq_line(unsigned int (*irq_line_callback)(void));
 
-void system_pull_down_rst_line(void);
+void system_connect_rst_line(unsigned int (*irq_line_callback)(void));
 
 void system_set_rst_cycles(unsigned int cycles);
 

@@ -117,7 +117,7 @@ static PpuControl g_ppu_control;
 static PpuMask g_ppu_mask;
 static PpuStatus g_ppu_status;
 static PpuInternalRegisters g_ppu_internal_regs;
-static bool g_nmi_occurred;
+static bool g_nmi_occurred = false;
 
 static unsigned char g_name_table_mem[VRAM_SIZE];
 static unsigned char g_palette_ram[PALETTE_RAM_SIZE];
@@ -133,11 +133,17 @@ static bool g_vbl_flag_suppression = false;
 
 static RenderMode g_render_mode;
 
+static unsigned int _ppu_nmi_connection(void) {
+    return (g_nmi_occurred && g_ppu_control.gen_nmis) ? 0 : 1;
+}
+
 bool ppu_is_rendering_enabled(void) {
     return g_ppu_mask.show_background || g_ppu_mask.show_sprites;
 }
 
 void initialize_ppu(void) {
+    system_connect_nmi_line(_ppu_nmi_connection);
+
     switch (system_get_tv_system()) {
         case TV_SYSTEM_NTSC:
             g_scanline_count = SCANLINE_COUNT_NTSC;
@@ -239,7 +245,6 @@ uint8_t ppu_read_mmio(uint8_t index) {
             // set bit 7 to value in nmi_occurred latch and reset the latch
             g_ppu_status.vblank = g_nmi_occurred;
             g_nmi_occurred = false;
-            //printf("clear flag\n");
 
             uint8_t res = g_ppu_status.serial;
 
@@ -560,7 +565,6 @@ void _do_tile_fetching(void) {
         if (g_scanline_tick == VBL_SCANLINE_TICK) {
             if (!g_vbl_flag_suppression) {
                 g_nmi_occurred = true;
-                //printf("set flag\n");
             }
             g_vbl_flag_suppression = false;
         }
@@ -569,7 +573,6 @@ void _do_tile_fetching(void) {
         // clear status
         if (g_scanline_tick == 1) {
             g_nmi_occurred = false;
-            //printf("clear flag 2\n");
             g_ppu_status.vblank = 0;
             g_ppu_status.sprite_0_hit = 0;
             g_ppu_status.sprite_overflow = 0;
@@ -1167,10 +1170,6 @@ void cycle_ppu(void) {
         // feed the attribute registers from the latch(es)
         g_ppu_internal_regs.palette_shift_h |= (g_ppu_internal_regs.attr_table_entry_latch & 0b10) << 6;
         g_ppu_internal_regs.palette_shift_l |= (g_ppu_internal_regs.attr_table_entry_latch & 0b01) << 7;
-    }
-
-    if (g_nmi_occurred && g_ppu_control.gen_nmis) {
-        system_pull_down_nmi_line();
     }
 
     // if the frame is odd and background rendering is enabled, skip the last cycle

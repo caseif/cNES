@@ -140,6 +140,14 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
     return ((bank * CHR_BANK_GRANULARITY) | (addr % bank_size)) % cart->chr_size;
 }
 
+static unsigned int _mmc3_irq_connection(void) {
+    return g_pending_irq ? 0 : 1;
+}
+
+static void _mmc3_init(Cartridge *cart) {
+    system_connect_irq_line(_mmc3_irq_connection);
+}
+
 static uint8_t _mmc3_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr < 0x6000) {
         return system_lower_memory_read(addr);
@@ -337,10 +345,6 @@ static void _mmc3_tick(void) {
         }
     }
 
-    if (g_pending_irq) {
-        system_pull_down_irq_line();
-    }
-
     if (new_a12 == !g_use_a12_fall) {
         a12_cooldown = IRQ_COOLDOWN_PERIOD;
     }
@@ -349,12 +353,12 @@ static void _mmc3_tick(void) {
 void mapper_init_mmc3(Mapper *mapper, unsigned int submapper_id) {
     mapper->id = MAPPER_ID_MMC3;
     memcpy(mapper->name, "MMC3", strlen("MMC3") + 1);
-    mapper->init_func       = NULL;
-    mapper->ram_read_func   = *_mmc3_ram_read;
-    mapper->ram_write_func  = *_mmc3_ram_write;
-    mapper->vram_read_func  = *_mmc3_vram_read;
-    mapper->vram_write_func = *_mmc3_vram_write;
-    mapper->tick_func       = *_mmc3_tick;
+    mapper->init_func       = _mmc3_init;
+    mapper->ram_read_func   = _mmc3_ram_read;
+    mapper->ram_write_func  = _mmc3_ram_write;
+    mapper->vram_read_func  = _mmc3_vram_read;
+    mapper->vram_write_func = _mmc3_vram_write;
+    mapper->tick_func       = _mmc3_tick;
 
     if (submapper_id == 3) {
         g_use_a12_fall = true;

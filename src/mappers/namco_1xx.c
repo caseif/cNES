@@ -57,7 +57,13 @@ static bool g_disable_nt_1;
 static uint16_t g_irq_counter = 0;
 static bool g_irq_pending = false;
 
+static unsigned int _namco_1xx_irq_connection(void) {
+    return g_irq_pending ? 0 : 1;
+}
+
 static void _namco_1xx_init(Cartridge *cart) {
+    system_connect_irq_line(_namco_1xx_irq_connection);
+
     g_prg_banks[0] = 0;
     g_prg_banks[1] = 1;
     g_prg_banks[2] = (cart->prg_size >> PRG_BANK_SHIFT) - 2;
@@ -208,10 +214,6 @@ static void _namco_1xx_tick(void) {
         g_irq_pending = true;
     } else {
         g_irq_counter++;
-    }
-
-    if (g_irq_pending) {
-        system_pull_down_irq_line();
     }
 }
 
