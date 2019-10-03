@@ -211,7 +211,7 @@ static void _namco_1xx_tick(void) {
     }
 
     if (g_irq_pending) {
-        cpu_pull_down_irq_line();
+        system_pull_down_irq_line();
     }
 }
 

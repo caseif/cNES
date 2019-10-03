@@ -95,6 +95,8 @@ void system_pull_down_irq_line(void);
 
 void system_pull_down_rst_line(void);
 
+void system_set_rst_cycles(unsigned int cycles);
+
 void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color);
 
 void system_flush_frame(void);

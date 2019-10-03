@@ -100,6 +100,16 @@ static bool g_dma_in_progress;
 static uint8_t g_dma_page;
 static unsigned int g_dma_step;
 
+static unsigned int g_nmi_line = 1;
+static unsigned int g_irq_line = 1;
+static unsigned int g_rst_line = 1;
+
+static bool g_should_pull_nmi = false;
+static bool g_should_pull_irq = false;
+static bool g_should_pull_rst = false;
+
+static int g_rst_cycles = 0;
+
 #if PRINT_INSTRS
 // snapshots for logging
 static unsigned int g_total_cycles_snapshot;
@@ -177,6 +187,18 @@ static void _handle_dma(void) {
     }
 }
 
+static unsigned int _read_nmi_line(void) {
+    return g_nmi_line;
+}
+
+static unsigned int _read_irq_line(void) {
+    return g_irq_line;
+}
+
+static unsigned int _read_rst_line(void) {
+    return g_rst_line;
+}
+
 void initialize_system(Cartridge *cart) {
     g_cart = cart;
 
@@ -243,7 +265,10 @@ void initialize_system(Cartridge *cart) {
             system_memory_read,
             system_memory_write,
             system_bus_read,
-            system_bus_write
+            system_bus_write,
+            _read_nmi_line,
+            _read_irq_line,
+            _read_rst_line
     });
     initialize_ppu();
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
@@ -446,11 +471,25 @@ void do_system_loop(void) {
 
         if (!g_halted) {
             if ((g_cycle_index % g_ppu_clock_divider) == 0) {
-                cycle_ppu();                
+                //printf("cycle\n");
+                cycle_ppu();
 
                 if (g_cart->mapper->tick_func != NULL) {
                     g_cart->mapper->tick_func();
                 }
+
+                if (g_rst_cycles > 0) {
+                    g_rst_cycles--;
+                    g_should_pull_rst = true;
+                }
+
+                g_nmi_line = g_should_pull_nmi ? 0 : 1;
+                g_irq_line = g_should_pull_irq ? 0 : 1;
+                g_rst_line = g_should_pull_rst ? 0 : 1;
+
+                g_should_pull_nmi = false;
+                g_should_pull_irq = false;
+                g_should_pull_rst = false;
             }
 
             if ((g_cycle_index % g_cpu_clock_divider) == 0) {
@@ -506,15 +545,19 @@ void kill_execution(void) {
 }
 
 void system_pull_down_nmi_line(void) {
-    cpu_pull_down_nmi_line();
+    g_should_pull_nmi = true;
 }
 
 void system_pull_down_irq_line(void) {
-    cpu_pull_down_irq_line();
+    g_should_pull_irq = true;
 }
 
 void system_pull_down_rst_line(void) {
-    cpu_pull_down_rst_line();
+    g_should_pull_rst = true;
+}
+
+void system_set_rst_cycles(unsigned int cycles) {
+    g_rst_cycles = cycles;
 }
 
 void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color) {

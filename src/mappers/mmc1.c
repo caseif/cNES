@@ -33,6 +33,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define CHR_RAM_SIZE 0x2000

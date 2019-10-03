@@ -32,9 +32,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define RESOLUTION_H 256
-#define RESOLUTION_V 240
-
 #define FIRST_VISIBLE_LINE 0
 #define FIRST_VISIBLE_CYCLE 0
 #define LAST_VISIBLE_CYCLE 256
@@ -242,6 +239,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
             // set bit 7 to value in nmi_occurred latch and reset the latch
             g_ppu_status.vblank = g_nmi_occurred;
             g_nmi_occurred = false;
+            //printf("clear flag\n");
 
             uint8_t res = g_ppu_status.serial;
 
@@ -562,6 +560,7 @@ void _do_tile_fetching(void) {
         if (g_scanline_tick == VBL_SCANLINE_TICK) {
             if (!g_vbl_flag_suppression) {
                 g_nmi_occurred = true;
+                //printf("set flag\n");
             }
             g_vbl_flag_suppression = false;
         }
@@ -570,6 +569,7 @@ void _do_tile_fetching(void) {
         // clear status
         if (g_scanline_tick == 1) {
             g_nmi_occurred = false;
+            //printf("clear flag 2\n");
             g_ppu_status.vblank = 0;
             g_ppu_status.sprite_0_hit = 0;
             g_ppu_status.sprite_overflow = 0;

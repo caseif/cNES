@@ -33,6 +33,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MMC3_DEBUG_LOGGING 0
@@ -67,6 +68,7 @@ static uint8_t g_irq_latch;
 static bool g_irq_reload;
 static bool g_irq_enabled = false;
 static uint16_t a12_cooldown = 0;
+static bool g_pending_irq = false;
 
 // submapper configurations
 static bool g_use_counter_edge = false;
@@ -243,6 +245,7 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             if (g_irq_enabled) {
                 g_irq_enabled = false;
             }
+            g_pending_irq = false; // acknowledge any pending interrupt
             return;
         case 0xE001:
             g_irq_enabled = true;
@@ -317,7 +320,9 @@ static void _mmc3_tick(void) {
     }
 
     if (clock_counter) {
-        //printf("counter clocked @ (%03d, %03d)\n", ppu_get_scanline(), ppu_get_scanline_tick());
+        #if MMC3_DEBUG_LOGGING
+        printf("MMC3 IRQ counter clocked @ (%03d, %03d)\n", ppu_get_scanline(), ppu_get_scanline_tick());
+        #endif
         uint8_t counter_old = g_irq_counter;
 
         if (g_irq_reload || g_irq_counter == 0) {
@@ -328,8 +333,12 @@ static void _mmc3_tick(void) {
         }
 
         if ((!g_use_counter_edge || counter_old > 0) && g_irq_counter == 0 && g_irq_enabled) {
-            cpu_pull_down_irq_line();
+            g_pending_irq = true;
         }
+    }
+
+    if (g_pending_irq) {
+        system_pull_down_irq_line();
     }
 
     if (new_a12 == !g_use_a12_fall) {

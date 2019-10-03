@@ -28,6 +28,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define RESOLUTION_H 256
+#define RESOLUTION_V 240
+
 // ~600 ms
 #define PPU_OPEN_BUS_DECAY_CYCLES 3220000
 
