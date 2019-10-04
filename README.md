@@ -5,6 +5,8 @@ cNES is a cycle-accurate NES emulator written in C.
 cNES is partially derived from the now-defunct
 [jNES](https://github.com/caseif/jNES).
 
+cNES's CPU emulation is handled by its sister project, [c6502](https://github.com/caseif/c6502).
+
 ### Features
 
 - Support for popular mappers (NROM, MMC1, UNROM, CNROM, MMC3, AxROM)
