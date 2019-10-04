@@ -2,10 +2,11 @@
 
 cNES is a cycle-accurate NES emulator written in C.
 
+cNES's CPU emulation is handled by its sister project,
+[c6502](https://github.com/caseif/c6502).
+
 cNES is partially derived from the now-defunct
 [jNES](https://github.com/caseif/jNES).
-
-cNES's CPU emulation is handled by its sister project, [c6502](https://github.com/caseif/c6502).
 
 ### Features
 
@@ -29,12 +30,12 @@ cNES's CPU emulation is handled by its sister project, [c6502](https://github.co
 ### Non-goals
 
 - User-friendliness
-    - This project is a technical challenge for myself, and as such a 
-      user-friendly interface is not one of its goals. This is not to say that
-      it will never exist, just that it's not a priority.
+  - This project is a technical challenge for myself, and as such a
+    user-friendly interface is not one of its goals. This is not to say that
+    it will never exist, just that it's not a priority.
 - Save states
-    - Again, I'm interested in adding such a feature, but it's definitely not a
-      priority.
+  - Again, I'm interested in adding such a feature, but it's definitely not a
+    priority.
 
 ### Why?
 

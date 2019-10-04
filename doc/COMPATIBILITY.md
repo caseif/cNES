@@ -20,7 +20,7 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Bible Buffet | ![](res/circle_green.svg) | playable | |
 | Bubble Bobble | ![](res/circle_green.svg) | playable | |
 | Cabal | ![](res/circle_green.svg) | playable | |
-| Captain SkyHawk | ![](res/circle_greep.svg) | playable | |
+| Captain SkyHawk | ![](res/circle_green.svg) | playable | |
 | Castlevania | ![](res/circle_green.svg) | playable | |
 | Castlevania II - Simon's Quest | ![](res/circle_green.svg) | playable | |
 | Cobra Triangle | ![](res/circle_green.svg) | playable | |
@@ -49,8 +49,8 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Jeopardy!: Junior Edition | ![](res/circle_green.svg) | playable | |
 | Kickle Cubicle | ![](res/circle_green.svg) | playable | |
 | The King of Kings - The Early Years | ![](res/circle_green.svg) | playable | |
-| Kirby's Adventure | ![](circle_green.svg) | playable | |
-| Kirby's Adventure (PAL) | ![](circle_green.svg) | playable | Minor graphical glitches near screen split |
+| Kirby's Adventure | ![](res/circle_green.svg) | playable | |
+| Kirby's Adventure (PAL) | ![](res/circle_green.svg) | playable | Minor graphical glitches near screen split |
 | The Legend of Zelda | ![](res/circle_green.svg) | playable | |
 | Little Samson | ![](res/circle_green.svg) | playable | |
 | Lode Runner | ![](res/circle_green.svg) | playable | |
