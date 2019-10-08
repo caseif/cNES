@@ -120,6 +120,7 @@ typedef struct {
     unsigned int m:3;   // sprite data index, used for sprite evaluation
     unsigned int n:7;   // primary OAM index, used for sprite evaluation
     unsigned int o:4;   // secondary OAM index, used for sprite evaluation/tile fetching
+    unsigned int p:8;   // (imaginary) current offset into OAM RAM
     uint8_t sprite_attr_latch; // latch for sprite during evaluation
     bool has_latched_sprite;   // whether a byte is latched
     uint8_t loaded_sprites; // number of currently loaded sprites

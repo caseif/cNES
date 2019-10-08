@@ -734,14 +734,18 @@ void _do_sprite_evaluation(void) {
                 }
                 break;
             case 65 ... 256: {
-                if (g_ppu_internal_regs.n >= sizeof(g_oam_ram) / sizeof(Sprite)) {
+                if (g_scanline_tick == 65) {
+                    g_ppu_internal_regs.p = g_ppu_internal_regs.s;
+                }
+
+                if (g_ppu_internal_regs.n >= (sizeof(g_oam_ram) - g_ppu_internal_regs.p) / sizeof(Sprite)) {
                     // we've reached the end of OAM
                     break;
                 }
 
                 if (g_scanline_tick % 2 == 1) {
                     // read from primary OAM on odd ticks
-                    Sprite sprite = g_oam_ram[g_ppu_internal_regs.n];
+                    Sprite sprite = ((Sprite*) ((unsigned char*) g_oam_ram + g_ppu_internal_regs.p))[g_ppu_internal_regs.n];
 
                     switch (g_ppu_internal_regs.m) {
                         case 0: {
@@ -843,6 +847,8 @@ void _do_sprite_fetching(void) {
     if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline) || g_scanline == g_pre_render_line) {
         if (g_scanline_tick >= 257 && g_scanline_tick <= 320) {
             // sprite tile fetching
+
+            g_ppu_internal_regs.s = 0;
 
             if (g_scanline_tick == 257) {
                 g_ppu_internal_regs.loaded_sprites = g_ppu_internal_regs.o;
