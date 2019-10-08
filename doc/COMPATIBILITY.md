@@ -61,9 +61,9 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Mega Man | ![](res/circle_green.svg) | playable | |
 | Mega Man 2 | ![](res/circle_green.svg) | playable | |
 | Mega Man 3 | ![](res/circle_green.svg) | playable | Scanline glitch on boss select screen occurs on hardware |
-| Mega Man 4 | ![](res/circle_orange.svg) | intro | Execution loops infinitely after "AD200X" |
+| Mega Man 4 | ![](res/circle_green.svg) | playable | |
 | Mega Man 5 | ![](res/circle_green.svg) | playable | |
-| Mega Man 6 | ![](res/circle_orange.svg) | intro | Crashes immediately after main menu |
+| Mega Man 6 | ![](res/circle_green.svg) | playable | |
 | Mickey Mousecapade | ![](res/circle_red.svg) | broken | Black screen |
 | Mother | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |

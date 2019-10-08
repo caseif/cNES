@@ -568,24 +568,25 @@ void _do_tile_fetching(void) {
             }
             g_vbl_flag_suppression = false;
         }
-    } else if (g_scanline == g_pre_render_line) {
-        // pre-render line
-        // clear status
-        if (g_scanline_tick == 1) {
-            g_nmi_occurred = false;
-            g_ppu_status.vblank = 0;
-            g_ppu_status.sprite_0_hit = 0;
-            g_ppu_status.sprite_overflow = 0;
+    } else if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline)
+            || g_scanline == g_pre_render_line) {
+        // special case for pre-render line
+        if (g_scanline == g_pre_render_line) {
+            // clear status
+            if (g_scanline_tick == 1) {
+                g_nmi_occurred = false;
+                g_ppu_status.vblank = 0;
+                g_ppu_status.sprite_0_hit = 0;
+                g_ppu_status.sprite_overflow = 0;
+            }
+
+            // vert(v) = vert(t)
+            if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && ppu_is_rendering_enabled()) {
+                g_ppu_internal_regs.v.addr &= ~0x7BE0; // clear vertical bits
+                g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x7BE0; // copy vertical bits to v from t
+            }
         }
 
-        // vert(v) = vert(t)
-        if (g_scanline_tick >= 280 && g_scanline_tick <= 304 && ppu_is_rendering_enabled()) {
-            g_ppu_internal_regs.v.addr &= ~0x7BE0; // clear vertical bits
-            g_ppu_internal_regs.v.addr |= g_ppu_internal_regs.t.addr & 0x7BE0; // copy vertical bits to v from t
-        }
-
-        // intentional fall-through
-    } else if (g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline) {
         // visible screen
         if (g_scanline_tick == 0) {
             // idle tick
