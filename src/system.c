@@ -183,18 +183,6 @@ static void _handle_dma(void) {
     }
 }
 
-static unsigned int _read_nmi_line(void) {
-    return g_nmi_line_callback != NULL ? g_nmi_line_callback() : 1;
-}
-
-static unsigned int _read_irq_line(void) {
-    return g_irq_line_callback != NULL ? g_irq_line_callback() : 1;
-}
-
-static unsigned int _read_rst_line(void) {
-    return g_rst_line_callback != NULL ? g_rst_line_callback() : 1;
-}
-
 static unsigned int _internal_rst_connection(void) {
     return g_rst_cycles > 0 ? 0 : 1;
 }
@@ -268,9 +256,9 @@ void initialize_system(Cartridge *cart) {
             system_memory_write,
             system_bus_read,
             system_bus_write,
-            _read_nmi_line,
-            _read_irq_line,
-            _read_rst_line
+            system_read_nmi_line,
+            system_read_irq_line,
+            system_read_rst_line
     });
     initialize_ppu();
     ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
@@ -286,6 +274,18 @@ void initialize_system(Cartridge *cart) {
 
 TvSystem system_get_tv_system(void) {
     return g_tv_system;
+}
+
+unsigned int system_read_nmi_line(void) {
+    return g_nmi_line_callback != NULL ? g_nmi_line_callback() : 1;
+}
+
+unsigned int system_read_irq_line(void) {
+    return g_irq_line_callback != NULL ? g_irq_line_callback() : 1;
+}
+
+unsigned int system_read_rst_line(void) {
+    return g_rst_line_callback != NULL ? g_rst_line_callback() : 1;
 }
 
 uint8_t system_bus_read(void) {

@@ -41,6 +41,12 @@ void initialize_system(Cartridge *cart);
 
 TvSystem system_get_tv_system(void);
 
+unsigned int system_read_nmi_line(void);
+
+unsigned int system_read_irq_line(void);
+
+unsigned int system_read_rst_line(void);
+
 uint8_t system_bus_read(void);
 
 void system_bus_write(uint8_t val);
