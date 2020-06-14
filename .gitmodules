@@ -1,0 +1,3 @@
+[submodule "c6502"]
+	path = c6502
+	url = git://github.com/caseif/c6502.git

@@ -29,7 +29,6 @@
 #include "input/global/hotkeys.h"
 #include "ppu.h"
 
-#include <pthread.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_events.h>
 

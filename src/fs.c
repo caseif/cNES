@@ -47,8 +47,6 @@ static int _mkdir(const char *path) {
 
     #ifdef _WIN32
     return _mkdir(path);
-    #elif _POSIX_C_SOURCE
-    return mkdir(path);
     #else
     return mkdir(path, 0755);
     #endif

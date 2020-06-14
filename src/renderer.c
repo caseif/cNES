@@ -28,7 +28,6 @@
 #include "system.h"
 #include "ppu.h"
 
-#include <pthread.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
