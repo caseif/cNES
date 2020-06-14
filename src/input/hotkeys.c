@@ -29,8 +29,8 @@
 #include "input/global/hotkeys.h"
 #include "ppu.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_events.h>
+#include <SDL.h>
+#include <SDL_events.h>
 
 #define KEY_MODE_NORMAL SDLK_F1
 #define KEY_MODE_NAME_TABLE SDLK_F2

@@ -242,11 +242,12 @@ void initialize_system(Cartridge *cart) {
     }
 
     if (g_cart->has_nv_ram && g_cart->prg_nvram_size > 0) {
-        unsigned char prg_ram_tmp[g_prg_ram_size];
+        unsigned char *prg_ram_tmp = malloc(g_prg_ram_size);
         if (read_game_data(cart->title, SRAM_FILE_NAME, prg_ram_tmp, g_prg_ram_size, true)) {
             printf("Loading SRAM from disk\n");
             memcpy(g_prg_ram, prg_ram_tmp, g_prg_ram_size);
         }
+        free(prg_ram_tmp);
     }
 
     memset(g_system_ram, 0x00, SYSTEM_MEMORY_SIZE);
@@ -323,11 +324,12 @@ void system_register_chip_ram(Cartridge *cart, unsigned char *ram, size_t size) 
     g_chip_ram = ram;
     g_chip_ram_size = size;
 
-    unsigned char chip_ram_tmp[g_chip_ram_size];
+    unsigned char *chip_ram_tmp = malloc(g_chip_ram_size);
     if (read_game_data(cart->title, CHIPRAM_FILE_NAME, chip_ram_tmp, g_chip_ram_size, true)) {
         printf("Loading chip RAM from disk\n");
         memcpy(g_chip_ram, chip_ram_tmp, g_chip_ram_size);
     }
+    free(chip_ram_tmp);
 }
 
 void system_ram_init(void) {
@@ -390,53 +392,46 @@ void system_vram_write(uint16_t addr, uint8_t val) {
 uint8_t system_lower_memory_read(uint16_t addr) {
     assert(addr < 0x8000);
 
-    switch (addr) {
-        case 0 ... 0x1FFF:
-            return system_ram_read(addr % SYSTEM_MEMORY_SIZE);
-        case 0x2000 ... 0x3FFF:
-            return ppu_read_mmio((uint8_t) (addr % 8));
-        case 0x4014:
-            //TODO: DMA register
-            return 0;
-        case 0x4000 ... 0x4013:
-        case 0x4015:
-            //TODO: APU MMIO
-            return 0;
-        case 0x4016 ... 0x4017: {
-            return 0x40 | controller_poll(addr - 0x4016);
-        }
-        default:
-            return system_bus_read(); // open bus
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
+        return system_ram_read(addr % SYSTEM_MEMORY_SIZE);
+    } else if (addr >= 0x2000 && addr <= 0x3FFF) {
+        return ppu_read_mmio((uint8_t) (addr % 8));
+        } else if (addr == 0x4014) {
+        //TODO: DMA register
+        return 0;
+        } else if ((addr >= 0x4000 && addr <= 0x4013) || addr == 0x4015) {
+        //TODO: APU MMIO
+        return 0;
+    } else if (addr >= 0x4016 && addr <= 0x4017) {
+        return 0x40 | controller_poll(addr - 0x4016);
+    } else {
+        return system_bus_read(); // open bus
     }
 }
 
 void system_lower_memory_write(uint16_t addr, uint8_t val) {
     assert(addr < 0x8000);
 
-    switch (addr) {
-        case 0 ... 0x1FFF: {
-            system_ram_write(addr % 0x800, val);
-            return;
-        }
-        case 0x2000 ... 0x3FFF: {
-            ppu_write_mmio((uint8_t) (addr % 8), val);
-            return;
-        }
-        case 0x4014: {
-            system_start_oam_dma(val);
-            return;
-        }
-        case 0x4000 ... 0x4013:
-        case 0x4015: {
-            //TODO: APU MMIO
-            return;
-        }
-        case 0x4016 ... 0x4017: {
-            controller_push(addr - 0x4016, val);
-            return;
-        }
-        default:
-            return; // do nothing
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
+        system_ram_write(addr % 0x800, val);
+        return;
+    }
+    else if (addr >= 0x2000 && addr <= 0x3FFF) {
+        ppu_write_mmio((uint8_t) (addr % 8), val);
+        return;
+    } else if (addr == 0x4014) {
+        system_start_oam_dma(val);
+        return;
+    }
+    else if ((addr >= 0x4000 && addr <= 0x4013) || addr == 0x4015) {
+        //TODO: APU MMIO
+        return;
+    }
+    else if (addr >= 0x4016 && addr <= 0x4017) {
+        controller_push(addr - 0x4016, val);
+        return;
+    } else {
+        return; // do nothing
     }
 }
 

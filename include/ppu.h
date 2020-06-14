@@ -25,6 +25,9 @@
 
 #pragma once
 
+#pragma warning(disable: 4201)
+#pragma warning(disable: 4214)
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -34,57 +37,57 @@
 // ~600 ms
 #define PPU_OPEN_BUS_DECAY_CYCLES 3220000
 
-#define PACKED __attribute__((packed))
-
 typedef struct {
     uint8_t r;
     uint8_t g;
     uint8_t b;
 } RGBValue;
+   
+#pragma pack(push,1)
 
 typedef union {
     struct {
-        unsigned char name_table:2 PACKED;
-        unsigned char vertical_increment:1 PACKED;
-        unsigned char sprite_table:1 PACKED;
-        unsigned char background_table:1 PACKED;
-        unsigned char tall_sprites:1 PACKED;
-        unsigned char ext_master:1 PACKED;
-        unsigned char gen_nmis:1 PACKED;
+        unsigned char name_table:2;
+        unsigned char vertical_increment:1;
+        unsigned char sprite_table:1;
+        unsigned char background_table:1;
+        unsigned char tall_sprites:1;
+        unsigned char ext_master:1;
+        unsigned char gen_nmis:1;
     };
     uint8_t serial;
 } PpuControl;
 
 typedef union {
     struct {
-        unsigned char monochrome:1 PACKED;
-        unsigned char show_background_left:1 PACKED;
-        unsigned char show_sprites_left:1 PACKED;
-        unsigned char show_background:1 PACKED;
-        unsigned char show_sprites:1 PACKED;
-        unsigned char em_red:1 PACKED;
-        unsigned char em_green:1 PACKED;
-        unsigned char em_blue:1 PACKED;
+        unsigned char monochrome:1;
+        unsigned char show_background_left:1;
+        unsigned char show_sprites_left:1;
+        unsigned char show_background:1;
+        unsigned char show_sprites:1;
+        unsigned char em_red:1;
+        unsigned char em_green:1;
+        unsigned char em_blue:1;
     };
     uint8_t serial;
 } PpuMask;
 
 typedef union {
     struct {
-        unsigned char :5 PACKED; // unused
-        unsigned char sprite_overflow:1 PACKED;
-        unsigned char sprite_0_hit:1 PACKED;
-        unsigned char vblank:1 PACKED;
+        unsigned char :5; // unused
+        unsigned char sprite_overflow:1;
+        unsigned char sprite_0_hit:1;
+        unsigned char vblank:1;
     };
     uint8_t serial;
 } PpuStatus;
 
 typedef struct {
-    unsigned int palette_index:2 PACKED;
-    unsigned int :3 PACKED; // unused
-    unsigned int low_priority:1 PACKED;
-    unsigned int flip_hor:1 PACKED;
-    unsigned int flip_ver:1 PACKED;
+    unsigned int palette_index:2;
+    unsigned int :3; // unused
+    unsigned int low_priority:1;
+    unsigned int flip_hor:1;
+    unsigned int flip_ver:1;
 } SpriteAttributes;
 
 typedef struct {
@@ -108,6 +111,8 @@ typedef union {
     };
     unsigned int addr:15;
 } VramAddr;
+
+#pragma pack(pop)
 
 typedef struct {
     VramAddr v;  // current VRAM address

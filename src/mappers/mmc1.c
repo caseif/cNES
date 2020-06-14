@@ -199,8 +199,7 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 static uint8_t _mmc1_vram_read(Cartridge *cart, uint16_t addr) {
-    switch (addr) {
-        case 0x0000 ... 0x1FFF: {
+        if (addr >= 0x0000 && addr <= 0x1FFF) {
             if (cart->chr_size == 0) {
                 return system_chr_ram_read(addr);
             }
@@ -213,35 +212,33 @@ static uint8_t _mmc1_vram_read(Cartridge *cart, uint16_t addr) {
             }
             
             return cart->chr_rom[chr_offset];
-        }
-        // name tables
-        case 0x2000 ... 0x3EFF:
+        } else if (addr >= 0x2000 && addr <= 0x3EFF) {
+            // name tables
             return ppu_name_table_read(addr % 0x1000);
-        // palette table
-        case 0x3F00 ... 0x3FFF:
+        } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+            // palette table
             return ppu_palette_table_read(addr % 0x20);
-        // open bus, generally returns low address byte
-        default:
+        } else {
+            // open bus, generally returns low address byte
             return addr & 0xFF;
-    }
+        }
 }
 
 static void _mmc1_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    switch (addr) {
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
         // PRG ROM
-        case 0x0000 ... 0x1FFF:
-            if (cart->chr_size == 0) {
-                system_chr_ram_write(addr, val);
-            }
-            return;
+        if (cart->chr_size == 0) {
+            system_chr_ram_write(addr, val);
+        }
+        return;
+    } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         // name tables
-        case 0x2000 ... 0x3EFF:
-            ppu_name_table_write(addr % 0x1000, val);
-            return;
+        ppu_name_table_write(addr % 0x1000, val);
+        return;
+    } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // palette table
-        case 0x3F00 ... 0x3FFF:
-            ppu_palette_table_write(addr % 0x20, val);
-            return;
+        ppu_palette_table_write(addr % 0x20, val);
+        return;
     }
 }
 

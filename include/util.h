@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifdef WINDOWS
+#ifdef _WIN32
 #include <windows.h>
 #else
 #ifndef __USE_POSIX199309
@@ -69,7 +69,7 @@ static inline uint32_t endian_swap(uint32_t x) {
 }
 
 static inline void sleep_cp(int ms) {
-    #ifdef WINDOWS
+    #ifdef _WIN32
     Sleep(ms);
     #else
     struct timespec spec[] = {{0, ms * 1000000L}};

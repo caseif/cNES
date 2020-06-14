@@ -38,10 +38,10 @@
 
 #define CNES_DIR ".cnes"
 
-static int _mkdir(const char *path) {
+static int pi_mkdir(const char *path) {
     struct stat st;
     stat(path, &st);
-    if (S_ISDIR(st.st_mode)) {
+    if (st.st_mode & S_IFDIR) {
         return 0;
     }
 
@@ -52,7 +52,7 @@ static int _mkdir(const char *path) {
     #endif
 }
 
-static char *_getcwd(char *path, size_t max_len) {
+static char *pi_getcwd(char *path, size_t max_len) {
     #ifdef _WIN32
     return _getcwd(path, max_len);
     #else
@@ -66,7 +66,7 @@ static char *get_save_dir(void) {
     bool must_free = false;
     if (!home) {
         home = malloc(MAX_PATH_LEN);
-        if (!_getcwd(home, MAX_PATH_LEN)) {
+        if (!pi_getcwd(home, MAX_PATH_LEN)) {
             printf("Failed to get CWD\n");
             return NULL;
         }
@@ -91,7 +91,7 @@ static FILE *_open_game_file(char *game_title, char *file_name, char *flags) {
         return NULL;
     }
 
-    if (_mkdir(save_dir) != 0) {
+    if (pi_mkdir(save_dir) != 0) {
         printf("Failed to create save directory while opening %s\n", file_name);
         free(save_dir);
         return NULL;
@@ -101,7 +101,7 @@ static FILE *_open_game_file(char *game_title, char *file_name, char *flags) {
     sprintf(game_path, "%s/%s", save_dir, game_title);
     free(save_dir);
 
-    if (_mkdir(game_path) != 0) {
+    if (pi_mkdir(game_path) != 0) {
         printf("Failed to create game directory while opening %s\n", file_name);
         free(game_path);
         return NULL;

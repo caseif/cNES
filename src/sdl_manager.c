@@ -29,7 +29,7 @@
 #include "ppu.h"
 
 #include <stdbool.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 static SDL_Window *g_window;
 

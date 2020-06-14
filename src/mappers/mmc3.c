@@ -78,27 +78,22 @@ static uint32_t _mmc3_get_prg_offset(Cartridge *cart, uint16_t addr) {
     assert(addr >= 0x8000);
 
     uint8_t bank = 0;
-    switch (addr) {
-        case 0x8000 ... 0x9FFF:
-            if (g_prg_switch_ranges) {
-                bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 2; // fixed, use second-to-last bank
-            } else {
-                bank = g_prg_1;
-            }
-            break;
-        case 0xA000 ... 0xBFFF:
-            bank = g_prg_2;
-            break;
-        case 0xC000 ... 0xDFFF:
-            if (g_prg_switch_ranges) {
-                bank = g_prg_1;
-            } else {
-                bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 2; // fixed, use second-to-last bank
-            }
-            break;
-        case 0xE000 ... 0xFFFF:
-            bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 1; // fixed, used last bank
-            break;
+    if (addr >= 0x8000 && addr <= 0x9FFF) {
+        if (g_prg_switch_ranges) {
+            bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 2; // fixed, use second-to-last bank
+        } else {
+            bank = g_prg_1;
+        }
+    } else if (addr >= 0xA000 && addr <= 0xBFFF) {
+        bank = g_prg_2;
+    } else if (addr >= 0xC000 && addr <= 0xDFFF) {
+        if (g_prg_switch_ranges) {
+            bank = g_prg_1;
+        } else {
+            bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 2; // fixed, use second-to-last bank
+        }
+    } else if (addr >= 0xE000 && addr <= 0xFFFF) {
+        bank = (cart->prg_size / PRG_BANK_GRANULARITY) - 1; // fixed, used last bank
     }
     uint32_t offset = ((bank * PRG_BANK_GRANULARITY) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size;
     return offset;
@@ -116,25 +111,18 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
 
     uint8_t bank;
 
-    switch (addr) {
-        case 0x0000 ... 0x07FF:
-            bank = g_chr_big_1;
-            break;
-        case 0x0800 ... 0x0FFF:
-            bank = g_chr_big_2;
-            break;
-        case 0x1000 ... 0x13FF:
-            bank = g_chr_little_1;
-            break;
-        case 0x1400 ... 0x17FF:
-            bank = g_chr_little_2;
-            break;
-        case 0x1800 ... 0x1BFF:
-            bank = g_chr_little_3;
-            break;
-        case 0x1C00 ... 0x1FFF:
-            bank = g_chr_little_4;
-            break;
+    if (addr >= 0x0000 && addr <= 0x07FF) {
+        bank = g_chr_big_1;
+    } else if (addr >= 0x0800 && addr <= 0x0FFF) {
+        bank = g_chr_big_2;
+    } else if (addr >= 0x1000 && addr <= 0x13FF) {
+        bank = g_chr_little_1;
+    } else if (addr >= 0x1400 && addr <= 0x17FF) {
+        bank = g_chr_little_2;
+    } else if (addr >= 0x1800 && addr <= 0x1BFF) {
+        bank = g_chr_little_3;
+    } else if (addr >= 0x1C00 && addr <= 0x1FFF) {
+        bank = g_chr_little_4;
     }
 
     return ((bank * CHR_BANK_GRANULARITY) | (addr % bank_size)) % cart->chr_size;
@@ -264,8 +252,7 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
-    switch (addr) {
-        case 0x0000 ... 0x1FFF: {
+        if (addr >= 0x0000 && addr <= 0x1FFF) {
             if (cart->chr_size == 0) {
                 return system_chr_ram_read(addr);
             }
@@ -278,35 +265,33 @@ static uint8_t _mmc3_vram_read(Cartridge *cart, uint16_t addr) {
             }
             
             return cart->chr_rom[chr_offset];
-        }
-        // name tables
-        case 0x2000 ... 0x3EFF:
+        } else if (addr >= 0x2000 && addr <= 0x3EFF) {
+            // name tables
             return ppu_name_table_read(addr % 0x1000);
-        // palette table
-        case 0x3F00 ... 0x3FFF:
+        } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+            // palette table
             return ppu_palette_table_read(addr % 0x20);
-        // open bus, generally returns low address byte
-        default:
+        } else {
+            // open bus, generally returns low address byte
             return addr & 0xFF;
-    }
+        }
 }
 
 static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    switch (addr) {
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
         // CHR
-        case 0x0000 ... 0x1FFF:
-            if (cart->chr_size == 0) {
-                system_chr_ram_write(addr, val);
-            }
-            return;
+        if (cart->chr_size == 0) {
+            system_chr_ram_write(addr, val);
+        }
+        return;
+    } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         // name tables
-        case 0x2000 ... 0x3EFF:
-            ppu_name_table_write(addr % 0x1000, val);
-            return;
+        ppu_name_table_write(addr % 0x1000, val);
+        return;
+    } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // palette table
-        case 0x3F00 ... 0x3FFF:
-            ppu_palette_table_write(addr % 0x20, val);
-            return;
+        ppu_palette_table_write(addr % 0x20, val);
+        return;
     }
 }
 

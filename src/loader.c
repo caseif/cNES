@@ -40,45 +40,49 @@
 #define CHR_CHUNK_SIZE ((size_t) 0x2000)
 #define PRG_RAM_CHUNK_SIZE ((size_t) 0x2000)
 
+#pragma pack(push)
+
 typedef struct {
-    unsigned int mirror_mode:1 PACKED;
-    bool has_nv_ram:1 PACKED;
-    bool has_trainer:1 PACKED;
-    bool ignore_mirror_ctrl:1 PACKED;
-    unsigned int mapper_low:4 PACKED;
+    unsigned int mirror_mode:1;
+    bool has_nv_ram:1;
+    bool has_trainer:1;
+    bool ignore_mirror_ctrl:1;
+    unsigned int mapper_low:4;
 } Flag6;
 
 typedef struct {
-    bool vs_unisystem:1 PACKED;
-    bool play_choice_10:1 PACKED;
-    unsigned int nes2:2 PACKED;
-    unsigned int mapper_high:4 PACKED;
+    bool vs_unisystem:1;
+    bool play_choice_10:1;
+    unsigned int nes2:2;
+    unsigned int mapper_high:4;
 } Flag7;
 
 typedef struct {
-    unsigned int mapper_highest:4 PACKED;
-    unsigned int submapper:4 PACKED;
+    unsigned int mapper_highest:4;
+    unsigned int submapper:4;
 } Flag8;
 
 typedef struct {
-    unsigned int prg_rom_size_msb:4 PACKED;
-    unsigned int chr_rom_size_msb:4 PACKED;
+    unsigned int prg_rom_size_msb:4;
+    unsigned int chr_rom_size_msb:4;
 } Flag9;
 
 typedef struct {
-    unsigned int prg_ram_shift_count:4 PACKED;
-    unsigned int prg_nvram_shift_count:4 PACKED;
+    unsigned int prg_ram_shift_count:4;
+    unsigned int prg_nvram_shift_count:4;
 } Flag10;
 
 typedef struct {
-    unsigned int chr_ram_shift_count:4 PACKED;
-    unsigned int chr_nvram_shift_count:4 PACKED;
+    unsigned int chr_ram_shift_count:4;
+    unsigned int chr_nvram_shift_count:4;
 } Flag11;
 
 typedef struct {
-    unsigned int timing_mode:2 PACKED;
-    unsigned int :6 PACKED; // unused
+    unsigned int timing_mode:2;
+    unsigned int :6; // unused
 } Flag12;
+
+#pragma pack(pop)
 
 void _init_mapper(Mapper *mapper, void (*init_func)(Mapper*, unsigned int), unsigned int submapper_id) {
     init_func(mapper, submapper_id);
@@ -129,7 +133,11 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     unsigned char buffer[16];
 
     // read the first 16 bytes
-    fread(buffer, 16, 1, file);
+    size_t read_bytes = fread(buffer, 16, 1, file);
+    if (read_bytes == 0) {
+        printf("Failed to read ROM magic (underflow)\n");
+        return NULL;
+    }
 
     // check the magic (the file format is Little Endian)
     uint32_t magic = endian_swap(*((uint32_t*) buffer));
@@ -144,9 +152,9 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     // extract the CHR ROM size
     size_t chr_size = buffer[5];
 
-    Flag6 flag6 = (Flag6) {};
+    Flag6 flag6 = (Flag6) {0};
     memcpy(&flag6, &(buffer[6]), 1);
-    Flag7 flag7 = (Flag7) {};
+    Flag7 flag7 = (Flag7) {0};
     memcpy(&flag7, &(buffer[7]), 1);
 
     uint16_t mapper_id = (flag7.mapper_high << 4) | flag6.mapper_low;
@@ -158,15 +166,15 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     unsigned int timing_mode = TIMING_MODE_NTSC;
 
     if (flag7.nes2 == 2) {
-        Flag8 flag8 = (Flag8) {};
+        Flag8 flag8 = (Flag8) {0};
         memcpy(&flag8, &(buffer[8]), 1);
-        Flag9 flag9 = (Flag9) {};
+        Flag9 flag9 = (Flag9) {0};
         memcpy(&flag9, &(buffer[9]), 1);
-        Flag10 flag10 = (Flag10) {};
+        Flag10 flag10 = (Flag10) {0};
         memcpy(&flag10, &(buffer[10]), 1);
-        Flag11 flag11 = (Flag11) {};
+        Flag11 flag11 = (Flag11) {0};
         memcpy(&flag11, &(buffer[11]), 1);
-        Flag12 flag12 = (Flag12) {};
+        Flag12 flag12 = (Flag12) {0};
         memcpy(&flag12, &(buffer[12]), 1);
         //TODO: rest of flags are unsupported for now
 
@@ -221,10 +229,10 @@ Cartridge *load_rom(FILE *file, char *file_name) {
 
     unsigned char *prg_data = (unsigned char*) malloc(prg_size * PRG_CHUNK_SIZE);
 
-    printf("Attempting to read %ld PRG chunks\n", prg_size);
+    printf("Attempting to read %zu PRG chunks\n", prg_size);
 
     if ((read_items = fread(prg_data, PRG_CHUNK_SIZE, prg_size, file)) != prg_size) {
-        printf("Failed to read all PRG data (expected %ld chunks, found %ld).\n", prg_size, read_items);
+        printf("Failed to read all PRG data (expected %zu chunks, found %zu).\n", prg_size, read_items);
 
         free(prg_data);
 
@@ -233,10 +241,10 @@ Cartridge *load_rom(FILE *file, char *file_name) {
 
     unsigned char *chr_data = (unsigned char*) malloc(chr_size * CHR_CHUNK_SIZE);
 
-    printf("Attempting to read %ld CHR chunks\n", chr_size);
+    printf("Attempting to read %zu CHR chunks\n", chr_size);
 
     if ((read_items = fread(chr_data, CHR_CHUNK_SIZE, chr_size, file)) != chr_size) {
-        printf("Failed to read all CHR data (expected %ld chunks, found %ld).\n", chr_size, read_items);
+        printf("Failed to read all CHR data (expected %zu chunks, found %zu).\n", chr_size, read_items);
 
         free(chr_data);
         free(prg_data);

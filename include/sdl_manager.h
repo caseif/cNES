@@ -23,7 +23,7 @@
  * THE SOFTWARE.
  */
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #define WINDOW_SCALE 4
 

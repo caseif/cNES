@@ -29,7 +29,7 @@
 #include "ppu.h"
 
 #include <stdbool.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #define RGB_CHANNELS 3
 #define BPP 8

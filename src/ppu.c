@@ -77,15 +77,19 @@
 
 #define PRINT_VRAM_WRITES 0
 
+#pragma pack(push)
+
 typedef union {
     struct sections {
-        unsigned char top_left:2 PACKED;
-        unsigned char top_right:2 PACKED;
-        unsigned char bottom_left:2 PACKED;
-        unsigned char bottom_right:2 PACKED;
+        unsigned char top_left:2;
+        unsigned char top_right:2;
+        unsigned char bottom_left:2;
+        unsigned char bottom_right:2;
     } sections;
     uint8_t serial;
 } AttributeTableEntry;
+
+#pragma pack(pop)
 
 static const RGBValue g_palette[] = {
     {0x66, 0x66, 0x66}, {0x00, 0x1E, 0x9A}, {0x0E, 0x09, 0xA8}, {0x44, 0x00, 0x93},
@@ -417,47 +421,41 @@ uint16_t _translate_name_table_address(uint16_t addr) {
         return (addr % 0x400) + 0x400;
     }
 
-    switch (addr) {
+    if (addr >= 0x000 && addr <= 0x3FF) {
         // name table 0
-        case 0x000 ... 0x3FF: {
-            // it's always in the first half
-            return addr;
-        }
+        // it's always in the first half
+        return addr;
+    } else if (addr >= 0x400 && addr <= 0x7FF) {
         // name table 1
-        case 0x400 ... 0x7FF: {
-            if (g_mirror_mode == MIRROR_VERTICAL) {
-                // no need for translation
-                return addr;
-            } else if (g_mirror_mode == MIRROR_HORIZONTAL) {
-                // look up the data in name table 0 since name table 1 is a mirror
-                return addr - 0x400;
-            } else {
-                printf("Got bad mirroring mode %d\n", g_mirror_mode);
-                exit(1);
-            }
+        if (g_mirror_mode == MIRROR_VERTICAL) {
+            // no need for translation
+            return addr;
+        } else if (g_mirror_mode == MIRROR_HORIZONTAL) {
+            // look up the data in name table 0 since name table 1 is a mirror
+            return addr - 0x400;
+        } else {
+            printf("Got bad mirroring mode %d\n", g_mirror_mode);
+            exit(1);
         }
+    } else if (addr >= 0x800 && addr <= 0xBFF) {
         // name table 2
-        case 0x800 ... 0xBFF: {
-            if (g_mirror_mode == MIRROR_HORIZONTAL) {
-                // use the second half of the memory
-                return addr - 0x400;
-            } else if (g_mirror_mode == MIRROR_VERTICAL) {
-                // use name table 0 since name table 2 is a mirror
-                return addr - 0x800;
-            } else {
-                printf("Got bad mirroring mode %d\n", g_mirror_mode);
-                exit(1);
-            }
-        }
-        // name table 3
-        case 0xC00 ... 0xFFF: {
-            // it's always in the second half
+        if (g_mirror_mode == MIRROR_HORIZONTAL) {
+            // use the second half of the memory
+            return addr - 0x400;
+        } else if (g_mirror_mode == MIRROR_VERTICAL) {
+            // use name table 0 since name table 2 is a mirror
             return addr - 0x800;
+        } else {
+            printf("Got bad mirroring mode %d\n", g_mirror_mode);
+            exit(1);
         }
-        default: {
-            printf("Bad nametable address $%04X\n", addr);
-            exit(-1); // shouldn't happen
-        }
+    } else if (addr >= 0xC00 && addr <= 0xFFF) {
+        // name table 3
+        // it's always in the second half
+        return addr - 0x800;
+    } else {
+        printf("Bad nametable address $%04X\n", addr);
+        exit(-1); // shouldn't happen
     }
 }
 
@@ -716,128 +714,122 @@ void _do_tile_fetching(void) {
 
 void _do_sprite_evaluation(void) {
     if (g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline) {
-        switch (g_scanline_tick) {
-            // idle tick
-            case 0:
-                // reset some registers
-                g_ppu_internal_regs.m = 0;
-                g_ppu_internal_regs.n = 0;
-                g_ppu_internal_regs.o = 0;
-                // copy sprite 0 flag to flag for current scanline
-                g_ppu_internal_regs.sprite_0_scanline = g_ppu_internal_regs.sprite_0_next_scanline;
-                g_ppu_internal_regs.sprite_0_next_scanline = false;
-                break;
-            case 1 ... 64:
-                // clear secondary OAM byte-by-byte, but only on even ticks
-                if (g_scanline_tick % 2 == 0) {
-                    ((char*) g_secondary_oam_ram)[(uint8_t) (g_scanline_tick / 2 - 1)] = 0xFF;
-                }
-                break;
-            case 65 ... 256: {
-                if (g_scanline_tick == 65) {
-                    g_ppu_internal_regs.p = g_ppu_internal_regs.s;
-                }
+        // idle tick
+        if (g_scanline_tick == 0) {
+            // reset some registers
+            g_ppu_internal_regs.m = 0;
+            g_ppu_internal_regs.n = 0;
+            g_ppu_internal_regs.o = 0;
+            // copy sprite 0 flag to flag for current scanline
+            g_ppu_internal_regs.sprite_0_scanline = g_ppu_internal_regs.sprite_0_next_scanline;
+            g_ppu_internal_regs.sprite_0_next_scanline = false;
+        } else if (g_scanline_tick >= 1 && g_scanline_tick <= 64) {
+            // clear secondary OAM byte-by-byte, but only on even ticks
+            if (g_scanline_tick % 2 == 0) {
+                ((char*) g_secondary_oam_ram)[(uint8_t) (g_scanline_tick / 2 - 1)] = 0xFF;
+            }
+        } else if (g_scanline_tick >= 65 && g_scanline_tick <= 256) {
+            if (g_scanline_tick == 65) {
+                g_ppu_internal_regs.p = g_ppu_internal_regs.s;
+            }
 
-                if (g_ppu_internal_regs.n >= (sizeof(g_oam_ram) - g_ppu_internal_regs.p) / sizeof(Sprite)) {
-                    // we've reached the end of OAM
-                    break;
-                }
+            if (g_ppu_internal_regs.n >= (sizeof(g_oam_ram) - g_ppu_internal_regs.p) / sizeof(Sprite)) {
+                // we've reached the end of OAM
+                return;
+            }
 
-                if (g_scanline_tick % 2 == 1) {
-                    // read from primary OAM on odd ticks
-                    Sprite sprite = ((Sprite*) ((unsigned char*) g_oam_ram + g_ppu_internal_regs.p))[g_ppu_internal_regs.n];
+            if (g_scanline_tick % 2 == 1) {
+                // read from primary OAM on odd ticks
+                Sprite sprite = ((Sprite*) ((unsigned char*) g_oam_ram + g_ppu_internal_regs.p))[g_ppu_internal_regs.n];
 
-                    switch (g_ppu_internal_regs.m) {
-                        case 0: {
-                            uint8_t val = sprite.y;
+                switch (g_ppu_internal_regs.m) {
+                    case 0: {
+                        uint8_t val = sprite.y;
 
-                            // check if the sprite is on the next scanline
-                            // we compare to the current line since sprites are rendered a line late
-                            if (val <= g_scanline && g_scanline - val <= (g_ppu_control.tall_sprites ? 15 : 7)) {
-                                // increment m if it is
-                                g_ppu_internal_regs.m++;
+                        // check if the sprite is on the next scanline
+                        // we compare to the current line since sprites are rendered a line late
+                        if (val <= g_scanline && g_scanline - val <= (g_ppu_control.tall_sprites ? 15 : 7)) {
+                            // increment m if it is
+                            g_ppu_internal_regs.m++;
 
-                                // store the byte in a latch for writing on the next cycle
-                                g_ppu_internal_regs.sprite_attr_latch = val;
-                                g_ppu_internal_regs.has_latched_sprite = true;
+                            // store the byte in a latch for writing on the next cycle
+                            g_ppu_internal_regs.sprite_attr_latch = val;
+                            g_ppu_internal_regs.has_latched_sprite = true;
 
-                                // if we've already hit the max sprites per line, set the overflow flag
-                                if (g_ppu_internal_regs.o >= 8) {
-                                    g_ppu_status.sprite_overflow = 1;
-                                }
-                            } else {
-                                // move to next sprite
-                                g_ppu_internal_regs.n++;
+                            // if we've already hit the max sprites per line, set the overflow flag
+                            if (g_ppu_internal_regs.o >= 8) {
+                                g_ppu_status.sprite_overflow = 1;
                             }
-
-                            break;
+                        } else {
+                            // move to next sprite
+                            g_ppu_internal_regs.n++;
                         }
-                        case 1: {
-                            uint8_t val = sprite.tile_num;
 
-                            // store the byte in a latch for writing on the next cycle
-                            g_ppu_internal_regs.sprite_attr_latch = val;
-                            g_ppu_internal_regs.has_latched_sprite = true;
-
-                            // increment m since we've already decided to copy this sprite
-                            g_ppu_internal_regs.m++;
-
-                            break;
-                        }
-                        case 2: {
-                            uint8_t val = sprite.attrs_serial;
-
-                            // store the byte in a latch for writing on the next cycle
-                            g_ppu_internal_regs.sprite_attr_latch = val;
-                            g_ppu_internal_regs.has_latched_sprite = true;
-
-                            // increment m, same as above
-                            g_ppu_internal_regs.m++;
-
-                            break;
-                        }
-                        case 3: {
-                            uint8_t val = sprite.x;
-
-                            // store the byte in a latch for writing on the next cycle
-                            g_ppu_internal_regs.sprite_attr_latch = val;
-                            g_ppu_internal_regs.has_latched_sprite = true;
-
-                            // increment m, same as above
-                            g_ppu_internal_regs.m++;
-
-                            break;
-                        }
+                        break;
                     }
-                } else {
-                    // write the latched byte to secondary oam, if applicable
-                    if (g_ppu_internal_regs.has_latched_sprite) {
-                        if (g_ppu_internal_regs.o < 8) {
-                            assert(g_ppu_internal_regs.m <= 4);
+                    case 1: {
+                        uint8_t val = sprite.tile_num;
 
-                            if (g_ppu_internal_regs.m == 0) {
-                                break;
-                            }
+                        // store the byte in a latch for writing on the next cycle
+                        g_ppu_internal_regs.sprite_attr_latch = val;
+                        g_ppu_internal_regs.has_latched_sprite = true;
 
-                            ((char*) &g_secondary_oam_ram[g_ppu_internal_regs.o])[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
-                            g_ppu_internal_regs.has_latched_sprite = false;
-                        }
+                        // increment m since we've already decided to copy this sprite
+                        g_ppu_internal_regs.m++;
+
+                        break;
                     }
+                    case 2: {
+                        uint8_t val = sprite.attrs_serial;
 
-                    // reset our registers
-                    if (g_ppu_internal_regs.m == 4) {
-                        if (g_ppu_internal_regs.n == 0) {
-                            g_ppu_internal_regs.sprite_0_next_scanline = true;
+                        // store the byte in a latch for writing on the next cycle
+                        g_ppu_internal_regs.sprite_attr_latch = val;
+                        g_ppu_internal_regs.has_latched_sprite = true;
+
+                        // increment m, same as above
+                        g_ppu_internal_regs.m++;
+
+                        break;
+                    }
+                    case 3: {
+                        uint8_t val = sprite.x;
+
+                        // store the byte in a latch for writing on the next cycle
+                        g_ppu_internal_regs.sprite_attr_latch = val;
+                        g_ppu_internal_regs.has_latched_sprite = true;
+
+                        // increment m, same as above
+                        g_ppu_internal_regs.m++;
+
+                        break;
+                    }
+                }
+            } else {
+                // write the latched byte to secondary oam, if applicable
+                if (g_ppu_internal_regs.has_latched_sprite) {
+                    if (g_ppu_internal_regs.o < 8) {
+                        assert(g_ppu_internal_regs.m <= 4);
+
+                        if (g_ppu_internal_regs.m == 0) {
+                            return;
                         }
-                        // reset m and increment n/o
-                        g_ppu_internal_regs.n++;
-                        g_ppu_internal_regs.o++;
 
-                        g_ppu_internal_regs.m = 0;
+                        ((char*) &g_secondary_oam_ram[g_ppu_internal_regs.o])[g_ppu_internal_regs.m - 1] = g_ppu_internal_regs.sprite_attr_latch;
+                        g_ppu_internal_regs.has_latched_sprite = false;
                     }
                 }
 
-                break;
+                // reset our registers
+                if (g_ppu_internal_regs.m == 4) {
+                    if (g_ppu_internal_regs.n == 0) {
+                        g_ppu_internal_regs.sprite_0_next_scanline = true;
+                    }
+                    // reset m and increment n/o
+                    g_ppu_internal_regs.n++;
+                    g_ppu_internal_regs.o++;
+
+                    g_ppu_internal_regs.m = 0;
+                }
             }
         }
     }
