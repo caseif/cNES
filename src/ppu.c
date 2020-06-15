@@ -77,7 +77,7 @@
 
 #define PRINT_VRAM_WRITES 0
 
-#pragma pack(push)
+#pragma pack(push,1)
 
 typedef union {
     struct sections {

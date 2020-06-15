@@ -40,7 +40,7 @@
 #define CHR_CHUNK_SIZE ((size_t) 0x2000)
 #define PRG_RAM_CHUNK_SIZE ((size_t) 0x2000)
 
-#pragma pack(push)
+#pragma pack(push,1)
 
 typedef struct {
     unsigned int mirror_mode:1;
