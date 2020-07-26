@@ -44,6 +44,8 @@ SDL_Window *get_window(void);
 
 void close_window(void);
 
+void set_window_title(const char *title);
+
 void add_event_callback(EventCallback callback);
 
 void initialize_renderer(void);
