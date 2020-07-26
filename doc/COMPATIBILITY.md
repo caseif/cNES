@@ -7,9 +7,44 @@ Unless otherwise noted, only the US version of each game has been tested.
 Games are only considered "perfect" after fairly thorough testing - any games marked
 "playable" with no additional comment probably just need more testing done.
 
+A gray circle indicates that the required mapper has not yet been implemented.
+
+Game titles in _italics_ denote games which were never officially released.
+
 | Game | | State | Description |
 | --- | --- | --- | :-- |
+| 10-Yard Fight | ![](res/circle_green.svg) | playable | |
+| 1942 | ![](res/circle_green.svg) | playable | |
+| 1943 - The Battle of Midway | ![](res/circle_green.svg) | playable | |
+| 1991 Du Ma Racing | ![](res/circle_gray.svg) | mapper | |
+| 3-D WorldRunner | ![](res/circle_yellow.svg) | ingame | Crashes on game over |
+| 720 Degrees | ![](res/circle_green.svg) | playable | |
+| 8 Eyes | ![](res/circle_green.svg) | playable | |
+| Abadox - The Deadly Inner War | ![](res/circle_green.svg) | playable | |
+| Action in New York (Europe) | ![](res/circle_green.svg) | playable | |
+| The Addams Family | ![](res/circle_green.svg) | playable | |
+| The Addams Family - Pugley's Scavenger Hunt | ![](res/circle_green.svg) | playable | |
+| _The Addams Family - Uncle Fester's Quest_ | ![](res/circle_green.svg) | playable | Improper sprite rendering at beginning of first level (occurs inconsistently) |
+| Advanced Dungeons & Dragons - DragonStrike | ![](res/circle_green.svg) | playable | |
+| Advanced Dungeons & Dragons - Heroes of the Lance | ![](res/circle_green.svg) | playable | |
+| Advanced Dungeons & Dragons - Hillsfar | ![](res/circle_red.svg) | broken | Infinitely loads data into PPURAM |
+| Advanced Dungeons & Dragons - Pool of Radiance | ![](res/circle_yellow.svg) | ingame | Texture bank switching issues |
 | Arch Rivals: A Basketbrawl! | ![](res/circle_green.svg) | playable | |
+| Adventures in the Magic Kingdom | ![](res/circle_green.svg) | playable | |
+| Adventures Island Classic (Europe) | ![](res/circle_green.svg) | playable | Title screen has texture bank issues |
+| Adventures Island 2 | ![](res/circle_green.svg) | playable | |
+| Adventures Island 3 | ![](res/circle_green.svg) | playable | |
+| The Adventures of Bayou Billy | ![](res/circle_green.svg) | playable | |
+| Adventures of Dino Riki | ![](res/circle_yellow.svg) | ingame | Texture bank switching issues |
+| Adventures of Dr. Franken | ![](res/circle_green.svg) | playable | |
+| Adventures of Lolo | ![](res/circle_green.svg) | playable | |
+| Adventures of Lolo 2 | ![](res/circle_green.svg) | playable | |
+| Adventures of Lolo 3 | ![](res/circle_green.svg) | playable | |
+| The Adventures of Rad Gravity | ![](res/circle_green.svg) | playable | Screen split artifact is incorrect |
+| The Adventures of Rocky and Bullwinkle and Friends | ![](res/circle_green.svg) | playable | |
+| The Adventures of Tom Sawyer | ![](res/circle_green.svg) | playable | |
+| _Airball (Proto 1)_ | ![](res/circle_green.svg) | playable | |
+| _Airball (Proto 2)_ | ![](res/circle_green.svg) | playable | |
 | Astyanax | ![](res/circle_green.svg) | playable | |
 | Baseball | ![](res/circle_green.svg) | playable | |
 | Baby Boomer | ![](res/circle_green.svg) | playable | |
@@ -67,12 +102,12 @@ Games are only considered "perfect" after fairly thorough testing - any games ma
 | Mickey Mousecapade | ![](res/circle_red.svg) | broken | Black screen |
 | Mother | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
-| Ms. Pac-Man (Tengen) | ![](res/circle_yellow.svg) | ingame | Lots of graphical glitches; Nintendulator chokes on this too |
+| Ms. Pac-Man (Tengen) | ![](res/circle_red.svg) | broken | Black screen |
 | NARC | ![](res/circle_green.svg) | playable | Minor graphical glitches at top of screen |
 | A Nightmare on Elm Street | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Tengen) | ![](res/circle_green.svg) | playable | |
-| Paperboy | ![](res/circle_yellow.svg) | ingame | Sprite bank switching issues |
+| Paperboy | ![](res/circle_yellow.svg) | ingame | Texture bank switching issues |
 | Power Blade | ![](res/circle_green.svg) | playable | |
 | R.C. Pro-Am | ![](res/circle_green.svg) | playable | |
 | R.C. Pro-Am II | ![](res/circle_green.svg) | playable | |

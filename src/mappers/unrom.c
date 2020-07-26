@@ -53,8 +53,8 @@ static uint8_t _unrom_ram_read(Cartridge *cart, uint16_t addr) {
         return system_bus_read();
     }
 
-    return cart->prg_rom[((addr < 0xC000 ? g_prg_bank : ((cart->prg_size >> PRG_BANK_SHIFT) - 1)) << PRG_BANK_SHIFT)
-            | (addr % PRG_BANK_GRANULARITY) % cart->prg_size];
+    return cart->prg_rom[(((addr < 0xC000 ? g_prg_bank : ((cart->prg_size >> PRG_BANK_SHIFT) - 1)) << PRG_BANK_SHIFT)
+            | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size];
 }
 
 static void _unrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {

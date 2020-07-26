@@ -32,7 +32,7 @@
 
 #include <stdint.h>
 
-#define WINDOW_SCALE 4
+#define WINDOW_SCALE 3
 
 typedef void (*EventCallback)(SDL_Event*);
 
