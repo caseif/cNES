@@ -26,7 +26,6 @@
 #include "cartridge.h"
 #include "loader.h"
 #include "renderer.h"
-#include "sdl_manager.h"
 #include "system.h"
 #include "input/global/hotkeys.h"
 

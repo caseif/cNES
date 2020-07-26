@@ -23,7 +23,6 @@
  * THE SOFTWARE.
  */
 
-#include "sdl_manager.h"
 #include "system.h"
 #include "c6502/cpu.h"
 #include "input/global/hotkeys.h"

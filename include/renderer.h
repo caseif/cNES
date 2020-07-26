@@ -27,7 +27,24 @@
 
 #include "ppu.h"
 
+#include <SDL_events.h>
+#include <SDL_render.h>
+
 #include <stdint.h>
+
+#define WINDOW_SCALE 4
+
+typedef void (*EventCallback)(SDL_Event*);
+
+void initialize_window(void);
+
+void do_window_loop(void);
+
+SDL_Window *get_window(void);
+
+void close_window(void);
+
+void add_event_callback(EventCallback callback);
 
 void initialize_renderer(void);
 

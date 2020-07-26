@@ -24,9 +24,9 @@
  */
 
 #include "renderer.h"
-#include "sdl_manager.h"
 #include "system.h"
 #include "ppu.h"
+#include "util.h"
 
 #include <stdbool.h>
 #include <SDL.h>
@@ -34,13 +34,74 @@
 #define RGB_CHANNELS 3
 #define BPP 8
 
+static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
+
+static LinkedList g_callbacks = {0};
 
 static RGBValue g_pixel_buffer[RESOLUTION_H][RESOLUTION_V];
 
 static unsigned char g_pixel_rgb_data[RESOLUTION_V][RESOLUTION_H][RGB_CHANNELS];
 
 static SDL_Texture *g_texture;
+
+void _close_listener(SDL_Event *event) {
+    switch (event->type) {
+        case SDL_WINDOWEVENT:
+            if (event->window.event != SDL_WINDOWEVENT_CLOSE) {
+                break;
+            }
+            // intentional fall-through
+        case SDL_QUIT:
+            kill_execution();
+            close_window();
+            return;
+    }
+}
+
+void initialize_window() {
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+
+    g_window = SDL_CreateWindow("cNES", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+            RESOLUTION_H * WINDOW_SCALE, RESOLUTION_V * WINDOW_SCALE, SDL_WINDOW_SHOWN);
+
+    if (!g_window) {
+        printf("Failed to create window: %s\n", SDL_GetError());
+        exit(-1);
+    }
+
+    add_event_callback(_close_listener);
+
+    SDL_ShowWindow(g_window);
+}
+
+void do_window_loop(void) {
+    SDL_Event event;
+
+    while (SDL_WaitEvent(&event)) {
+        LinkedList *item = &g_callbacks;
+        do {
+            if (item->value != NULL) {
+                ((EventCallback) item->value)(&event);
+            }
+            item = item->next;
+        } while (item != NULL);
+
+        SDL_PumpEvents();
+    }
+}
+
+SDL_Window *get_window() {
+    return g_window;
+}
+
+void close_window(void) {
+    SDL_Quit();
+}
+
+void add_event_callback(EventCallback callback) {
+    add_to_linked_list(&g_callbacks, (void*) callback);
+}
 
 void initialize_renderer(void) {
     g_renderer = SDL_CreateRenderer(get_window(), -1, 0);
