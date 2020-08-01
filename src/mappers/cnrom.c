@@ -35,14 +35,20 @@
 
 #define CHR_BANK_GRANULARITY 0x2000
 
-#define CHR_RAM_SIZE 0x2000
-
-static unsigned char g_chr_bank;
+static uint8_t g_chr_bank;
 
 static uint32_t _cnrom_get_chr_offset(Cartridge *cart, uint16_t addr) {
     assert(addr < 0x2000);
 
     return ((g_chr_bank * CHR_BANK_GRANULARITY) | (addr % CHR_BANK_GRANULARITY)) % cart->chr_size;
+}
+
+void _cnrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    if (addr < 0x8000) {
+        nrom_ram_write(cart, addr, val);
+    } else {
+        g_chr_bank = val & 0x03;
+    }
 }
 
 uint8_t _cnrom_vram_read(Cartridge *cart, uint16_t addr) {
@@ -58,7 +64,7 @@ void mapper_init_cnrom(Mapper *mapper, unsigned int submapper_id) {
     memcpy(mapper->name, "CNROM", strlen("CNROM") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *nrom_ram_read;
-    mapper->ram_write_func  = *nrom_ram_write;
+    mapper->ram_write_func  = *_cnrom_ram_write;
     mapper->vram_read_func  = *_cnrom_vram_read;
     mapper->vram_write_func = *nrom_vram_write;
     mapper->tick_func       = NULL;

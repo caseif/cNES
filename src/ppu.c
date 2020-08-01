@@ -210,27 +210,27 @@ static inline unsigned char _reverse_bits(unsigned char b) {
    return b;
 }
 
-static void _update_ppu_open_bus(uint8_t val, uint8_t bitmask) {
-    g_ppu_internal_regs.ppu_open_bus &= ~bitmask;
-    g_ppu_internal_regs.ppu_open_bus |= val & bitmask;
+static void _update_ppu_bus(uint8_t val, uint8_t bitmask) {
+    g_ppu_internal_regs.ppu_bus &= ~bitmask;
+    g_ppu_internal_regs.ppu_bus |= val & bitmask;
 
     for (unsigned int i = 0; i < 8; i++) {
         // only refresh bits within the bitmask
         if (bitmask & (1 << i)) {
-            g_ppu_internal_regs.ppu_open_bus_decay_timers[i] = PPU_OPEN_BUS_DECAY_CYCLES;
+            g_ppu_internal_regs.ppu_bus_decay_timers[i] = PPU_BUS_DECAY_CYCLES;
         }
     }
 }
 
-static void _check_open_bus_decay(void) {
+static void _check_bus_decay(void) {
     for (unsigned int i = 0; i < 8; i++) {
         // we don't want to decrement the timer if it's already 0
-        if (g_ppu_internal_regs.ppu_open_bus_decay_timers[i] == 0) {
+        if (g_ppu_internal_regs.ppu_bus_decay_timers[i] == 0) {
             continue;
         }
-        if (--g_ppu_internal_regs.ppu_open_bus_decay_timers[i] == 0) {
-            g_ppu_internal_regs.ppu_open_bus &= ~(1 << i);
-        } else if (g_ppu_internal_regs.ppu_open_bus_decay_timers[i] < 1000) {
+        if (--g_ppu_internal_regs.ppu_bus_decay_timers[i] == 0) {
+            g_ppu_internal_regs.ppu_bus &= ~(1 << i);
+        } else if (g_ppu_internal_regs.ppu_bus_decay_timers[i] < 1000) {
         }
     }
 }
@@ -260,7 +260,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 g_vbl_flag_suppression = true;
             }
 
-            _update_ppu_open_bus(res, 0xE0);
+            _update_ppu_bus(res, 0xE0);
 
             break;
         }
@@ -272,7 +272,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 res &= 0xE3;
             }
             
-            _update_ppu_open_bus(res, 0xFF);
+            _update_ppu_bus(res, 0xFF);
 
             break;
         }
@@ -289,7 +289,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 // copy to address bus
                 g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
 
-                _update_ppu_open_bus(res, 0xFF);
+                _update_ppu_bus(res, 0xFF);
             } else {
                 // palette reading bypasses buffer, but still updates it in a weird way
 
@@ -298,7 +298,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
                 res = system_vram_read(g_ppu_internal_regs.v.addr);
 
-                _update_ppu_open_bus(res, 0x3F);
+                _update_ppu_bus(res, 0x3F);
             }
 
             break;
@@ -311,7 +311,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
     // we can get away with this because for registers that are readable, the open bus has already been updated
     // with the appropriate value
     // doing it this way simplifies handling of registers where some bits of the read value are from the open bus
-    return g_ppu_internal_regs.ppu_open_bus;
+    return g_ppu_internal_regs.ppu_bus;
 }
 
 void ppu_write_mmio(uint8_t index, uint8_t val) {
@@ -409,7 +409,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             assert(false);
     }
 
-    _update_ppu_open_bus(val, 0xFF);
+    _update_ppu_bus(val, 0xFF);
 }
 
 uint16_t _translate_name_table_address(uint16_t addr) {
@@ -1191,7 +1191,7 @@ void cycle_ppu(void) {
         }
     }
 
-    _check_open_bus_decay();
+    _check_bus_decay();
 }
 
 void dump_vram(void) {

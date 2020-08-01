@@ -35,7 +35,7 @@
 #define RESOLUTION_V 240
 
 // ~600 ms
-#define PPU_OPEN_BUS_DECAY_CYCLES 3220000
+#define PPU_BUS_DECAY_CYCLES 3220000
 
 typedef struct {
     uint8_t r;
@@ -158,8 +158,8 @@ typedef struct {
     uint8_t palette_shift_l;
     uint8_t palette_shift_h;
 
-    uint8_t ppu_open_bus;
-    uint32_t ppu_open_bus_decay_timers[8];
+    uint8_t ppu_bus;
+    uint32_t ppu_bus_decay_timers[8];
 } PpuInternalRegisters;
 
 typedef enum {

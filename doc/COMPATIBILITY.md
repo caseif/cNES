@@ -31,11 +31,11 @@ Game titles in _italics_ denote games which were never officially released.
 | Advanced Dungeons & Dragons - Pool of Radiance | ![](res/circle_yellow.svg) | ingame | Texture bank switching issues |
 | Arch Rivals: A Basketbrawl! | ![](res/circle_green.svg) | playable | |
 | Adventures in the Magic Kingdom | ![](res/circle_green.svg) | playable | |
-| Adventures Island Classic (Europe) | ![](res/circle_green.svg) | playable | Title screen has texture bank issues |
-| Adventures Island 2 | ![](res/circle_green.svg) | playable | |
-| Adventures Island 3 | ![](res/circle_green.svg) | playable | |
+| Adventurs Island Classic (Europe) | ![](res/circle_green.svg) | playable | |
+| Adventurs Island 2 | ![](res/circle_green.svg) | playable | |
+| Adventurs Island 3 | ![](res/circle_green.svg) | playable | |
 | The Adventures of Bayou Billy | ![](res/circle_green.svg) | playable | |
-| Adventures of Dino Riki | ![](res/circle_yellow.svg) | ingame | Texture bank switching issues |
+| Adventures of Dino Riki | ![](res/circle_green.svg) | playable | |
 | Adventures of Dr. Franken | ![](res/circle_green.svg) | playable | |
 | Adventures of Lolo | ![](res/circle_green.svg) | playable | |
 | Adventures of Lolo 2 | ![](res/circle_green.svg) | playable | |
@@ -45,6 +45,9 @@ Game titles in _italics_ denote games which were never officially released.
 | The Adventures of Tom Sawyer | ![](res/circle_green.svg) | playable | |
 | _Airball (Proto 1)_ | ![](res/circle_green.svg) | playable | |
 | _Airball (Proto 2)_ | ![](res/circle_green.svg) | playable | |
+| Air Fortress | ![](res/circle_green.svg) | playable | |
+| Airwolf | ![](res/circle_green.svg) | playable | |
+| Aladdin | ![](res/circle_green.svg) | playable | |
 | Astyanax | ![](res/circle_green.svg) | playable | |
 | Baseball | ![](res/circle_green.svg) | playable | |
 | Baby Boomer | ![](res/circle_green.svg) | playable | |
@@ -99,7 +102,7 @@ Game titles in _italics_ denote games which were never officially released.
 | Mega Man 4 | ![](res/circle_green.svg) | playable | |
 | Mega Man 5 | ![](res/circle_green.svg) | playable | |
 | Mega Man 6 | ![](res/circle_green.svg) | playable | |
-| Mickey Mousecapade | ![](res/circle_red.svg) | broken | Black screen |
+| Mickey Mousecapade | ![](res/circle_green.svg) | playable | |
 | Mother | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Tengen) | ![](res/circle_red.svg) | broken | Black screen |
@@ -107,7 +110,7 @@ Game titles in _italics_ denote games which were never officially released.
 | A Nightmare on Elm Street | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Tengen) | ![](res/circle_green.svg) | playable | |
-| Paperboy | ![](res/circle_yellow.svg) | ingame | Texture bank switching issues |
+| Paperboy | ![](res/circle_green.svg) | playable | |
 | Power Blade | ![](res/circle_green.svg) | playable | |
 | R.C. Pro-Am | ![](res/circle_green.svg) | playable | |
 | R.C. Pro-Am II | ![](res/circle_green.svg) | playable | |
