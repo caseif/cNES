@@ -298,6 +298,8 @@ uint8_t ppu_read_mmio(uint8_t index) {
 
                 res = system_vram_read(g_ppu_internal_regs.v.addr);
 
+                g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
+
                 _update_ppu_bus(res, 0x3F);
             }
 
