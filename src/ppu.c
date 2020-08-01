@@ -285,6 +285,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 g_ppu_internal_regs.read_buf = system_vram_read(g_ppu_internal_regs.v.addr);
 
                 g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
+                g_ppu_internal_regs.v.addr &= 0x3FFF;
 
                 // copy to address bus
                 g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
@@ -299,6 +300,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 res = system_vram_read(g_ppu_internal_regs.v.addr);
 
                 g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
+                g_ppu_internal_regs.v.addr &= 0x3FFF;
 
                 _update_ppu_bus(res, 0x3F);
             }
