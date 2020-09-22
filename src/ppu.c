@@ -122,6 +122,7 @@ static PpuMask g_ppu_mask;
 static PpuStatus g_ppu_status;
 static PpuInternalRegisters g_ppu_internal_regs;
 static bool g_nmi_occurred = false;
+static bool g_nmi_occurred_buffer = false;
 
 static unsigned char g_name_table_mem[VRAM_SIZE];
 static unsigned char g_palette_ram[PALETTE_RAM_SIZE];
@@ -132,13 +133,10 @@ static bool g_odd_frame;
 static uint16_t g_scanline;
 static uint16_t g_scanline_tick;
 
-// ugly VBL flag suppression hack
-static bool g_vbl_flag_suppression = false;
-
 static RenderMode g_render_mode;
 
 static unsigned int _ppu_nmi_connection(void) {
-    return (g_nmi_occurred && g_ppu_control.gen_nmis) ? 0 : 1;
+    return (g_nmi_occurred_buffer && g_ppu_control.gen_nmis) ? 0 : 1;
 }
 
 bool ppu_is_rendering_enabled(void) {
@@ -244,21 +242,17 @@ uint8_t ppu_read_mmio(uint8_t index) {
         case 3:
         case 5:
         case 6:
-            break; // just return the current open bus value
+            break; // just return the current bus value
         case 2: {
             // set bit 7 to value in nmi_occurred latch and reset the latch
             g_ppu_status.vblank = g_nmi_occurred;
+            g_nmi_occurred_buffer = false;
             g_nmi_occurred = false;
 
             uint8_t res = g_ppu_status.serial;
 
             // reading this register resets this latch
             g_ppu_internal_regs.w = 0;
-
-            //TODO: figure out why this only passes blargg's test with VBL_SCANLINE_TICK (and not VBL_SCANLINE_TICK - 1)
-            if (g_scanline == g_vbl_start_scanline && g_scanline_tick == VBL_SCANLINE_TICK) {
-                g_vbl_flag_suppression = true;
-            }
 
             _update_ppu_bus(res, 0xE0);
 
@@ -312,9 +306,9 @@ uint8_t ppu_read_mmio(uint8_t index) {
         }
     }
 
-    // we can get away with this because for registers that are readable, the open bus has already been updated
+    // we can get away with this because for registers that are readable, the bus has already been updated
     // with the appropriate value
-    // doing it this way simplifies handling of registers where some bits of the read value are from the open bus
+    // doing it this way simplifies handling of registers where some bits of the read value are open bus
     return g_ppu_internal_regs.ppu_bus;
 }
 
@@ -562,21 +556,20 @@ void _update_v_horizontal(void) {
 }
 
 void _do_tile_fetching(void) {
+    g_nmi_occurred = g_nmi_occurred_buffer;
     if (g_scanline == g_vbl_start_scanline) {
         // set vblank flag
-        if (g_scanline_tick == VBL_SCANLINE_TICK) {
-            if (!g_vbl_flag_suppression) {
-                g_nmi_occurred = true;
-            }
-            g_vbl_flag_suppression = false;
+        if (g_scanline_tick == VBL_SCANLINE_TICK - 1) {
+            g_nmi_occurred_buffer = true;
         }
     } else if ((g_scanline >= FIRST_VISIBLE_LINE && g_scanline <= g_last_visible_scanline)
             || g_scanline == g_pre_render_line) {
         // special case for pre-render line
         if (g_scanline == g_pre_render_line) {
             // clear status
-            if (g_scanline_tick == 1) {
-                g_nmi_occurred = false;
+            if (g_scanline_tick == 0) {
+                g_nmi_occurred_buffer = false;
+            } else if (g_scanline_tick == 1) {
                 g_ppu_status.vblank = 0;
                 g_ppu_status.sprite_0_hit = 0;
                 g_ppu_status.sprite_overflow = 0;
