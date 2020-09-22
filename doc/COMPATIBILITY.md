@@ -105,7 +105,7 @@ Game titles in _italics_ denote games which were never officially released.
 | Mickey Mousecapade | ![](res/circle_green.svg) | playable | |
 | Mother | ![](res/circle_green.svg) | playable | |
 | Ms. Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
-| Ms. Pac-Man (Tengen) | ![](res/circle_red.svg) | broken | Black screen |
+| Ms. Pac-Man (Tengen) | ![](res/circle_red.svg) | playable | Relies on precise NMI timing. |
 | NARC | ![](res/circle_green.svg) | playable | Minor graphical glitches at top of screen |
 | A Nightmare on Elm Street | ![](res/circle_green.svg) | playable | |
 | Pac-Man (Namco) | ![](res/circle_green.svg) | playable | |
