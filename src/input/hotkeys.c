@@ -23,10 +23,11 @@
  * THE SOFTWARE.
  */
 
-#include "system.h"
-#include "c6502/cpu.h"
-#include "input/global/hotkeys.h"
 #include "ppu.h"
+#include "renderer.h"
+#include "system.h"
+#include "input/global/hotkeys.h"
+#include "c6502/cpu.h"
 
 #include <SDL.h>
 #include <SDL_events.h>
