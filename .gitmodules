@@ -1,0 +1,6 @@
+[submodule "c6502"]
+	path = c6502
+	url = git://github.com/caseif/c6502.git
+[submodule "cmake/sdl2"]
+	path = cmake/sdl2
+	url = git://github.com/aminosbh/sdl2-cmake-modules

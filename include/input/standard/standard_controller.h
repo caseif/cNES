@@ -39,8 +39,8 @@
 #define STD_BTN_LEFT   6
 #define STD_BTN_RIGHT  7
 
-void sc_attach_driver(NullaryCallback init, NullaryCallback callback);
+void sc_attach_driver(NullaryCallback init, UintConsumer callback);
 
-Controller *create_standard_controller(void);
+Controller *create_standard_controller(unsigned int controller_id);
 
 void sc_set_state(Controller *controller, bool button_states[]);

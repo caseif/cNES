@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "util.h"
+#include "ppu.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -34,8 +34,10 @@ struct cartridge;
 
 #include "mappers/mappers.h"
 
-typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL,
-                            MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER} MirroringMode;
+#define TIMING_MODE_NTSC 0
+#define TIMING_MODE_PAL 1
+#define TIMING_MODE_MULTI 2
+#define TIMING_MODE_DENDY 3
 
 typedef struct cartridge {
     char *title;
@@ -43,9 +45,13 @@ typedef struct cartridge {
     unsigned char *chr_rom;
     size_t prg_size; // in bytes
     size_t chr_size; // in bytes
-    size_t prg_ram_size; // in bytes
     MirroringMode mirror_mode;
     bool has_nv_ram;
     bool ignore_mirror_ctrl;
+    size_t prg_ram_size;
+    size_t prg_nvram_size;
+    size_t chr_ram_size;
+    size_t chr_nvram_size;
+    unsigned int timing_mode;
     Mapper *mapper;
 } Cartridge;

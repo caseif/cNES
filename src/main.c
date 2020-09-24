@@ -26,14 +26,20 @@
 #include "cartridge.h"
 #include "loader.h"
 #include "renderer.h"
-#include "sdl_manager.h"
 #include "system.h"
 #include "input/global/hotkeys.h"
 
-#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
+#define SDL_MAIN_HANDLED 1
 
 void interrupt_handler(int signum) {
     kill_execution();
@@ -105,12 +111,20 @@ int main(int argc, char **argv) {
 
     initialize_system(cart);
 
-    pthread_t system_thread;
-    int rc;
-    if ((rc = pthread_create(&system_thread, NULL, &_start_system_thread, NULL)) != 0) {
-        fprintf(stderr, "Failed to create system thread (error code %d)\n", rc);
+    #ifdef _WIN32
+    HANDLE thread_handle = CreateThread(NULL, 0, _start_system_thread, NULL, 0, NULL);
+    if (thread_handle == NULL) {
+        fprintf(stderr, "Failed to create emulation thread (error code %d)\n", GetLastError());
         return 1;
     }
+    #else
+    pthread_t thread_handle;
+    int rc;
+    if ((rc = pthread_create(&thread_handle, NULL, &_start_system_thread, NULL)) != 0) {
+        fprintf(stderr, "Failed to create emulation thread (error code %d)\n", rc);
+        return 1;
+    }
+    #endif
 
     do_window_loop();
 

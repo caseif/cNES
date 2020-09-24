@@ -1,43 +1,58 @@
 # cNES
 
-cNES is a NES emulator written in C.
+cNES is a cycle-accurate NES emulator written in C.
 
-cNES is partially derived from the now-defunct [jNES](https://github.com/caseif/jNES).
+cNES's CPU emulation is handled by its sister project,
+[c6502](https://github.com/caseif/c6502).
+
+cNES is partially derived from the now-defunct
+[jNES](https://github.com/caseif/jNES).
 
 ### Features
 
-- NROM/MMC3 mapper support
-
-##### CPU
-
-- Instruction-granular emulation
-
-##### PPU
-
-- Cycle-granular emulation
-- Low-level emulation of hardware latches/registers
+- Support for popular mappers (NROM, MMC1, UNROM, CNROM, MMC3, AxROM)
+- Cycle-accurate CPU and PPU emulation
+- Low-level emulation of PPU hardware latches/registers
 
 ### Limitations
 
-- Tile attributes are buggy with fine x-scroll
-- CPU is not cycle-accurate
-  - Interrupts may be slightly mis-timed depending on their alignment with instruction execution
-- PPU memory access is not cycle-accurate (it's done as a single operation at the moment)
-- MMC3 implementation is a bit buggy
+- No APU support
+- PPU timings are juuust a little bit off
 - No support for color masking
+- Certain games are broken in one way or another (see [compatibility list](doc/COMPATIBILITY.md))
 
 ### Planned Features
 
+- APU support
 - More mapper implementations
-- Cycle-accurate CPU emulation
-- Cycle accurate memory access for PPU fetching
 - Color masking support
+
+### Non-goals
+
+- User-friendliness
+  - This project is a technical challenge for myself, and as such a
+    user-friendly interface is not one of its goals. This is not to say that
+    it will never exist, just that it's not a priority.
+- Save states
+  - Again, I'm interested in adding such a feature, but it's definitely not a
+    priority.
 
 ### Why?
 
-Mostly for educational purposes, and also for fun. Don't expect too much out of it.
+Mostly for educational purposes, and also for fun.
+
+### Special Thanks
+
+- The NesDev [forums](https://forums.nesdev.com/) and
+  [wiki](http://wiki.nesdev.com), which have been an invaluable resource in
+  building this project
+- [blargg](http://blargg.8bitalley.com/), whose tests have helped immensely with
+  getting details (both large and small) locked down
+- Everyone responsible for the documents listed on the
+  [resources page](doc/RESOURCES.md)
 
 ### License
 
 cNES is published under the [MIT License](https://opensource.org/licenses/MIT).
-Use of its code and any provided assets is permitted per the terms of the license.
+Use of its code and any provided assets is permitted per the terms of the
+license.

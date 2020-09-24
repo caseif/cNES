@@ -1,4 +1,4 @@
-This file is a part of cNES.
+This file is a part of ${project}.
 Copyright (c) ${year}, ${author} <${email}>
 
 The MIT License

@@ -23,25 +23,49 @@
  * THE SOFTWARE.
  */
 
-#include "cpu/cpu_tester.h"
-
 #include "cartridge.h"
-#include "loader.h"
 #include "system.h"
+#include "c6502/cpu.h"
+#include "mappers/mappers.h"
+#include "mappers/nrom.h"
 
+#include <assert.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
-int main(int argc, char **argv) {
+#define CHR_BANK_GRANULARITY 0x2000
 
-    printf("Starting CPU tests...\n");
+static uint8_t g_chr_bank;
 
-    if (do_cpu_tests()) {
-        printf("All CPU tests completed successfully.\n");
+static uint32_t _cnrom_get_chr_offset(Cartridge *cart, uint16_t addr) {
+    assert(addr < 0x2000);
+
+    return ((g_chr_bank * CHR_BANK_GRANULARITY) | (addr % CHR_BANK_GRANULARITY)) % cart->chr_size;
+}
+
+void _cnrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    if (addr < 0x8000) {
+        nrom_ram_write(cart, addr, val);
     } else {
-        printf("CPU tests failed!\n");
-        return -1;
+        g_chr_bank = val & 0x03;
     }
+}
 
-    return 0;
+uint8_t _cnrom_vram_read(Cartridge *cart, uint16_t addr) {
+    if (addr < 0x2000) {
+        return cart->chr_rom[_cnrom_get_chr_offset(cart, addr)];
+    } else {
+        return nrom_vram_read(cart, addr);
+    }
+}
+
+void mapper_init_cnrom(Mapper *mapper, unsigned int submapper_id) {
+    mapper->id = MAPPER_ID_CNROM;
+    memcpy(mapper->name, "CNROM", strlen("CNROM") + 1);
+    mapper->init_func       = NULL;
+    mapper->ram_read_func   = *nrom_ram_read;
+    mapper->ram_write_func  = *_cnrom_ram_write;
+    mapper->vram_read_func  = *_cnrom_vram_read;
+    mapper->vram_write_func = *nrom_vram_write;
+    mapper->tick_func       = NULL;
 }

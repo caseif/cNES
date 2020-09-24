@@ -27,4 +27,4 @@
 
 void sc_init(void);
 
-void sc_poll_input(void);
+void sc_poll_input(unsigned int controller_id);

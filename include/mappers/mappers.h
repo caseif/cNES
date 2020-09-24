@@ -29,12 +29,24 @@
 
 #include <stdint.h>
 
+#define MAPPER_ID_NROM 0
+#define MAPPER_ID_MMC1 1
+#define MAPPER_ID_UNROM 2
+#define MAPPER_ID_CNROM 3
+#define MAPPER_ID_MMC3 4
+#define MAPPER_ID_AXROM 7
+#define MAPPER_ID_COLOR_DREAMS 11
+#define MAPPER_ID_NAMCO_1XX 19
+#define MAPPER_ID_CNROM_COPY 185
+
 typedef void (*MapperInitFunction)(struct cartridge *cart);
 typedef uint8_t (*MemoryReadFunction)(struct cartridge *cart, uint16_t);
 typedef void (*MemoryWriteFunction)(struct cartridge *cart, uint16_t, uint8_t);
 typedef void (*MapperTickFunction)(void);
 
 typedef struct {
+    unsigned int id;
+    char name[12];
     MapperInitFunction init_func;
     MemoryReadFunction ram_read_func;
     MemoryWriteFunction ram_write_func;
@@ -43,10 +55,20 @@ typedef struct {
     MapperTickFunction tick_func;
 } Mapper;
 
-void mapper_init_nrom(Mapper *mapper);
+void mapper_init_nrom(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_mmc1(Mapper *mapper);
+void mapper_init_mmc1(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_unrom(Mapper *mapper);
+void mapper_init_unrom(Mapper *mapper, unsigned int submapper_id);
 
-void mapper_init_mmc3(Mapper *mapper);
+void mapper_init_cnrom(Mapper *mapper, unsigned int submapper_id);
+
+void mapper_init_mmc3(Mapper *mapper, unsigned int submapper_id);
+
+void mapper_init_axrom(Mapper *mapper, unsigned int submapper_id);
+
+void mapper_init_color_dreams(Mapper *mapper, unsigned int submapper_id);
+
+void mapper_init_namco_1xx(Mapper *mapper, unsigned int submapper_id);
+
+void mapper_init_cnrom_copy(Mapper *mapper, unsigned int submapper_id);

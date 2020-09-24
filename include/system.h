@@ -27,15 +27,49 @@
 
 #include "cartridge.h"
 
+#define SYSTEM_MEMORY_SIZE 0x800
 #define PRG_RAM_SIZE 0x2000
+#define CHR_RAM_SIZE 0x2000
 
-unsigned char g_prg_ram[PRG_RAM_SIZE];
+typedef enum tv_system_t {
+    TV_SYSTEM_NTSC,
+    TV_SYSTEM_PAL,
+    TV_SYSTEM_DENDY,
+} TvSystem;
 
 void initialize_system(Cartridge *cart);
+
+TvSystem system_get_tv_system(void);
+
+unsigned int system_read_nmi_line(void);
+
+unsigned int system_read_irq_line(void);
+
+unsigned int system_read_rst_line(void);
+
+uint8_t system_bus_read(void);
+
+void system_bus_write(uint8_t val);
+
+uint8_t system_prg_ram_read(uint16_t addr);
+
+void system_prg_ram_write(uint16_t addr, uint8_t val);
+
+uint8_t system_chr_ram_read(uint16_t addr);
+
+void system_chr_ram_write(uint16_t addr, uint8_t val);
+
+void system_register_chip_ram(Cartridge *cart, unsigned char *ram, size_t size);
+
+void system_ram_init(void);
 
 uint8_t system_ram_read(uint16_t addr);
 
 void system_ram_write(uint16_t addr, uint8_t val);
+
+uint8_t system_memory_read(uint16_t addr);
+
+void system_memory_write(uint16_t addr, uint8_t val);
 
 uint8_t system_vram_read(uint16_t addr);
 
@@ -44,6 +78,10 @@ void system_vram_write(uint16_t addr, uint8_t val);
 uint8_t system_lower_memory_read(uint16_t addr);
 
 void system_lower_memory_write(uint16_t addr, uint8_t val);
+
+void system_dump_ram(void);
+
+void system_start_oam_dma(uint8_t page);
 
 void do_system_loop(void);
 
@@ -56,3 +94,15 @@ void step_execution(void);
 bool is_execution_halted(void);
 
 void kill_execution(void);
+
+void system_connect_nmi_line(unsigned int (*nmi_line_callback)(void));
+
+void system_connect_irq_line(unsigned int (*irq_line_callback)(void));
+
+void system_connect_rst_line(unsigned int (*irq_line_callback)(void));
+
+void system_set_rst_cycles(unsigned int cycles);
+
+void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color);
+
+void system_flush_frame(void);

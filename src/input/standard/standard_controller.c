@@ -25,6 +25,7 @@
 
 #include "input/standard/standard_controller.h"
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -36,40 +37,50 @@ typedef struct {
     unsigned int bit;
 } ScState;
 
-static NullaryCallback g_poll_callback;
+static UintConsumer g_poll_callback;
 
-void sc_attach_driver(NullaryCallback init, NullaryCallback callback) {
+void sc_attach_driver(NullaryCallback init, UintConsumer callback) {
     init();
     g_poll_callback = callback;
 }
 
-uint8_t _sc_poll(void *state) {
-    ScState *state_cast = (ScState*) state;
+uint8_t _sc_poll(Controller *controller) {
+    ScState *state_cast = (ScState*) controller->state;
 
     if (state_cast->strobe) {
         state_cast->bit = 0;
 
-        g_poll_callback();
+        g_poll_callback(controller->id);
     }
 
-    bool res = state_cast->button_states[state_cast->bit];
-    state_cast->bit += 1;
-    return res;
+    if (state_cast->bit > 7) {
+        state_cast->bit++;
+        return 1; // input is tied to vcc, so extra reads reutrn 1
+    }
+
+    // for some reason, the ternary expression originally here would sometimes evaluate to 2
+    if (state_cast->button_states[state_cast->bit++]) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
-void _sc_push(void *state, uint8_t data) {
-    ScState *state_cast = (ScState*) state;
+void _sc_push(Controller *controller, uint8_t data) {
+    ScState *state_cast = (ScState*) controller->state;
 
     state_cast->strobe = data & 1;
 
     if (state_cast->strobe) {
         state_cast->bit = 0;
-        g_poll_callback();
+        g_poll_callback(controller->id);
     }
 }
 
-Controller *create_standard_controller(void) {
+Controller *create_standard_controller(unsigned int controller_id) {
     Controller *controller = (Controller*) malloc(sizeof(Controller));
+    controller->id = controller_id;
+    controller->type = CONTROLLER_TYPE_STANDARD;
     controller->poller = _sc_poll;
     controller->pusher = _sc_push;
     controller->state = (ScState*) malloc(sizeof(ScState));

@@ -38,23 +38,21 @@
 
 #define CNES_DIR ".cnes"
 
-static int _mkdir(const char *path) {
+static int pi_mkdir(const char *path) {
     struct stat st;
     stat(path, &st);
-    if (S_ISDIR(st.st_mode)) {
+    if (st.st_mode & S_IFDIR) {
         return 0;
     }
 
     #ifdef _WIN32
     return _mkdir(path);
-    #elif _POSIX_C_SOURCE
-    return mkdir(path);
     #else
     return mkdir(path, 0755);
     #endif
 }
 
-static char *_getcwd(char *path, size_t max_len) {
+static char *pi_getcwd(char *path, size_t max_len) {
     #ifdef _WIN32
     return _getcwd(path, max_len);
     #else
@@ -68,7 +66,7 @@ static char *get_save_dir(void) {
     bool must_free = false;
     if (!home) {
         home = malloc(MAX_PATH_LEN);
-        if (!_getcwd(home, MAX_PATH_LEN)) {
+        if (!pi_getcwd(home, MAX_PATH_LEN)) {
             printf("Failed to get CWD\n");
             return NULL;
         }
@@ -85,7 +83,7 @@ static char *get_save_dir(void) {
     return full_dir;
 }
 
-static FILE *_open_game_file(char *game_title, char *file_name) {
+static FILE *_open_game_file(char *game_title, char *file_name, char *flags) {
     char *save_dir = get_save_dir();
 
     if (!save_dir) {
@@ -93,7 +91,7 @@ static FILE *_open_game_file(char *game_title, char *file_name) {
         return NULL;
     }
 
-    if (_mkdir(save_dir) != 0) {
+    if (pi_mkdir(save_dir) != 0) {
         printf("Failed to create save directory while opening %s\n", file_name);
         free(save_dir);
         return NULL;
@@ -103,7 +101,7 @@ static FILE *_open_game_file(char *game_title, char *file_name) {
     sprintf(game_path, "%s/%s", save_dir, game_title);
     free(save_dir);
 
-    if (_mkdir(game_path) != 0) {
+    if (pi_mkdir(game_path) != 0) {
         printf("Failed to create game directory while opening %s\n", file_name);
         free(game_path);
         return NULL;
@@ -113,14 +111,14 @@ static FILE *_open_game_file(char *game_title, char *file_name) {
     sprintf(file_path, "%s/%s", game_path, file_name);
     free(game_path);
 
-    FILE *save_file = fopen(file_path, "w+");
+    FILE *save_file = fopen(file_path, flags);
     free(file_path);
 
     return save_file;
 }
 
 bool read_game_data(char *game_title, char *file_name, void *buf, size_t buf_len, bool quiet) {
-    FILE *in_file = _open_game_file(game_title, file_name);
+    FILE *in_file = _open_game_file(game_title, file_name, "r");
 
     if (!in_file || !fread(buf, buf_len, 1, in_file)) {
         if (quiet) {
@@ -135,7 +133,7 @@ bool read_game_data(char *game_title, char *file_name, void *buf, size_t buf_len
 }
 
 bool write_game_data(char *game_title, char *file_name, void *buf, size_t buf_len) {
-    FILE *out_file = _open_game_file(game_title, file_name);
+    FILE *out_file = _open_game_file(game_title, file_name, "w+");
 
     if (!out_file || !fwrite(buf, buf_len, 1, out_file)) {
         printf("Failed to write to file %s\n", file_name);

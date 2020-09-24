@@ -25,28 +25,29 @@
 
 #include "cartridge.h"
 #include "system.h"
-#include "cpu/cpu.h"
+#include "c6502/cpu.h"
 #include "input/input_device.h"
 #include "mappers/mappers.h"
-#include "ppu/ppu.h"
+#include "mappers/nrom.h"
+#include "ppu.h"
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define CHR_RAM_SIZE 0x2000
 
 #define CHR_BANK_GRANULARITY 0x1000
 #define PRG_BANK_GRANULARITY 0x4000
 
-static unsigned char g_chr_ram[CHR_RAM_SIZE];
-
 static uint8_t g_write_count = 0;
 static uint8_t g_write_val = 0;
 
 static struct {
-        unsigned int chr_bank_mode:1;
-        unsigned int prg_bank_mode:2;
-        unsigned int mirroring:2;
+    unsigned int chr_bank_mode:1;
+    unsigned int prg_bank_mode:2;
+    unsigned int mirroring:2;
 } g_mmc1_control;
 static unsigned char g_chr_bank_0;
 static unsigned char g_chr_bank_1;
@@ -115,8 +116,10 @@ static uint32_t _mmc1_get_chr_offset(Cartridge *cart, uint16_t addr) {
 static uint8_t _mmc1_ram_read(Cartridge *cart, uint16_t addr) {
     if (addr < 0x6000) {
         return system_lower_memory_read(addr);
-    } else if (addr < 0x8000) {
-        return g_enable_prg_ram ? g_prg_ram[addr % 0x2000] : 0;
+    }
+
+    if (addr < 0x8000) {
+        return g_enable_prg_ram ? system_prg_ram_read(addr % 0x2000) : system_bus_read();
     }
 
     uint32_t prg_offset = _mmc1_get_prg_offset(cart, addr);
@@ -133,9 +136,13 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
     if (addr < 0x6000) {
         system_lower_memory_write(addr, val);
         return;
-    } else if (addr < 0x8000) {
+    }
+
+    if (addr < 0x8000) {
         if (g_enable_prg_ram) {
-            g_prg_ram[addr % 0x2000] = val;
+            system_prg_ram_write(addr % 0x2000, val);
+        } else {
+            system_bus_write(addr & 0xFF);
         }
         return;
     }
@@ -192,10 +199,9 @@ static void _mmc1_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 static uint8_t _mmc1_vram_read(Cartridge *cart, uint16_t addr) {
-    switch (addr) {
-        case 0x0000 ... 0x1FFF: {
+        if (addr >= 0x0000 && addr <= 0x1FFF) {
             if (cart->chr_size == 0) {
-                return g_chr_ram[addr];
+                return system_chr_ram_read(addr);
             }
 
             uint32_t chr_offset = _mmc1_get_chr_offset(cart, addr);
@@ -206,38 +212,39 @@ static uint8_t _mmc1_vram_read(Cartridge *cart, uint16_t addr) {
             }
             
             return cart->chr_rom[chr_offset];
-        }
-        // name tables
-        case 0x2000 ... 0x3EFF:
+        } else if (addr >= 0x2000 && addr <= 0x3EFF) {
+            // name tables
             return ppu_name_table_read(addr % 0x1000);
-        // palette table
-        case 0x3F00 ... 0x3FFF:
+        } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+            // palette table
             return ppu_palette_table_read(addr % 0x20);
-        default:
-            return 0; // technically open bus
-    }
+        } else {
+            // open bus, generally returns low address byte
+            return addr & 0xFF;
+        }
 }
 
 static void _mmc1_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    switch (addr) {
+    if (addr >= 0x0000 && addr <= 0x1FFF) {
         // PRG ROM
-        case 0x0000 ... 0x1FFF:
-            if (cart->chr_size == 0) {
-                g_chr_ram[addr] = val;
-            }
-            return;
+        if (cart->chr_size == 0) {
+            system_chr_ram_write(addr, val);
+        }
+        return;
+    } else if (addr >= 0x2000 && addr <= 0x3EFF) {
         // name tables
-        case 0x2000 ... 0x3EFF:
-            ppu_name_table_write(addr % 0x1000, val);
-            return;
+        ppu_name_table_write(addr % 0x1000, val);
+        return;
+    } else if (addr >= 0x3F00 && addr <= 0x3FFF) {
         // palette table
-        case 0x3F00 ... 0x3FFF:
-            ppu_palette_table_write(addr % 0x20, val);
-            return;
+        ppu_palette_table_write(addr % 0x20, val);
+        return;
     }
 }
 
-void mapper_init_mmc1(Mapper *mapper) {
+void mapper_init_mmc1(Mapper *mapper, unsigned int submapper_id) {
+    mapper->id = MAPPER_ID_MMC1;
+    memcpy(mapper->name, "MMC1", strlen("MMC1") + 1);
     mapper->init_func       = NULL;
     mapper->ram_read_func   = *_mmc1_ram_read;
     mapper->ram_write_func  = *_mmc1_ram_write;

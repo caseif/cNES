@@ -34,14 +34,14 @@
 
 static Controller *controllers[2];
 
-uint8_t nil_poller(void *state) {
+uint8_t nil_poller(Controller *controller) {
     return 0;
 }
 
-void nil_pusher(void *state, uint8_t data) {
+void nil_pusher(Controller *controller, uint8_t data) {
 }
 
-static Controller empty_controller = {nil_poller, nil_pusher, NULL};
+static Controller empty_controller = {0, CONTROLLER_TYPE_NONE, nil_poller, nil_pusher, NULL};
 
 void init_controllers(void) {
     for (unsigned int i = MIN_PORT; i <= MAX_PORT; i++) {
@@ -54,10 +54,9 @@ Controller *get_controller(unsigned int port) {
     return controllers[port];
 }
 
-void controller_connect(unsigned int port, Controller *controller) {
-    assert(port >= MIN_PORT && port <= MAX_PORT);
-
-    controllers[port] = controller;
+void controller_connect(Controller *controller) {
+    assert(controller->id >= MIN_PORT && controller->id <= MAX_PORT);
+    controllers[controller->id] = controller;
 }
 
 void controller_disconnect(unsigned int port) {
@@ -76,11 +75,12 @@ void controller_disconnect(unsigned int port) {
 uint8_t controller_poll(unsigned int port) {
     assert(port >= MIN_PORT && port <= MAX_PORT);
  
-    return controllers[port]->poller(controllers[port]->state);
+    return controllers[port]->poller(controllers[port]);
 }
 
 void controller_push(unsigned int port, uint8_t data) {
-    assert(port >= MIN_PORT && port <= MAX_PORT);
-
-    controllers[port]->pusher(controllers[port]->state, data);
+    // there's only one output port, which is directed to both controllers
+    for (int port = MIN_PORT; port <= MAX_PORT; port++) {
+        controllers[port]->pusher(controllers[port], data);
+    }
 }

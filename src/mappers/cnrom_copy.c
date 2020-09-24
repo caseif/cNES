@@ -23,12 +23,42 @@
  * THE SOFTWARE.
  */
 
-#pragma once
+#include "cartridge.h"
+#include "system.h"
+#include "c6502/cpu.h"
+#include "mappers/mappers.h"
+#include "mappers/nrom.h"
 
-#include <stdbool.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
 
-void load_cpu_test(char *file_name);
+static unsigned int garbage_reads = 2;
 
-void pump_cpu(void);
+extern uint8_t _cnrom_vram_read(Cartridge *cart, uint16_t addr);
 
-bool do_cpu_tests(void);
+static uint8_t _cnrom_copy_ram_read(Cartridge *cart, uint16_t addr) {
+    if (addr == 0x2007 && garbage_reads > 0) {
+        garbage_reads--;
+        return 0x01 + garbage_reads; // arbitary garbage value not in use by any games
+    } else {
+        return nrom_ram_read(cart, addr);
+    }
+}
+
+static void _cnrom_copy_tick() {
+    if (system_read_rst_line() == 0) {
+        garbage_reads = 2;
+    }
+}
+
+void mapper_init_cnrom_copy(Mapper *mapper, unsigned int submapper_id) {
+    mapper->id = MAPPER_ID_CNROM_COPY;
+    memcpy(mapper->name, "CNROM+COPY", strlen("CNROM+COPY") + 1);
+    mapper->init_func       = NULL;
+    mapper->ram_read_func   = *_cnrom_copy_ram_read;
+    mapper->ram_write_func  = *nrom_ram_write;
+    mapper->vram_read_func  = *_cnrom_vram_read;
+    mapper->vram_write_func = *nrom_vram_write;
+    mapper->tick_func       = _cnrom_copy_tick;
+}

@@ -23,30 +23,34 @@
  * THE SOFTWARE.
  */
 
-#include "sdl_manager.h"
 #include "system.h"
-#include "cpu/cpu.h"
+#include "c6502/cpu.h"
 #include "input/global/hotkeys.h"
-#include "ppu/ppu.h"
+#include "ppu.h"
 
-#include <pthread.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_events.h>
+#include <SDL.h>
+#include <SDL_events.h>
 
 #define KEY_MODE_NORMAL SDLK_F1
 #define KEY_MODE_NAME_TABLE SDLK_F2
 #define KEY_MODE_PATTERN_TABLE SDLK_F3
 #define KEY_ACTION_CONTINUE SDLK_F5
 #define KEY_ACTION_STEP SDLK_F6
-#define KEY_ACTION_BREAK SDLK_F8
+#define KEY_ACTION_BREAK SDLK_F7
 #define KEY_ACTION_DUMP_RAM SDLK_F9
 #define KEY_ACTION_DUMP_VRAM SDLK_F10
 #define KEY_ACTION_DUMP_OAM SDLK_F11
+#define KEY_ACTION_RESET SDLK_r
+
+static bool g_ctrl_down = false;
 
 static void _global_hotkey_callback(SDL_Event *event) {
     switch (event->type) {
         case SDL_KEYDOWN:
             switch (event->key.keysym.sym) {
+                case SDLK_LCTRL:
+                    g_ctrl_down = true;
+                    break;
                 case KEY_MODE_NORMAL:
                     set_render_mode(RM_NORMAL);
                     printf("Showing normal output\n");
@@ -90,7 +94,7 @@ static void _global_hotkey_callback(SDL_Event *event) {
                     break;
                 case KEY_ACTION_DUMP_RAM:
                     printf("Dumping system RAM\n");
-                    dump_ram();
+                    system_dump_ram();
                     break;
                 case KEY_ACTION_DUMP_VRAM:
                     printf("Dumping VRAM\n");
@@ -100,9 +104,19 @@ static void _global_hotkey_callback(SDL_Event *event) {
                     printf("Dumping OAM\n");
                     dump_oam();
                     break;
-                    
+                case KEY_ACTION_RESET:
+                    if (g_ctrl_down) {
+                        system_set_rst_cycles(10);
+                    }
+                    break;
             }
             break;
+        case SDL_KEYUP:
+            switch (event->key.keysym.sym) {
+                case SDLK_LCTRL:
+                    g_ctrl_down = false;
+                    break;
+            }
     }
 }
 

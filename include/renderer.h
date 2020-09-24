@@ -25,13 +25,28 @@
 
 #pragma once
 
+#include "ppu.h"
+
+#include <SDL_events.h>
+#include <SDL_render.h>
+
 #include <stdint.h>
 
-typedef struct {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-} RGBValue;
+#define WINDOW_SCALE 3
+
+typedef void (*EventCallback)(SDL_Event*);
+
+void initialize_window(void);
+
+void do_window_loop(void);
+
+SDL_Window *get_window(void);
+
+void close_window(void);
+
+void set_window_title(const char *title);
+
+void add_event_callback(EventCallback callback);
 
 void initialize_renderer(void);
 

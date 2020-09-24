@@ -33,62 +33,53 @@
 #include <stdio.h>
 #include <string.h>
 
-#define PRG_BANK_SHIFT 14
+#define PRG_BANK_SHIFT 15
 #define PRG_BANK_GRANULARITY (1 << PRG_BANK_SHIFT)
 
-#define CHR_RAM_SIZE 0x2000
-
 static unsigned char g_prg_bank;
+static unsigned char g_nametable;
 
-static unsigned char chr_ram[CHR_RAM_SIZE];
-
-static void _unrom_init(Cartridge *cart) {
-    memcpy(chr_ram, cart->chr_rom, cart->chr_size < CHR_RAM_SIZE ? cart->chr_size : CHR_RAM_SIZE);
-}
-
-static uint8_t _unrom_ram_read(Cartridge *cart, uint16_t addr) {
-    if (addr < 0x6000) {
+static uint8_t _axrom_ram_read(Cartridge *cart, uint16_t addr) {
+    if (addr < 0x8000) {
         return system_lower_memory_read(addr);
-    } else if (addr < 0x8000) {
-        return system_bus_read();
     }
 
-    return cart->prg_rom[(((addr < 0xC000 ? g_prg_bank : ((cart->prg_size >> PRG_BANK_SHIFT) - 1)) << PRG_BANK_SHIFT)
-            | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size];
+    return cart->prg_rom[((g_prg_bank * PRG_BANK_GRANULARITY) | (addr % PRG_BANK_GRANULARITY)) % cart->prg_size];
 }
 
-static void _unrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    if (addr < 0x6000) {
+static void _axrom_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    if (addr < 0x8000) {
         system_lower_memory_write(addr, val);
         return;
     }
 
-    g_prg_bank = val;
+    g_prg_bank = val & 0x7;
+    g_nametable = (val >> 4) & 0x1;
 }
 
-static uint8_t _unrom_vram_read(Cartridge *cart, uint16_t addr) {
-    if (addr < 0x2000) {
-        return chr_ram[addr];
+static uint8_t _axrom_vram_read(Cartridge *cart, uint16_t addr) {
+    if (addr >= 0x2000 && addr <= 0x3EFF) {
+        return nrom_vram_read(cart, (addr % 0x800) + (g_nametable ? 0x2800 : 0x2000));
+    } else {
+        return nrom_vram_read(cart, addr);
     }
-
-    return nrom_vram_read(cart, addr);
 }
 
-static void _unrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
-    if (addr < 0x2000) {
-        chr_ram[addr] = val;
+static void _axrom_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
+    if (addr >= 0x2000 && addr <= 0x3EFF) {
+        nrom_vram_write(cart, (addr % 0x800) + (g_nametable ? 0x2800 : 0x2000), val);
     } else {
         nrom_vram_write(cart, addr, val);
     }
 }
 
-void mapper_init_unrom(Mapper *mapper, unsigned int submapper_id) {
-    mapper->id = MAPPER_ID_UNROM;
-    memcpy(mapper->name, "UNROM", strlen("UNROM") + 1);
-    mapper->init_func       = *_unrom_init;
-    mapper->ram_read_func   = *_unrom_ram_read;
-    mapper->ram_write_func  = *_unrom_ram_write;
-    mapper->vram_read_func  = *_unrom_vram_read;
-    mapper->vram_write_func = *_unrom_vram_write;
+void mapper_init_axrom(Mapper *mapper, unsigned int submapper_id) {
+    mapper->id = MAPPER_ID_CNROM;
+    memcpy(mapper->name, "AxROM", strlen("AxROM") + 1);
+    mapper->init_func       = NULL;
+    mapper->ram_read_func   = *_axrom_ram_read;
+    mapper->ram_write_func  = *_axrom_ram_write;
+    mapper->vram_read_func  = *_axrom_vram_read;
+    mapper->vram_write_func = *_axrom_vram_write;
     mapper->tick_func       = NULL;
 }

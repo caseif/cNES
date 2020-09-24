@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifdef WINDOWS
+#ifdef _WIN32
 #include <windows.h>
 #else
 #ifndef __USE_POSIX199309
@@ -69,17 +69,10 @@ static inline uint32_t endian_swap(uint32_t x) {
 }
 
 static inline void sleep_cp(int ms) {
-    #ifdef WINDOWS
+    #ifdef _WIN32
     Sleep(ms);
     #else
     struct timespec spec[] = {{0, ms * 1000000L}};
     nanosleep(spec, NULL);
     #endif
-}
-
-static inline unsigned char reverse_bits(unsigned char b) {
-   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-   return b;
 }
