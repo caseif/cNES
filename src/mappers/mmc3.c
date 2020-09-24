@@ -38,12 +38,18 @@
 
 #define MMC3_DEBUG_LOGGING 0
 
+#if MMC3_DEBUG_LOGGING
+#define MMC3_DEBUG(fmt, ...) printf("[MMC3] " fmt, ##__VA_ARGS__)
+#else
+#define MMC3_DEBUG(fmt, ...)
+#endif
+
 #define CHR_RAM_SIZE 0x2000
 
 #define CHR_BANK_GRANULARITY 0x400
 #define PRG_BANK_GRANULARITY 0x2000
 
-#define IRQ_COOLDOWN_PERIOD 8
+#define A12_COOLDOWN_PERIOD 3
 
 // false -> $C000-DFFF fixed, $8000-9FFF swappable
 // true  -> $8000-9FFF fixed, $C000-DFFF swappable
@@ -67,8 +73,10 @@ static uint8_t g_irq_counter;
 static uint8_t g_irq_latch;
 static bool g_irq_reload;
 static bool g_irq_enabled = false;
-static uint16_t a12_cooldown = 0;
-static bool g_pending_irq = false;
+static uint16_t g_a12_cooldown = 0;
+static uint16_t g_last_addr = 0;
+static bool g_staged_irq = false;
+static bool g_asserting_irq = false;
 
 // submapper configurations
 static bool g_use_counter_edge = false;
@@ -129,7 +137,7 @@ static uint32_t _mmc3_get_chr_offset(Cartridge *cart, uint16_t addr) {
 }
 
 static unsigned int _mmc3_irq_connection(void) {
-    return g_pending_irq ? 0 : 1;
+    return g_asserting_irq && g_irq_enabled ? 0 : 1;
 }
 
 static void _mmc3_init(Cartridge *cart) {
@@ -168,12 +176,10 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 
     switch (addr & 0xE001) {
         case 0x8000:
-            #if MMC3_DEBUG_LOGGING
-            printf("$8000 write\n");
-            printf("  PRG range switch: %01d -> %01d\n", g_prg_switch_ranges, (val >> 6) & 1);
-            printf("  CHR inversion: %01d -> %01d\n", g_chr_inversion, (val >> 7) & 1);
-            printf("  Range select: %01d\n", val & 0x7);
-            #endif
+            MMC3_DEBUG("$8000 write\n");
+            MMC3_DEBUG("  PRG range switch: %01d -> %01d\n", g_prg_switch_ranges, (val >> 6) & 1);
+            MMC3_DEBUG("  CHR inversion: %01d -> %01d\n", g_chr_inversion, (val >> 7) & 1);
+            MMC3_DEBUG("  Range select: %01d\n", val & 0x7);
 
             g_prg_switch_ranges = (val >> 6) & 1;
             g_chr_inversion = (val >> 7) & 1;
@@ -214,11 +220,9 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
                     break;
             }
 
-            #if MMC3_DEBUG_LOGGING
-            printf("$8001 write\n");
-            printf("  Selected range: %01d\n", g_bank_select);
-            printf("  New bank: %02d -> %02d\n", *bank, val);
-            #endif
+            MMC3_DEBUG("$8001 write\n");
+            MMC3_DEBUG("  Selected range: %01d\n", g_bank_select);
+            MMC3_DEBUG("  New bank: %02d -> %02d\n", *bank, val);
 
             *bank = val;
 
@@ -232,19 +236,24 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             return;
         case 0xC000:
             g_irq_latch = val;
+            MMC3_DEBUG("Latch reloaded with value %02x\n", val);
             return;
         case 0xC001:
             g_irq_counter = 0xFF;
             g_irq_reload = true;
+            MMC3_DEBUG("Reload requested\n");
             return;
         case 0xE000:
-            if (g_irq_enabled) {
-                g_irq_enabled = false;
-            }
-            g_pending_irq = false; // acknowledge any pending interrupt
+            g_irq_enabled = false;
+            g_asserting_irq = false; // acknowledge any pending interrupt
+            g_staged_irq = false;
+
+            MMC3_DEBUG("IRQ disabled\n");
             return;
         case 0xE001:
             g_irq_enabled = true;
+
+            MMC3_DEBUG("IRQ enabled\n");
             return;
         default:
             return; // ignore bogus write
@@ -296,26 +305,47 @@ static void _mmc3_vram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
 }
 
 static void _mmc3_tick(void) {
-    #if MMC3_DEBUG_LOGGING
-    printf("MMC3 counter: %d\n", g_irq_counter);
-    #endif
+    MMC3_DEBUG("Counter: %d | Staged IRQ: %d | Asserting IRQ: %d \n", g_irq_counter, g_staged_irq, g_asserting_irq);
 
-    bool new_a12 = (ppu_get_internal_regs()->addr_bus & 0x1000);
-    if (a12_cooldown > 0) {
-        a12_cooldown--;
+    if (g_a12_cooldown > 0) {
+        g_a12_cooldown--;
     }
 
-    bool clock_counter;
-    if (g_use_a12_fall) {
-        clock_counter = !a12_cooldown && !new_a12;
+    if (g_staged_irq) {
+        g_asserting_irq = true;
+        g_staged_irq = false;
+
+        MMC3_DEBUG("Asserting staged IRQ\n");
+    }
+
+    uint16_t old_addr = g_last_addr;
+    uint16_t new_addr = ppu_get_internal_regs()->addr_bus;
+    g_last_addr = new_addr;
+
+    bool old_a12 = old_addr & 0x1000;
+    bool new_a12 = new_addr & 0x1000;
+
+    bool rising_a12 = false;
+
+    if (old_a12 == new_a12) {
+        return;
+    } else if (new_a12) {
+        rising_a12 = true;
+    }
+
+    if (rising_a12) {
+        MMC3_DEBUG("Detected A12 rising edge (old %04X, new %04X)\n", old_addr, new_addr);
     } else {
-        clock_counter = !a12_cooldown && new_a12;
+        MMC3_DEBUG("Detected A12 falling edge (old %04X, new %04X)\n", old_addr, new_addr);
     }
 
-    if (clock_counter) {
-        #if MMC3_DEBUG_LOGGING
-        printf("MMC3 IRQ counter clocked @ (%03d, %03d)\n", ppu_get_scanline(), ppu_get_scanline_tick());
-        #endif
+    if (g_a12_cooldown) {
+        MMC3_DEBUG("Ignoring A12 edge (wasn't low/high for long enough prior)\n");
+        return;
+    }
+
+    if (g_use_a12_fall != rising_a12) {
+        MMC3_DEBUG("MMC3 IRQ counter clocked @ (%03d, %03d)\n", ppu_get_scanline(), ppu_get_scanline_tick());
         uint8_t counter_old = g_irq_counter;
 
         if (g_irq_reload || g_irq_counter == 0) {
@@ -326,12 +356,11 @@ static void _mmc3_tick(void) {
         }
 
         if ((!g_use_counter_edge || counter_old > 0) && g_irq_counter == 0 && g_irq_enabled) {
-            g_pending_irq = true;
+            g_staged_irq = true;
+            MMC3_DEBUG("Staging IRQ for assertion on next tick\n");
         }
-    }
-
-    if (new_a12 == !g_use_a12_fall) {
-        a12_cooldown = IRQ_COOLDOWN_PERIOD;
+    } else {
+        g_a12_cooldown = A12_COOLDOWN_PERIOD;
     }
 }
 

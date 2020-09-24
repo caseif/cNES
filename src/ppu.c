@@ -208,6 +208,10 @@ static inline unsigned char _reverse_bits(unsigned char b) {
    return b;
 }
 
+void _update_addr_bus(uint16_t addr) {
+    g_ppu_internal_regs.addr_bus = addr;
+}
+
 static void _update_ppu_bus(uint8_t val, uint8_t bitmask) {
     g_ppu_internal_regs.ppu_bus &= ~bitmask;
     g_ppu_internal_regs.ppu_bus |= val & bitmask;
@@ -282,7 +286,7 @@ uint8_t ppu_read_mmio(uint8_t index) {
                 g_ppu_internal_regs.v.addr &= 0x3FFF;
 
                 // copy to address bus
-                g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
+                _update_addr_bus(g_ppu_internal_regs.v.addr);
 
                 _update_ppu_bus(res, 0xFF);
             } else {
@@ -373,7 +377,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
                 g_ppu_internal_regs.v.addr = g_ppu_internal_regs.t.addr;
 
                 // copy to address bus
-                g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
+                _update_addr_bus(g_ppu_internal_regs.v.addr);
             } else {
                 // clear upper bits
                 g_ppu_internal_regs.t.addr &= ~0x7F00;
@@ -399,7 +403,7 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
             g_ppu_internal_regs.v.addr += g_ppu_control.vertical_increment ? 32 : 1;
 
             // copy to address bus
-            g_ppu_internal_regs.addr_bus = g_ppu_internal_regs.v.addr;
+            _update_addr_bus(g_ppu_internal_regs.v.addr);
 
             break;
         }
@@ -613,7 +617,7 @@ void _do_tile_fetching(void) {
 
                     // compute NT address
                     // address = name table base + (v except fine y)
-                    g_ppu_internal_regs.addr_bus = NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF);
+                    _update_addr_bus(NAME_TABLE_BASE_ADDR | (g_ppu_internal_regs.v.addr & 0x0FFF));
 
                     break;
                 }
@@ -629,7 +633,7 @@ void _do_tile_fetching(void) {
                 case 2: {
                     unsigned int v = g_ppu_internal_regs.v.addr;
                     // address = attr table base + (name table offset) + (shifted v)
-                    g_ppu_internal_regs.addr_bus = ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
+                    _update_addr_bus(ATTR_TABLE_BASE_ADDR | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07));
 
                     break;
                 }
@@ -661,8 +665,7 @@ void _do_tile_fetching(void) {
                     unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
                             + g_ppu_internal_regs.v.y_fine;
 
-                    g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                            + pattern_offset;
+                    _update_addr_bus((g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR) + pattern_offset);
 
                     break;
                 }
@@ -678,8 +681,7 @@ void _do_tile_fetching(void) {
                     unsigned int pattern_offset = g_ppu_internal_regs.name_table_entry_latch * 16
                             + g_ppu_internal_regs.v.y_fine + 8;
 
-                    g_ppu_internal_regs.addr_bus = (g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                            + pattern_offset;
+                    _update_addr_bus((g_ppu_control.background_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR) + pattern_offset);
 
                     break;
                 }
@@ -895,10 +897,10 @@ void _do_sprite_fetching(void) {
 
                     if (g_ppu_control.tall_sprites) {
                         uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                        g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y);
+                        _update_addr_bus(((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y));
                     } else {
-                        g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                | (tile_index * 16 + cur_y);
+                        _update_addr_bus((g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                | (tile_index * 16 + cur_y));
                     }
 
                     break;
@@ -946,10 +948,10 @@ void _do_sprite_fetching(void) {
 
                     if (g_ppu_control.tall_sprites) {
                         uint16_t adj_tile_index = (tile_index & 0xFE) | (bottom_tile ? 1 : 0);
-                        g_ppu_internal_regs.addr_bus = ((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8);
+                        _update_addr_bus(((tile_index & 1) * 0x1000) | (adj_tile_index * 16 + cur_y + 8));
                     } else {
-                        g_ppu_internal_regs.addr_bus = (g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
-                                | (tile_index * 16 + cur_y + 8);
+                        _update_addr_bus((g_ppu_control.sprite_table ? PT_RIGHT_ADDR : PT_LEFT_ADDR)
+                                | (tile_index * 16 + cur_y + 8));
                     }
 
                     break;

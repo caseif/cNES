@@ -467,19 +467,18 @@ void do_system_loop(void) {
         }
 
         if (!g_halted) {
-            if ((g_cycle_index % g_ppu_clock_divider) == 0) {
-                cycle_ppu();
+            bool tick_ppu = (g_cycle_index % g_ppu_clock_divider) == 0;
+            bool tick_cpu = (g_cycle_index % g_cpu_clock_divider) == 0;
 
-                if (g_cart->mapper->tick_func != NULL) {
-                    g_cart->mapper->tick_func();
-                }
+            if (tick_ppu) {
+                cycle_ppu();
 
                 if (g_rst_cycles > 0) {
                     g_rst_cycles--;
                 }
             }
 
-            if ((g_cycle_index % g_cpu_clock_divider) == 0) {
+            if (tick_cpu) {
                 if (g_dma_in_progress) {
                     _handle_dma();
                 } else {
@@ -487,6 +486,12 @@ void do_system_loop(void) {
                 }
 
                 g_total_cpu_cycles++;
+            }
+
+            if (tick_ppu) {
+                if (g_cart->mapper->tick_func != NULL) {
+                    g_cart->mapper->tick_func();
+                }
             }
 
             if (++g_cycle_index == g_clock_divider_lcd) {

@@ -33,7 +33,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define MAPPER_MSG "Found mapper %d (%s)\n"
+#define MAPPER_MSG "Found mapper %d,%d (%s)\n"
 
 #define NES_MAGIC 0x4E45531A
 #define PRG_CHUNK_SIZE ((size_t) 0x4000)
@@ -86,7 +86,7 @@ typedef struct {
 
 void _init_mapper(Mapper *mapper, void (*init_func)(Mapper*, unsigned int), unsigned int submapper_id) {
     init_func(mapper, submapper_id);
-    printf(MAPPER_MSG, mapper->id, mapper->name);
+    printf(MAPPER_MSG, mapper->id, submapper_id, mapper->name);
 }
 
 Mapper *_create_mapper(unsigned int mapper_id, unsigned int submapper_id) {
