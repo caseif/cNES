@@ -215,26 +215,6 @@ void _update_addr_bus(uint16_t addr) {
 static void _update_ppu_bus(uint8_t val, uint8_t bitmask) {
     g_ppu_internal_regs.ppu_bus &= ~bitmask;
     g_ppu_internal_regs.ppu_bus |= val & bitmask;
-
-    for (unsigned int i = 0; i < 8; i++) {
-        // only refresh bits within the bitmask
-        if (bitmask & (1 << i)) {
-            g_ppu_internal_regs.ppu_bus_decay_timers[i] = PPU_BUS_DECAY_CYCLES;
-        }
-    }
-}
-
-static void _check_bus_decay(void) {
-    for (unsigned int i = 0; i < 8; i++) {
-        // we don't want to decrement the timer if it's already 0
-        if (g_ppu_internal_regs.ppu_bus_decay_timers[i] == 0) {
-            continue;
-        }
-        if (--g_ppu_internal_regs.ppu_bus_decay_timers[i] == 0) {
-            g_ppu_internal_regs.ppu_bus &= ~(1 << i);
-        } else if (g_ppu_internal_regs.ppu_bus_decay_timers[i] < 1000) {
-        }
-    }
 }
 
 uint8_t ppu_read_mmio(uint8_t index) {
@@ -1189,8 +1169,6 @@ void cycle_ppu(void) {
             system_flush_frame();
         }
     }
-
-    _check_bus_decay();
 }
 
 void dump_vram(void) {
