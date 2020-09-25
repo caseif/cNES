@@ -25,15 +25,16 @@
 
 #include "cartridge.h"
 #include "fs.h"
+#include "ppu.h"
 #include "renderer.h"
 #include "system.h"
 #include "util.h"
-#include "c6502/cpu.h"
-#include "c6502/instrs.h"
 #include "input/input_device.h"
 #include "input/standard/sc_driver.h"
 #include "input/standard/standard_controller.h"
-#include "ppu.h"
+
+#include "c6502/cpu.h"
+#include "c6502/instrs.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -43,32 +44,34 @@
 #include <string.h>
 #include <time.h>
 
+#define MAX(a, b) (a > b ? a : b)
+
+#define LOG_PERFORMANCE 0
+#define PRINT_SYS_MEMORY_ACCESS 0
+#define PRINT_PPU_MEMORY_ACCESS 0
+#define PRINT_INSTRS 0
+
 #define FRAMES_PER_SECOND_NTSC 60.0988
 #define MASTER_CLOCK_SPEED_NTSC 21477272
 #define CPU_CLOCK_DIVIDER_NTSC 12
 #define PPU_CLOCK_DIVIDER_NTSC 4
-#define CLOCK_DIVIDER_LCD_NTSC 12
 
 #define FRAMES_PER_SECOND_PAL 50.0070
 #define MASTER_CLOCK_SPEED_PAL 26601712
 #define CPU_CLOCK_DIVIDER_PAL 16
 #define PPU_CLOCK_DIVIDER_PAL 5
-#define CLOCK_DIVIDER_LCD_PAL 80
 
 #define FRAMES_PER_SECOND_DENDY 50.0070
 #define MASTER_CLOCK_SPEED_DENDY 26601712
 #define CPU_CLOCK_DIVIDER_DENDY 15
 #define PPU_CLOCK_DIVIDER_DENDY 5
-#define CLOCK_DIVIDER_LCD_DENDY 15
 
-#define SLEEP_INTERVAL 10 // milliseconds
+#define THROTTLE_SPEED 1
+#define SLEEP_INTERVAL 1000 // microseconds
+#define SLEEP_OVERHEAD 70 // microseconds
 
 #define SRAM_FILE_NAME "sram.bin"
 #define CHIPRAM_FILE_NAME "chipram.bin"
-
-#define PRINT_SYS_MEMORY_ACCESS 0
-#define PRINT_PPU_MEMORY_ACCESS 0
-#define PRINT_INSTRS 0
 
 static bool g_halted = false;
 static bool g_stepping = false;
@@ -86,10 +89,10 @@ static size_t g_chip_ram_size = 0;
 static Cartridge *g_cart;
 
 static TvSystem g_tv_system;
-static unsigned int g_master_clock_speed;
-static unsigned int g_cpu_clock_divider;
-static unsigned int g_ppu_clock_divider;
-static unsigned int g_clock_divider_lcd;
+static uint64_t g_master_clock_speed;
+static uint64_t g_cpu_clock_divider;
+static uint64_t g_ppu_clock_divider;
+static uint64_t g_clock_divider_cd;
 
 static uint8_t g_bus_val; // the value on the data bus
 
@@ -155,6 +158,12 @@ static void _log_callback(char *instr_str, CpuRegisters regs_snapshot) {
 }
 #endif
 
+static uint64_t now_us() {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+    return now.tv_sec * 1000000 + now.tv_nsec / 1000;
+}
+
 static void _handle_dma(void) {
     uint8_t index = ppu_get_internal_regs()->s;
     if (g_dma_step == 0) {
@@ -200,7 +209,6 @@ void initialize_system(Cartridge *cart) {
             g_master_clock_speed = MASTER_CLOCK_SPEED_NTSC;
             g_cpu_clock_divider = CPU_CLOCK_DIVIDER_NTSC;
             g_ppu_clock_divider = PPU_CLOCK_DIVIDER_NTSC;
-            g_clock_divider_lcd = CLOCK_DIVIDER_LCD_NTSC;
             break;
         case TIMING_MODE_PAL:
             printf("Using PAL system timing\n");
@@ -208,7 +216,6 @@ void initialize_system(Cartridge *cart) {
             g_master_clock_speed = MASTER_CLOCK_SPEED_PAL;
             g_cpu_clock_divider = CPU_CLOCK_DIVIDER_PAL;
             g_ppu_clock_divider = PPU_CLOCK_DIVIDER_PAL;
-            g_clock_divider_lcd = CLOCK_DIVIDER_LCD_PAL;
             break;
         case TIMING_MODE_DENDY:
             printf("Using Dendy system timing\n");
@@ -216,11 +223,12 @@ void initialize_system(Cartridge *cart) {
             g_master_clock_speed = MASTER_CLOCK_SPEED_DENDY;
             g_cpu_clock_divider = CPU_CLOCK_DIVIDER_DENDY;
             g_ppu_clock_divider = PPU_CLOCK_DIVIDER_DENDY;
-            g_clock_divider_lcd = CLOCK_DIVIDER_LCD_DENDY;
             break;
         default:
             printf("Unhandled case %d\n", cart->timing_mode);
             exit(1);
+
+        g_clock_divider_cd = g_cpu_clock_divider * g_ppu_clock_divider;
     }
 
     if (cart->prg_ram_size > 0) {
@@ -455,11 +463,14 @@ void system_start_oam_dma(uint8_t page) {
 }
 
 void do_system_loop(void) {
-    unsigned int cycles_per_interval = g_master_clock_speed / 1000.0 * SLEEP_INTERVAL;
+    unsigned int cycles_per_interval = g_master_clock_speed * SLEEP_INTERVAL / 1000000;
 
     unsigned int cycles_since_sleep = 0;
 
-    time_t last_sleep = 0;
+    uint64_t last_sleep = now_us();
+
+    int cycles_since_log = 0;
+    uint64_t last_log = now_us();
 
     while (true) {
         if (g_dead) {
@@ -467,8 +478,8 @@ void do_system_loop(void) {
         }
 
         if (!g_halted) {
-            bool tick_ppu = (g_cycle_index % g_ppu_clock_divider) == 0;
             bool tick_cpu = (g_cycle_index % g_cpu_clock_divider) == 0;
+            bool tick_ppu = (g_cycle_index % g_ppu_clock_divider) == 0;
 
             if (tick_ppu) {
                 cycle_ppu();
@@ -494,7 +505,7 @@ void do_system_loop(void) {
                 }
             }
 
-            if (++g_cycle_index == g_clock_divider_lcd) {
+            if (++g_cycle_index == g_clock_divider_cd) {
                 g_cycle_index = 0;
             }
 
@@ -504,11 +515,47 @@ void do_system_loop(void) {
             }
         }
 
+        #if THROTTLE_SPEED
         if (++cycles_since_sleep > cycles_per_interval) {
-            sleep_cp(SLEEP_INTERVAL - (clock() - last_sleep) / 1000);
+            uint64_t now = now_us();
+            uint64_t delta_us = now - last_sleep;
+
+            if (delta_us < SLEEP_INTERVAL) {
+                uint64_t sleep_for_us = SLEEP_INTERVAL - delta_us;
+
+                if (sleep_for_us > SLEEP_OVERHEAD) {
+                    sleep_for_us -= SLEEP_OVERHEAD;
+                    struct timespec sleep_for;
+                    sleep_for.tv_sec = sleep_for_us / 1000000;
+                    sleep_for.tv_nsec = (sleep_for_us % 1000000) * 1000;
+                    
+                    nanosleep(&sleep_for, &sleep_for);
+                }
+            }
+            
+            last_sleep = now_us();
+            
             cycles_since_sleep = 0;
-            last_sleep = clock();
         }
+        #endif
+
+        #if LOG_PERFORMANCE
+        if (cycles_since_log > g_master_clock_speed) {
+            cycles_since_log = 0;
+
+            uint64_t now = now_us();
+
+            uint64_t delta_us = now - last_log;
+            
+            float fraction = 1000000.0 / delta_us;
+
+            printf("Running at %.1f%% fullspeed\n", fraction * 100);
+
+            last_log = now;
+        } else {
+            cycles_since_log++;
+        }
+        #endif
     }
 }
 
