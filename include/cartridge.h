@@ -47,7 +47,7 @@ typedef struct cartridge {
     size_t chr_size; // in bytes
     MirroringMode mirror_mode;
     bool has_nv_ram;
-    bool ignore_mirror_ctrl;
+    bool four_screen_mode;
     size_t prg_ram_size;
     size_t prg_nvram_size;
     size_t chr_ram_size;

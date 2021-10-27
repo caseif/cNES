@@ -51,7 +51,7 @@
 #define CYCLES_PER_SCANLINE 341 // same across TV systems
 #define VBL_SCANLINE_TICK 1
 
-#define VRAM_SIZE 0x800
+#define VRAM_MAX_SIZE 0x1000
 #define PALETTE_RAM_SIZE 0x20
 #define OAM_PRIMARY_SIZE 0x100
 #define OAM_SECONDARY_SIZE 0x20
@@ -124,7 +124,7 @@ static PpuInternalRegisters g_ppu_internal_regs;
 static bool g_nmi_occurred = false;
 static bool g_nmi_occurred_buffer = false;
 
-static unsigned char g_name_table_mem[VRAM_SIZE];
+static unsigned char g_name_table_mem[VRAM_MAX_SIZE];
 static unsigned char g_palette_ram[PALETTE_RAM_SIZE];
 static Sprite g_oam_ram[OAM_PRIMARY_SIZE / sizeof(Sprite)];
 static Sprite g_secondary_oam_ram[OAM_SECONDARY_SIZE / sizeof(Sprite)];
@@ -397,7 +397,9 @@ void ppu_write_mmio(uint8_t index, uint8_t val) {
 uint16_t _translate_name_table_address(uint16_t addr) {
     assert(addr < 0x1000);
 
-    if (g_mirror_mode == MIRROR_SINGLE_LOWER) {
+    if (g_mirror_mode == MIRROR_FOUR_SCREEN) {
+        return addr;
+    } else if (g_mirror_mode == MIRROR_SINGLE_LOWER) {
         return addr % 0x400;
     } else if (g_mirror_mode == MIRROR_SINGLE_UPPER) {
         return (addr % 0x400) + 0x400;
@@ -1179,7 +1181,7 @@ void dump_vram(void) {
         return;
     }
 
-    fwrite(g_name_table_mem, VRAM_SIZE, 1, out_file);
+    fwrite(g_name_table_mem, VRAM_MAX_SIZE, 1, out_file);
     fwrite(g_palette_ram, PALETTE_RAM_SIZE, 1, out_file);
 
     fclose(out_file);

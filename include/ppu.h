@@ -166,8 +166,9 @@ typedef enum {
     RM_NORMAL, RM_NT0, RM_NT1, RM_NT2, RM_NT3, RM_PT
 } RenderMode;
 
-typedef enum MirroringMode {MIRROR_HORIZONTAL, MIRROR_VERTICAL,
-                            MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER} MirroringMode;
+typedef enum MirroringMode { MIRROR_HORIZONTAL, MIRROR_VERTICAL,
+                             MIRROR_SINGLE_LOWER, MIRROR_SINGLE_UPPER,
+                             MIRROR_FOUR_SCREEN } MirroringMode;
 
 void initialize_ppu(void);
 

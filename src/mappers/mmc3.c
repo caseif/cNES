@@ -229,7 +229,9 @@ static void _mmc3_ram_write(Cartridge *cart, uint16_t addr, uint8_t val) {
             return;
         }
         case 0xA000:
-            ppu_set_mirroring_mode((val & 1) ? MIRROR_HORIZONTAL : MIRROR_VERTICAL);
+            if (!cart->four_screen_mode && cart->mirror_mode == 0) {
+                ppu_set_mirroring_mode((val & 1) ? MIRROR_HORIZONTAL : MIRROR_VERTICAL);
+            }
             return;
         case 0xA001:
             // unimplemented for MMC3

@@ -270,7 +270,11 @@ void initialize_system(Cartridge *cart) {
             system_read_rst_line
     });
     initialize_ppu();
-    ppu_set_mirroring_mode(g_cart->mirror_mode ? MIRROR_VERTICAL : MIRROR_HORIZONTAL);
+    ppu_set_mirroring_mode(g_cart->four_screen_mode
+            ? MIRROR_FOUR_SCREEN
+            : g_cart->mirror_mode
+                ? MIRROR_VERTICAL
+                : MIRROR_HORIZONTAL);
 
     _init_controllers();
 

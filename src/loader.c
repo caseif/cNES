@@ -46,7 +46,7 @@ typedef struct {
     unsigned int mirror_mode:1;
     bool has_nv_ram:1;
     bool has_trainer:1;
-    bool ignore_mirror_ctrl:1;
+    bool four_screen_mode:1;
     unsigned int mapper_low:4;
 } Flag6;
 
@@ -262,7 +262,7 @@ Cartridge *load_rom(FILE *file, char *file_name) {
     cart->chr_size = chr_size * CHR_CHUNK_SIZE;
     cart->mirror_mode = flag6.mirror_mode;
     cart->has_nv_ram = flag6.has_nv_ram;
-    cart->ignore_mirror_ctrl = flag6.ignore_mirror_ctrl;
+    cart->four_screen_mode = flag6.four_screen_mode;
     cart->prg_ram_size = prg_ram_size;
     cart->prg_nvram_size = prg_nvram_size;
     cart->chr_ram_size = chr_ram_size;
