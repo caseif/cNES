@@ -21,13 +21,13 @@ cNES is partially derived from the now-defunct
 - No support for color masking
 - Certain games are broken in one way or another (see [compatibility list](https://github.com/caseif/cNES/wiki/Compatibility))
 
-### Planned Features
+## Planned Features
 
 - APU support
 - More mapper implementations
 - Color masking support
 
-### Non-goals
+## Non-goals
 
 - User-friendliness
   - This project is a technical challenge for myself, and as such a
@@ -37,11 +37,11 @@ cNES is partially derived from the now-defunct
   - Again, I'm interested in adding such a feature, but it's definitely not a
     priority.
 
-### Why?
+## Why?
 
 Mostly for educational purposes, and also for fun.
 
-### Special Thanks
+## Special Thanks
 
 - The NesDev [forums](https://forums.nesdev.com/) and
   [wiki](http://wiki.nesdev.com), which have been an invaluable resource in
@@ -51,7 +51,7 @@ Mostly for educational purposes, and also for fun.
 - Everyone responsible for the documents listed on the
   [resources page](doc/RESOURCES.md)
 
-### License
+## License
 
 cNES is published under the [MIT License](https://opensource.org/licenses/MIT).
 Use of its code and any provided assets is permitted per the terms of the
