@@ -8,18 +8,18 @@ cNES's CPU emulation is handled by its sister project,
 cNES is partially derived from the now-defunct
 [jNES](https://github.com/caseif/jNES).
 
-### Features
+## Features
 
 - Support for popular mappers (NROM, MMC1, UNROM, CNROM, MMC3, AxROM)
 - Cycle-accurate CPU and PPU emulation
 - Low-level emulation of PPU hardware latches/registers
 
-### Limitations
+## Limitations
 
 - No APU support
 - PPU timings are juuust a little bit off
 - No support for color masking
-- Certain games are broken in one way or another (see [compatibility list](doc/COMPATIBILITY.md))
+- Certain games are broken in one way or another (see [compatibility list](https://github.com/caseif/cNES/wiki/Compatibility))
 
 ### Planned Features
 
