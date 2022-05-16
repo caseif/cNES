@@ -36,7 +36,18 @@
 
 #define MAX_PATH_LEN 256
 
-#define CNES_DIR ".cnes"
+#define CNES_DIR "cnes"
+#define SAVES_DIR "saves"
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#define HOME_ENV_VAR "UserProfile"
+#define APP_DATA_ENV_VAR "LOCALAPPDATA"
+#define DEFAULT_DATA_PATH "AppData\\Local"
+#else
+#define HOME_ENV_VAR "HOME"
+#define APP_DATA_ENV_VAR "XDG_DATA_HOME"
+#define DEFAULT_DATA_PATH ".local/share"
+#endif
 
 static int pi_mkdir(const char *path) {
     struct stat st;
@@ -60,25 +71,56 @@ static char *pi_getcwd(char *path, size_t max_len) {
     #endif
 }
 
-static char *get_save_dir(void) {
-    char *home = getenv("HOME");
-    
+static char *get_data_dir(void) {
     bool must_free = false;
-    if (!home) {
-        home = malloc(MAX_PATH_LEN);
-        if (!pi_getcwd(home, MAX_PATH_LEN)) {
-            printf("Failed to get CWD\n");
-            return NULL;
+
+    char *data_dir;
+
+    const char *app_data_ev = getenv(APP_DATA_ENV_VAR);
+
+    if (app_data_ev != NULL && strlen(app_data_ev) > 0) {
+        data_dir = malloc(strlen(app_data_ev) + strlen(CNES_DIR) + 2);
+        sprintf(data_dir, "%s/%s", app_data_ev, CNES_DIR);
+    } else {
+        const char *home_ev = getenv(HOME_ENV_VAR);
+
+        if (home_ev != NULL && strlen(home_ev) > 0) {
+            data_dir = malloc(strlen(home_ev) + strlen(DEFAULT_DATA_PATH) + strlen(CNES_DIR) + 3);
+            sprintf(data_dir, "%s/%s/%s", home_ev, DEFAULT_DATA_PATH, CNES_DIR);
+        } else {
+            char *cwd = malloc(MAX_PATH_LEN);
+            if (!pi_getcwd(cwd, MAX_PATH_LEN)) {
+                printf("Failed to get working directory\n");
+                return NULL;
+            }
+
+            data_dir = malloc(strlen(cwd) + strlen(CNES_DIR) + 2);
+            sprintf(data_dir, "%s/%s", cwd, "." CNES_DIR);
+
+            free(cwd);
         }
-        must_free = true;
     }
 
-    char *full_dir = malloc(strlen(CNES_DIR) + strlen(home) + 2);
-    sprintf(full_dir, "%s/%s", home, CNES_DIR);
-    
-    if (must_free) {
-        free(home);
+    if (pi_mkdir(data_dir) != 0) {
+        printf("Failed to create app data directory at %s\n", data_dir);
+        free(data_dir);
+        return NULL;
     }
+
+    return data_dir;
+}
+
+static char *get_save_dir(void) {
+    char *data_dir = get_data_dir();
+
+    if (data_dir == NULL) {
+        return NULL;
+    }
+
+    char *full_dir = malloc(strlen(data_dir) + strlen(SAVES_DIR) + 2);
+    sprintf(full_dir, "%s/%s", data_dir, SAVES_DIR);
+
+    free(data_dir);
 
     return full_dir;
 }
@@ -86,7 +128,7 @@ static char *get_save_dir(void) {
 static FILE *_open_game_file(char *game_title, char *file_name, char *flags) {
     char *save_dir = get_save_dir();
 
-    if (!save_dir) {
+    if (save_dir == NULL) {
         printf("Failed to get save directory while opening %s\n", file_name);
         return NULL;
     }
