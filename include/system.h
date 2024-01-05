@@ -105,4 +105,4 @@ void system_set_rst_cycles(unsigned int cycles);
 
 void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color);
 
-void system_flush_frame(void);
+void system_submit_frame(void);

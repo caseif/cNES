@@ -607,6 +607,6 @@ void system_emit_pixel(unsigned int x, unsigned int y, const RGBValue color) {
     set_pixel(x, y, color);
 }
 
-void system_flush_frame(void) {
-    flush_frame();
+void system_submit_frame(void) {
+    submit_frame();
 }

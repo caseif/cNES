@@ -40,6 +40,8 @@
 #define VIEWPORT_H RESOLUTION_H
 #define VIEWPORT_V (VIEWPORT_BOTTOM - VIEWPORT_TOP + 1)
 
+typedef unsigned char pixel_buffer_t[VIEWPORT_V][VIEWPORT_H][RGB_CHANNELS];
+
 static SDL_Window *g_window;
 static SDL_Renderer *g_renderer;
 
@@ -47,9 +49,15 @@ static LinkedList g_callbacks = {0};
 
 static RGBValue g_pixel_buffer[RESOLUTION_H][RESOLUTION_V];
 
-static unsigned char g_pixel_rgb_data[VIEWPORT_V][VIEWPORT_H][RGB_CHANNELS];
+static pixel_buffer_t g_pixel_rgb_data_1;
+static pixel_buffer_t g_pixel_rgb_data_2;
+
+static pixel_buffer_t *g_pixel_buffer_front = &g_pixel_rgb_data_1;
+static pixel_buffer_t *g_pixel_buffer_back = &g_pixel_rgb_data_2;
 
 static SDL_Texture *g_texture;
+
+bool g_close_requested = false;
 
 void _close_listener(SDL_Event *event) {
     switch (event->type) {
@@ -61,6 +69,7 @@ void _close_listener(SDL_Event *event) {
         case SDL_QUIT:
             kill_execution();
             close_window();
+            g_close_requested = true;
             return;
     }
 }
@@ -82,16 +91,24 @@ void initialize_window() {
 }
 
 void do_window_loop(void) {
-    SDL_Event event;
+    while (true) {
+        SDL_Event event;
 
-    while (SDL_WaitEvent(&event)) {
-        LinkedList *item = &g_callbacks;
-        do {
-            if (item->value != NULL) {
-                ((EventCallback) item->value)(&event);
-            }
-            item = item->next;
-        } while (item != NULL);
+        if (SDL_PollEvent(&event)) {
+            LinkedList *item = &g_callbacks;
+            do {
+                if (item->value != NULL) {
+                    ((EventCallback) item->value)(&event);
+                }
+                item = item->next;
+            } while (item != NULL);
+        }
+
+        draw_frame();
+
+        if (g_close_requested) {
+            break;
+        }
 
         SDL_PumpEvents();
     }
@@ -127,19 +144,11 @@ void initialize_renderer(void) {
             VIEWPORT_H, VIEWPORT_V);
 }
 
-void _render_frame(void) {
-    SDL_UpdateTexture(g_texture, NULL, g_pixel_rgb_data, VIEWPORT_H * RGB_CHANNELS);
-
-    SDL_RenderCopy(g_renderer, g_texture, NULL, NULL);
-
-    SDL_RenderPresent(g_renderer);
-};
-
 void set_pixel(unsigned int x, unsigned int y, const RGBValue rgb) {
     g_pixel_buffer[x][y] = rgb;
 }
 
-void flush_frame(void) {
+void submit_frame(void) {
     for (unsigned int x = 0; x < RESOLUTION_H; x++) {
         for (unsigned int y = 0; y < RESOLUTION_V; y++) {
             if (y < VIEWPORT_TOP || y > VIEWPORT_BOTTOM) {
@@ -148,11 +157,22 @@ void flush_frame(void) {
 
             const RGBValue rgb = g_pixel_buffer[x][y];
 
-            g_pixel_rgb_data[y - VIEWPORT_TOP][x][0] = rgb.r;
-            g_pixel_rgb_data[y - VIEWPORT_TOP][x][1] = rgb.g;
-            g_pixel_rgb_data[y - VIEWPORT_TOP][x][2] = rgb.b;
+            (*g_pixel_buffer_back)[y - VIEWPORT_TOP][x][0] = rgb.r;
+            (*g_pixel_buffer_back)[y - VIEWPORT_TOP][x][1] = rgb.g;
+            (*g_pixel_buffer_back)[y - VIEWPORT_TOP][x][2] = rgb.b;
         }
     }
 
-    _render_frame();
+    pixel_buffer_t *new_front = g_pixel_buffer_back;
+    g_pixel_buffer_back = g_pixel_buffer_front;
+    g_pixel_buffer_front = new_front;
+    memcpy(*g_pixel_buffer_back, *g_pixel_buffer_front, sizeof(pixel_buffer_t));
+}
+
+void draw_frame(void) {
+    SDL_UpdateTexture(g_texture, NULL, g_pixel_buffer_front, VIEWPORT_H * RGB_CHANNELS);
+
+    SDL_RenderCopy(g_renderer, g_texture, NULL, NULL);
+
+    SDL_RenderPresent(g_renderer);
 }

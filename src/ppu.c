@@ -1168,7 +1168,7 @@ void cycle_ppu(void) {
 
             g_odd_frame = !g_odd_frame;
 
-            system_flush_frame();
+            system_submit_frame();
         }
     }
 }

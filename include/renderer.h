@@ -52,6 +52,8 @@ void initialize_renderer(void);
 
 void set_pixel(unsigned int x, unsigned int y, const RGBValue rgb);
 
-void flush_frame(void);
+void submit_frame(void);
+
+void draw_frame(void);
 
 void close_window(void);

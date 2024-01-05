@@ -41,9 +41,12 @@
 
 #define SDL_MAIN_HANDLED 1
 
+extern bool g_close_requested;
+
 void interrupt_handler(int signum) {
     kill_execution();
     close_window();
+    g_close_requested = true;
 }
 
 void *_start_system_thread(void *_) {
