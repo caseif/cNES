@@ -227,9 +227,9 @@ void initialize_system(Cartridge *cart) {
         default:
             printf("Unhandled case %d\n", cart->timing_mode);
             exit(1);
-
-        g_clock_divider_cd = g_cpu_clock_divider * g_ppu_clock_divider;
     }
+
+    g_clock_divider_cd = g_cpu_clock_divider * g_ppu_clock_divider;
 
     if (cart->prg_ram_size > 0) {
         g_prg_ram_size = cart->prg_ram_size;
